@@ -1,0 +1,53 @@
+---
+title: Arcnem Vision
+description: 機械に「見る」を教え、エージェントに「どうするか」を任せる。
+template: splash
+hero:
+  tagline: 写真をアップロードすると、LangGraphでオーケストレーションされ、MCPで接続され、データベースから設定されたAIエージェント群が、エンベディングの生成、説明文の作成、意味による検索を可能にします。
+  image:
+    file: ../../../assets/logo.svg
+  actions:
+    - text: クイックスタート
+      link: /ja/getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: GitHubで見る
+      link: https://github.com/arcnem-ai/arcnem-vision
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## 特徴
+
+<CardGrid stagger>
+  <Card title="データベース駆動のエージェントグラフ" icon="setting">
+    AIワークフローをコードではなく行として定義。再デプロイなしで組織ごとに処理パイプラインを切り替え可能。
+  </Card>
+  <Card title="GenUIチャットインターフェース" icon="puzzle">
+    AIはテキストで返答するだけではない。カード、ギャラリー、インタラクティブコンポーネントなど、実際のFlutterウィジェットをJSONからランタイムで生成。
+  </Card>
+  <Card title="オンデバイスGemma" icon="laptop">
+    インテント解析はネットワークに到達する前にスマートフォン上でローカル実行。デフォルトでプライバシー重視。
+  </Card>
+  <Card title="CLIPベクトル検索" icon="magnifier">
+    画像とその説明文を同一の768次元空間に埋め込み。画像で検索、テキストで検索、雰囲気で検索。
+  </Card>
+  <Card title="ビジュアルワークフロービルダー" icon="pencil">
+    Reactダッシュボードでエージェントグラフをドラッグ＆ドロップ：ワーカー、ツール、スーパーバイザー、エッジ、すべてを視覚的に構築。
+  </Card>
+  <Card title="MCPツールがファーストクラス" icon="open-book">
+    オープンなModel Context Protocolに準拠した5つの登録ツール。エージェントが呼び出す。あなたも呼び出せる。
+  </Card>
+</CardGrid>
+
+## 技術スタック
+
+| レイヤー | 技術 | 役割 |
+|---|---|---|
+| **クライアント** | Flutter, Dart, flutter_gemma, GenUI, fpdart | カメラキャプチャ、オンデバイスLLM、AI生成UI、関数型エラーハンドリング |
+| **API** | Bun, Hono, better-auth, Inngest, Pino | RESTルート、署名付きアップロード、ジョブスケジューリング、構造化ログ |
+| **ダッシュボード** | React 19, TanStack Router, Tailwind, shadcn/ui | ワークフロービルダー、ドキュメントビューア、管理インターフェース |
+| **エージェント** | Go, Gin, LangGraph, LangChain, inngestgo | グラフベースのエージェントオーケストレーション、ReActワーカー、ステップレベルトレーシング |
+| **MCP** | Go, MCP go-sdk, replicate-go, GORM | CLIPエンベディング、説明文生成、類似検索ツール |
+| **ストレージ** | Postgres 18 + pgvector, S3互換, Redis | ベクターインデックス、オブジェクトストレージ、セッションキャッシュ |

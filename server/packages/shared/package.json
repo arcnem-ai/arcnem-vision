@@ -1,0 +1,11 @@
+{
+  "name": "@arcnem-vision/shared",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "types": "./src/index.ts"
+}

@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+node_modules
+bin
+tmp
+site/dist
+site/.astro

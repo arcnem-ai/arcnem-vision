@@ -1,0 +1,53 @@
+---
+title: Arcnem Vision
+description: Teach machines to see. Let agents decide what to do about it.
+template: splash
+hero:
+  tagline: Upload a photo, and a swarm of AI agents — orchestrated by LangGraph, connected through MCP, and configured from a database — will generate embeddings, write descriptions, and make everything searchable by meaning.
+  image:
+    file: ../../assets/logo.svg
+  actions:
+    - text: Get Started
+      link: /getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/arcnem-ai/arcnem-vision
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Features
+
+<CardGrid stagger>
+  <Card title="Database-driven agent graphs" icon="setting">
+    Define AI workflows as rows, not code. Swap processing pipelines per organization without redeploying anything.
+  </Card>
+  <Card title="GenUI chat interface" icon="puzzle">
+    The AI generates real Flutter widgets at runtime — cards, galleries, interactive components — composed from JSON.
+  </Card>
+  <Card title="On-device Gemma" icon="laptop">
+    Intent parsing happens locally on the phone before anything hits the network. Private by default.
+  </Card>
+  <Card title="CLIP vector search" icon="magnifier">
+    Images and descriptions embedded in the same 768-dimensional space. Search by image, by text, or by vibes.
+  </Card>
+  <Card title="Visual workflow builder" icon="pencil">
+    A React dashboard where you drag-and-drop agent graphs: workers, tools, supervisors, edges, the whole thing.
+  </Card>
+  <Card title="MCP tools as a first-class primitive" icon="open-book">
+    Five registered tools following the open Model Context Protocol standard. Agents call them. You can too.
+  </Card>
+</CardGrid>
+
+## Tech Stack
+
+| Layer | Tech | What it does |
+|---|---|---|
+| **Client** | Flutter, Dart, flutter_gemma, GenUI, fpdart | Camera capture, on-device LLM, AI-generated UI, functional error handling |
+| **API** | Bun, Hono, better-auth, Inngest, Pino | REST routes, presigned uploads, durable job scheduling, structured logging |
+| **Dashboard** | React 19, TanStack Router, Tailwind, shadcn/ui | Workflow builder, document viewer, admin interface |
+| **Agents** | Go, Gin, LangGraph, LangChain, inngestgo | Graph-based agent orchestration, ReAct workers, step-level tracing |
+| **MCP** | Go, MCP go-sdk, replicate-go, GORM | CLIP embeddings, description generation, similarity search tools |
+| **Storage** | Postgres 18 + pgvector, S3-compatible, Redis | Vector indexes, object storage, session cache |
