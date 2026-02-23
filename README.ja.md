@@ -241,7 +241,6 @@ cd client && flutter test                      # Flutterテスト
 | ドキュメント                               | 内容                                                                                   |
 | ------------------------------------------ | -------------------------------------------------------------------------------------- |
 | [site/](site/)                             | オンボーディングと参照用のローカルドキュメントサイト（Starlight）                      |
-| [docs/README.md](docs/README.md)           | ディープダイブ一覧と運用方針                                                           |
 | [docs/embeddings.md](docs/embeddings.md)   | 現在のエンベディング実装と運用上の制約                                                 |
 | [docs/langgraphgo.md](docs/langgraphgo.md) | グラフオーケストレーションパターン、並列実行、チェックポイント、ヒューマンインザループ |
 | [docs/langchaingo.md](docs/langchaingo.md) | LLMプロバイダー、チェーン、エージェント、ツール、MCPブリッジ                           |

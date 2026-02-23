@@ -241,7 +241,6 @@ cd client && flutter test                      # Flutter tests
 | Doc                                        | What's in it                                                                       |
 | ------------------------------------------ | ---------------------------------------------------------------------------------- |
 | [site/](site/)                             | Local docs site (Starlight) for onboarding and reference pages                     |
-| [docs/README.md](docs/README.md)           | Deep-dive map and documentation maintenance guidance                               |
 | [docs/embeddings.md](docs/embeddings.md)   | Current embedding implementation and operational constraints                       |
 | [docs/langgraphgo.md](docs/langgraphgo.md) | Graph orchestration patterns, parallel execution, checkpointing, human-in-the-loop |
 | [docs/langchaingo.md](docs/langchaingo.md) | LLM providers, chains, agents, tools, MCP bridging                                 |
