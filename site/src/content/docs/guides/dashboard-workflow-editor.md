@@ -10,6 +10,7 @@ The dashboard (`server/packages/dashboard`) is where operators configure orchest
 - **Projects & Devices**: assign a workflow to each device.
 - **Workflow Library**: create/edit graph workflows.
 - **Documents**: browse uploads and run embedding-based search.
+- **Runs**: view agent graph execution history and inspect per-step details.
 
 ## Building workflows
 
@@ -73,3 +74,13 @@ In **Documents**, search with natural language (example: `red bike by a window`)
 - Matched cards show a similarity badge (for example `92% match`).
 
 Use this view to validate that the ingestion + embedding pipeline is producing useful retrieval behavior.
+
+## Viewing runs
+
+The **Runs** tab lists every agent graph execution with its status, workflow name, timestamp, and duration.
+
+- **Status**: each run is marked `completed`, `running`, or `failed`.
+- **Expand a run** to see its steps. Each step shows the node key, execution order, duration, and the state delta it produced.
+- **Initial / Final State**: the full graph state before the first step and after the last step are shown as JSON.
+- **Errors**: if a run or step failed, the error message is displayed inline.
+- Older runs load on demand via **Load more**.
