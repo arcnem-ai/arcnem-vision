@@ -33,14 +33,14 @@ Four languages. Five services. One pipeline from camera shutter to semantic sear
 
 ## Tech Stack
 
-| Layer | Tech | What it does |
-|---|---|---|
-| **Client** | Flutter, Dart, flutter_gemma, GenUI, fpdart | Camera capture, on-device LLM, AI-generated UI, functional error handling |
-| **API** | Bun, Hono, better-auth, Inngest, Pino | REST routes, presigned uploads, durable job scheduling, structured logging |
-| **Dashboard** | React 19, TanStack Router, Tailwind, shadcn/ui | Workflow builder, document viewer, admin interface |
-| **Agents** | Go, Gin, LangGraph, LangChain, inngestgo | Graph-based agent orchestration, ReAct workers, step-level tracing |
-| **MCP** | Go, MCP go-sdk, replicate-go, GORM | CLIP embeddings, description generation, similarity search tools |
-| **Storage** | Postgres 18 + pgvector, S3-compatible, Redis | Vector indexes, object storage, session cache |
+| Layer         | Tech                                           | What it does                                                               |
+| ------------- | ---------------------------------------------- | -------------------------------------------------------------------------- |
+| **Client**    | Flutter, Dart, flutter_gemma, GenUI, fpdart    | Camera capture, on-device LLM, AI-generated UI, functional error handling  |
+| **API**       | Bun, Hono, better-auth, Inngest, Pino          | REST routes, presigned uploads, durable job scheduling, structured logging |
+| **Dashboard** | React 19, TanStack Router, Tailwind, shadcn/ui | Workflow builder, document viewer, admin interface                         |
+| **Agents**    | Go, Gin, LangGraph, LangChain, inngestgo       | Graph-based agent orchestration, ReAct workers, step-level tracing         |
+| **MCP**       | Go, MCP go-sdk, replicate-go, GORM             | CLIP embeddings, description generation, similarity search tools           |
+| **Storage**   | Postgres 18 + pgvector, S3-compatible, Redis   | Vector indexes, object storage, session cache                              |
 
 ## Architecture
 
@@ -72,6 +72,7 @@ Four languages. Five services. One pipeline from camera shutter to semantic sear
 **The pipeline:** Client captures image → API issues presigned S3 URL → Client uploads directly → API acknowledges and fires Inngest event → Go agent service loads the document's agent graph from Postgres → LangGraph builds and executes the workflow → Worker nodes call LLMs, tool nodes call MCP → MCP generates CLIP embeddings and descriptions → Everything lands in Postgres with HNSW cosine indexes → Searchable by meaning.
 
 **Agent graphs are data, not code.** Templates define reusable workflows with nodes, edges, and tools. Instances bind templates to organizations. Three node types:
+
 - **Worker** — ReAct agent with access to MCP tools
 - **Tool** — Single MCP tool invocation with input/output mapping
 - **Supervisor** — Multi-agent orchestration across workers
@@ -125,6 +126,7 @@ cp client/.env.example              client/.env
 ```
 
 You'll need:
+
 - **S3-compatible storage config** — default local dev uses MinIO from `docker-compose.yaml`. Set the following in `server/packages/api/.env`, `server/packages/db/.env`, and `models/agents/.env`:
   - `S3_ACCESS_KEY_ID=minioadmin`
   - `S3_SECRET_ACCESS_KEY=minioadmin`
@@ -236,14 +238,14 @@ cd client && flutter test                      # Flutter tests
 
 ## Documentation
 
-| Doc | What's in it |
-|---|---|
-| [site/](site/) | Local docs site (Starlight) for onboarding and reference pages |
-| [docs/README.md](docs/README.md) | Deep-dive map and documentation maintenance guidance |
-| [docs/embeddings.md](docs/embeddings.md) | Current embedding implementation and operational constraints |
+| Doc                                        | What's in it                                                                       |
+| ------------------------------------------ | ---------------------------------------------------------------------------------- |
+| [site/](site/)                             | Local docs site (Starlight) for onboarding and reference pages                     |
+| [docs/README.md](docs/README.md)           | Deep-dive map and documentation maintenance guidance                               |
+| [docs/embeddings.md](docs/embeddings.md)   | Current embedding implementation and operational constraints                       |
 | [docs/langgraphgo.md](docs/langgraphgo.md) | Graph orchestration patterns, parallel execution, checkpointing, human-in-the-loop |
-| [docs/langchaingo.md](docs/langchaingo.md) | LLM providers, chains, agents, tools, MCP bridging |
-| [docs/genui.md](docs/genui.md) | Flutter GenUI SDK, DataModel binding, A2UI protocol, custom widgets |
+| [docs/langchaingo.md](docs/langchaingo.md) | LLM providers, chains, agents, tools, MCP bridging                                 |
+| [docs/genui.md](docs/genui.md)             | Flutter GenUI SDK, DataModel binding, A2UI protocol, custom widgets                |
 
 ## Contributing
 
@@ -252,5 +254,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor workflow. If you use AI c
 ---
 
 <p align="center">
-  Built by <a href="https://arcnem.ai">Arcnem</a> in Tokyo.
+  Built by <a href="https://arcnem.ai">Arcnem AI</a> in Tokyo.
 </p>

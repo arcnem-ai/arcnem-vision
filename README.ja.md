@@ -33,14 +33,14 @@ Arcnem Visionは、画像を「理解」に変えるオープンソースプラ�
 
 ## 技術スタック
 
-| レイヤー | 技術 | 役割 |
-|---|---|---|
-| **クライアント** | Flutter, Dart, flutter_gemma, GenUI, fpdart | カメラキャプチャ、オンデバイスLLM、AI生成UI、関数型エラーハンドリング |
-| **API** | Bun, Hono, better-auth, Inngest, Pino | RESTルート、署名付きアップロード、ジョブスケジューリング、構造化ログ |
-| **ダッシュボード** | React 19, TanStack Router, Tailwind, shadcn/ui | ワークフロービルダー、ドキュメントビューア、管理インターフェース |
-| **エージェント** | Go, Gin, LangGraph, LangChain, inngestgo | グラフベースのエージェントオーケストレーション、ReActワーカー、ステップレベルトレーシング |
-| **MCP** | Go, MCP go-sdk, replicate-go, GORM | CLIPエンベディング、説明文生成、類似検索ツール |
-| **ストレージ** | Postgres 18 + pgvector, S3互換, Redis | ベクターインデックス、オブジェクトストレージ、セッションキャッシュ |
+| レイヤー           | 技術                                           | 役割                                                                                      |
+| ------------------ | ---------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **クライアント**   | Flutter, Dart, flutter_gemma, GenUI, fpdart    | カメラキャプチャ、オンデバイスLLM、AI生成UI、関数型エラーハンドリング                     |
+| **API**            | Bun, Hono, better-auth, Inngest, Pino          | RESTルート、署名付きアップロード、ジョブスケジューリング、構造化ログ                      |
+| **ダッシュボード** | React 19, TanStack Router, Tailwind, shadcn/ui | ワークフロービルダー、ドキュメントビューア、管理インターフェース                          |
+| **エージェント**   | Go, Gin, LangGraph, LangChain, inngestgo       | グラフベースのエージェントオーケストレーション、ReActワーカー、ステップレベルトレーシング |
+| **MCP**            | Go, MCP go-sdk, replicate-go, GORM             | CLIPエンベディング、説明文生成、類似検索ツール                                            |
+| **ストレージ**     | Postgres 18 + pgvector, S3互換, Redis          | ベクターインデックス、オブジェクトストレージ、セッションキャッシュ                        |
 
 ## アーキテクチャ
 
@@ -72,6 +72,7 @@ Arcnem Visionは、画像を「理解」に変えるオープンソースプラ�
 **パイプライン：** クライアントが画像をキャプチャ → APIが署名付きS3 URLを発行 → クライアントが直接アップロード → APIが確認してInngestイベントを発火 → GoエージェントサービスがPostgresからドキュメントのエージェントグラフを読み込み → LangGraphがワークフローを構築・実行 → ワーカーノードがLLMを呼び出し、ツールノードがMCPを呼び出し → MCPがCLIPエンベディングと説明文を生成 → すべてがHNSWコサインインデックス付きでPostgresに格納 → 意味で検索可能に。
 
 **エージェントグラフはコードではなくデータ。** テンプレートがノード、エッジ、ツールを持つ再利用可能なワークフローを定義。インスタンスがテンプレートを組織にバインド。3つのノードタイプ：
+
 - **Worker** — MCPツールにアクセスできるReActエージェント
 - **Tool** — 入出力マッピング付きの単一MCPツール呼び出し
 - **Supervisor** — ワーカー間のマルチエージェントオーケストレーション
@@ -125,6 +126,7 @@ cp client/.env.example              client/.env
 ```
 
 必要なもの：
+
 - **S3互換ストレージ設定** — ローカル開発のデフォルトは`docker-compose.yaml`のMinIO。`server/packages/api/.env`、`server/packages/db/.env`、`models/agents/.env`に次を設定：
   - `S3_ACCESS_KEY_ID=minioadmin`
   - `S3_SECRET_ACCESS_KEY=minioadmin`
@@ -236,14 +238,14 @@ cd client && flutter test                      # Flutterテスト
 
 ## ドキュメント
 
-| ドキュメント | 内容 |
-|---|---|
-| [site/](site/) | オンボーディングと参照用のローカルドキュメントサイト（Starlight） |
-| [docs/README.md](docs/README.md) | ディープダイブ一覧と運用方針 |
-| [docs/embeddings.md](docs/embeddings.md) | 現在のエンベディング実装と運用上の制約 |
+| ドキュメント                               | 内容                                                                                   |
+| ------------------------------------------ | -------------------------------------------------------------------------------------- |
+| [site/](site/)                             | オンボーディングと参照用のローカルドキュメントサイト（Starlight）                      |
+| [docs/README.md](docs/README.md)           | ディープダイブ一覧と運用方針                                                           |
+| [docs/embeddings.md](docs/embeddings.md)   | 現在のエンベディング実装と運用上の制約                                                 |
 | [docs/langgraphgo.md](docs/langgraphgo.md) | グラフオーケストレーションパターン、並列実行、チェックポイント、ヒューマンインザループ |
-| [docs/langchaingo.md](docs/langchaingo.md) | LLMプロバイダー、チェーン、エージェント、ツール、MCPブリッジ |
-| [docs/genui.md](docs/genui.md) | Flutter GenUI SDK、DataModelバインディング、A2UIプロトコル、カスタムウィジェット |
+| [docs/langchaingo.md](docs/langchaingo.md) | LLMプロバイダー、チェーン、エージェント、ツール、MCPブリッジ                           |
+| [docs/genui.md](docs/genui.md)             | Flutter GenUI SDK、DataModelバインディング、A2UIプロトコル、カスタムウィジェット       |
 
 ## コントリビューション
 
@@ -252,5 +254,5 @@ cd client && flutter test                      # Flutterテスト
 ---
 
 <p align="center">
-  東京の<a href="https://arcnem.ai">Arcnem</a>が開発。
+  東京の<a href="https://arcnem.ai">Arcnem AI</a>が開発。
 </p>
