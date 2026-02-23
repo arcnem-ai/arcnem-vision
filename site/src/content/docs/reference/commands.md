@@ -12,6 +12,12 @@ cd server/packages/db && bun run db:studio     # Drizzle Studio UI
 cd server/packages/db && bun run db:seed       # Seed data
 ```
 
+## Infrastructure
+
+```bash
+docker compose up -d postgres redis minio minio-init
+```
+
 ## Go Model Generation
 
 After schema changes, regenerate Go models from the Drizzle-managed Postgres schema:

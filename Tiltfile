@@ -10,6 +10,14 @@ dc_resource('redis',
   labels=['infrastructure']
 )
 
+dc_resource('minio',
+  labels=['infrastructure']
+)
+
+dc_resource('minio-init',
+  labels=['infrastructure']
+)
+
 local_resource('inngest',
   serve_cmd='npx inngest-cli@latest dev -u http://localhost:3020/api/inngest',
   resource_deps=['agents'],
@@ -85,7 +93,7 @@ local_resource('agents',
 
 local_resource('server',
   serve_cmd='cd server/packages/api && bun run dev',
-  resource_deps=['server_deps', 'db_migrate', 'redis', 'inngest'],
+  resource_deps=['server_deps', 'db_migrate', 'redis', 'inngest', 'minio-init'],
   labels=['services']
 )
 

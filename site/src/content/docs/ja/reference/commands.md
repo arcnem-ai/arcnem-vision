@@ -12,6 +12,12 @@ cd server/packages/db && bun run db:studio     # Drizzle Studio UI
 cd server/packages/db && bun run db:seed       # シードデータ
 ```
 
+## インフラ
+
+```bash
+docker compose up -d postgres redis minio minio-init
+```
+
 ## Goモデル生成
 
 スキーマ変更後、Drizzle管理のPostgresスキーマからGoモデルを再生成：

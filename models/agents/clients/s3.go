@@ -3,9 +3,10 @@ package clients
 import (
 	"context"
 	"fmt"
-	"io"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -19,15 +20,27 @@ type S3Config struct {
 	BucketName      string
 	Endpoint        string
 	Region          string
+	UsePathStyle    bool
 }
 
 func LoadS3Config() S3Config {
+	usePathStyleRaw := strings.TrimSpace(os.Getenv("S3_USE_PATH_STYLE"))
+	usePathStyle := false
+	if usePathStyleRaw != "" {
+		v, err := strconv.ParseBool(usePathStyleRaw)
+		if err != nil {
+			log.Fatalf("invalid S3_USE_PATH_STYLE value %q: %v", usePathStyleRaw, err)
+		}
+		usePathStyle = v
+	}
+
 	s3Config := S3Config{
 		AccessKeyID:     os.Getenv("S3_ACCESS_KEY_ID"),
 		AccessKeySecret: os.Getenv("S3_SECRET_ACCESS_KEY"),
 		BucketName:      os.Getenv("S3_BUCKET"),
 		Endpoint:        os.Getenv("S3_ENDPOINT"),
 		Region:          os.Getenv("S3_REGION"),
+		UsePathStyle:    usePathStyle,
 	}
 
 	if s3Config.AccessKeyID == "" || s3Config.AccessKeySecret == "" || s3Config.BucketName == "" || s3Config.Endpoint == "" || s3Config.Region == "" {
@@ -58,7 +71,9 @@ func NewS3Client(ctx context.Context) *S3Client {
 		log.Fatalf("failed to load S3 config: %v", err)
 	}
 
-	s3Client := s3.NewFromConfig(cfg)
+	s3Client := s3.NewFromConfig(cfg, func(options *s3.Options) {
+		options.UsePathStyle = s3Config.UsePathStyle
+	})
 
 	return &S3Client{
 		s3Client: s3Client,
@@ -66,37 +81,20 @@ func NewS3Client(ctx context.Context) *S3Client {
 	}
 }
 
-func (c *S3Client) Download(ctx context.Context, key string) ([]byte, error) {
-	resp, err := c.s3Client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: &c.config.BucketName,
-		Key:    &key,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("GetObject %s: %w", key, err)
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading %s: %w", key, err)
-	}
-	return bodyBytes, nil
-}
-
-func (c *S3Client) PresignDownload(ctx context.Context, key string, expiresIn time.Duration) (string, error) {
+func (c *S3Client) PresignDownload(ctx context.Context, bucket string, key string, expiresIn time.Duration) (string, error) {
 	if expiresIn <= 0 {
 		expiresIn = 15 * time.Minute
 	}
 
 	presignClient := s3.NewPresignClient(c.s3Client)
 	req, err := presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket: &c.config.BucketName,
+		Bucket: &bucket,
 		Key:    &key,
 	}, func(opts *s3.PresignOptions) {
 		opts.Expires = expiresIn
 	})
 	if err != nil {
-		return "", fmt.Errorf("PresignGetObject %s: %w", key, err)
+		return "", fmt.Errorf("PresignGetObject bucket=%s key=%s: %w", bucket, key, err)
 	}
 
 	return req.URL, nil

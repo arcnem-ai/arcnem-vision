@@ -11,7 +11,7 @@ description: Arcnem Visionをクローン、設定、ローカルで実行する
 - CompileDaemon（`tilt up` のGoホットリロード用）
 - Flutter SDK（クライアント）
 - Inngest CLI（`npx inngest-cli@latest`）
-- ホストされたS3互換オブジェクトストレージバケット（S3 / R2 / Railway など）
+- S3互換オブジェクトストレージ（Docker ComposeのローカルMinIO、またはS3/R2/Railway等のホスト型）
 - Tilt（推奨）
 
 ## 1. クローンとインストール
@@ -38,7 +38,14 @@ cp client/.env.example              client/.env
 ```
 
 必要なもの：
-- **ホストされたS3互換バケット** — エンドポイント、バケット、認証情報を`server/packages/api/.env`と`models/agents/.env`に（例: AWS S3 / Cloudflare R2 / Railway Object Storage）
+- **S3互換ストレージ設定** — ローカル開発のデフォルトは`docker-compose.yaml`のMinIO。`server/packages/api/.env`、`server/packages/db/.env`、`models/agents/.env`に次を設定：
+  - `S3_ACCESS_KEY_ID=minioadmin`
+  - `S3_SECRET_ACCESS_KEY=minioadmin`
+  - `S3_BUCKET=arcnem-vision`
+  - `S3_ENDPOINT=http://localhost:9000`
+  - `S3_REGION=us-east-1`
+  - `S3_USE_PATH_STYLE=true`（agentsのみ）
+- **またはホスト型S3互換バケット** — AWS S3 / Cloudflare R2 / Railway Object Storage など
 - **OpenAI APIキー** — `models/agents/.env`に`OPENAI_API_KEY`
 - **Replicateトークン** — `models/mcp/.env`に`REPLICATE_API_TOKEN`
 - **データベースURL** — DB関連のenvファイルに`postgres://postgres:postgres@localhost:5480/postgres`
@@ -46,7 +53,7 @@ cp client/.env.example              client/.env
 ## 3. インフラの起動
 
 ```bash
-docker compose up -d postgres redis
+docker compose up -d postgres redis minio minio-init
 ```
 
 ## 4. マイグレーションとシード

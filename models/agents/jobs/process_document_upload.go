@@ -46,7 +46,12 @@ func ProcessDocumentUpload(ctx context.Context, input inngestgo.Input[inputs.Pro
 	}
 
 	tempURL, err := step.Run(ctx, "get-doc-temp-link", func(ctx context.Context) (string, error) {
-		return s3Client.PresignDownload(ctx, result.Document.ObjectKey, 15*time.Minute)
+		return s3Client.PresignDownload(
+			ctx,
+			result.Document.Bucket,
+			result.Document.ObjectKey,
+			15*time.Minute,
+		)
 	})
 	if err != nil {
 		return nil, inngestgo.NoRetryError(fmt.Errorf("Failed to produce temp url for document %v", err))

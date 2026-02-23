@@ -11,7 +11,7 @@ description: Clone, configure, and run Arcnem Vision locally.
 - CompileDaemon (Go hot reload for `tilt up`)
 - Flutter SDK (client)
 - Inngest CLI (`npx inngest-cli@latest`)
-- Hosted S3-compatible object storage bucket (S3 / R2 / Railway / etc.)
+- S3-compatible object storage (local MinIO via Docker Compose, or hosted S3/R2/Railway/etc.)
 - Tilt (recommended)
 
 ## 1. Clone and install
@@ -38,7 +38,14 @@ cp client/.env.example              client/.env
 ```
 
 You'll need:
-- **Hosted S3-compatible bucket** — endpoint, bucket, and credentials in `server/packages/api/.env` and `models/agents/.env` (for example AWS S3, Cloudflare R2, Railway Object Storage)
+- **S3-compatible storage config** — default local dev uses MinIO from `docker-compose.yaml`. Set the following in `server/packages/api/.env`, `server/packages/db/.env`, and `models/agents/.env`:
+  - `S3_ACCESS_KEY_ID=minioadmin`
+  - `S3_SECRET_ACCESS_KEY=minioadmin`
+  - `S3_BUCKET=arcnem-vision`
+  - `S3_ENDPOINT=http://localhost:9000`
+  - `S3_REGION=us-east-1`
+  - `S3_USE_PATH_STYLE=true` (agents only)
+- **Or hosted S3-compatible bucket** — AWS S3, Cloudflare R2, Railway Object Storage, etc.
 - **OpenAI API key** — `OPENAI_API_KEY` in `models/agents/.env`
 - **Replicate token** — `REPLICATE_API_TOKEN` in `models/mcp/.env`
 - **Database URL** — `postgres://postgres:postgres@localhost:5480/postgres` in the DB-related env files
@@ -46,7 +53,7 @@ You'll need:
 ## 3. Start infrastructure
 
 ```bash
-docker compose up -d postgres redis
+docker compose up -d postgres redis minio minio-init
 ```
 
 ## 4. Migrate and seed
