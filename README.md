@@ -22,6 +22,8 @@ Arcnem Vision is an open-source platform that turns images into understanding. U
 
 Four languages. Five services. One pipeline from camera shutter to semantic search.
 
+> **Two API keys. That's it.** Grab an [OpenAI API key](https://platform.openai.com/api-keys) and a [Replicate API token](https://replicate.com/account/api-tokens). Everything else — Postgres, Redis, S3, Inngest — runs locally via `docker compose`.
+
 **What makes it interesting:**
 
 - **Database-driven agent graphs** — Define AI workflows as rows, not code. Swap processing pipelines per organization without redeploying anything.
@@ -133,12 +135,12 @@ cp models/mcp/.env.example          models/mcp/.env
 cp client/.env.example              client/.env
 ```
 
-Fill in the required secrets:
+Add your two API keys — the only external services required:
 
-- **OpenAI API key** — `OPENAI_API_KEY` in `models/agents/.env`
-- **Replicate token** — `REPLICATE_API_TOKEN` in `models/mcp/.env`
-- **Database URL** — `postgres://postgres:postgres@localhost:5480/postgres` in the DB-related env files
-- **S3 storage** — defaults work out of the box with the local MinIO from `docker-compose.yaml` (see [S3 config details](#s3-config-details) below)
+- **[OpenAI API key](https://platform.openai.com/api-keys)** → `OPENAI_API_KEY` in `models/agents/.env`
+- **[Replicate API token](https://replicate.com/account/api-tokens)** → `REPLICATE_API_TOKEN` in `models/mcp/.env`
+
+Everything else is already configured for local development. Database, S3, and Redis all run in Docker via `docker-compose.yaml` — the `.env.example` defaults point to them out of the box.
 
 ### 2. Start everything
 

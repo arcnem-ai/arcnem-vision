@@ -3,6 +3,10 @@ title: クイックスタート
 description: Arcnem Visionをクローン、設定、ローカルで実行する方法。
 ---
 
+:::tip[必要なAPIキーはたった2つ]
+Arcnem Visionを始めるのに必要なのは[OpenAI APIキー](https://platform.openai.com/api-keys)と[Replicate APIトークン](https://replicate.com/account/api-tokens)だけです。Postgres、Redis、S3（MinIO）、Inngestなど、その他すべてはDocker Composeでローカル実行されます。`.env.example`のデフォルト値がそのまま使えます。
+:::
+
 ## 必要条件
 
 - Docker + Docker Compose
@@ -29,12 +33,12 @@ cp models/mcp/.env.example          models/mcp/.env
 cp client/.env.example              client/.env
 ```
 
-必要なシークレットを設定：
+外部サービスで必要なのはAPIキー2つだけ：
 
-- **OpenAI APIキー** — `models/agents/.env`に`OPENAI_API_KEY`
-- **Replicateトークン** — `models/mcp/.env`に`REPLICATE_API_TOKEN`
-- **データベースURL** — DB関連のenvファイルに`postgres://postgres:postgres@localhost:5480/postgres`
-- **S3ストレージ** — `docker-compose.yaml`のローカルMinIOでデフォルト設定がそのまま動作（下記[S3設定の詳細](#s3設定の詳細)を参照）
+- **[OpenAI APIキー](https://platform.openai.com/api-keys)** → `models/agents/.env`に`OPENAI_API_KEY`
+- **[Replicate APIトークン](https://replicate.com/account/api-tokens)** → `models/mcp/.env`に`REPLICATE_API_TOKEN`
+
+それ以外はすべてローカル開発用に設定済み。データベース、S3、Redisは`docker-compose.yaml`のDockerで起動され、`.env.example`のデフォルト値がそのまま使えます。
 
 ## 2. すべてを起動
 

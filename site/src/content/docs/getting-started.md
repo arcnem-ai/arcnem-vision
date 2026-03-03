@@ -3,6 +3,10 @@ title: Getting Started
 description: Clone, configure, and run Arcnem Vision locally.
 ---
 
+:::tip[Two API keys — that's all you need]
+Arcnem Vision only requires an [OpenAI API key](https://platform.openai.com/api-keys) and a [Replicate API token](https://replicate.com/account/api-tokens) to get started. Everything else — Postgres, Redis, S3 (MinIO), Inngest — runs locally via Docker Compose. The `.env.example` defaults point to them out of the box.
+:::
+
 ## Prerequisites
 
 - Docker + Docker Compose
@@ -29,12 +33,12 @@ cp models/mcp/.env.example          models/mcp/.env
 cp client/.env.example              client/.env
 ```
 
-Fill in the required secrets:
+Add your two API keys — the only external services required:
 
-- **OpenAI API key** — `OPENAI_API_KEY` in `models/agents/.env`
-- **Replicate token** — `REPLICATE_API_TOKEN` in `models/mcp/.env`
-- **Database URL** — `postgres://postgres:postgres@localhost:5480/postgres` in the DB-related env files
-- **S3 storage** — defaults work out of the box with the local MinIO from `docker-compose.yaml` (see [S3 config details](#s3-config-details) below)
+- **[OpenAI API key](https://platform.openai.com/api-keys)** → `OPENAI_API_KEY` in `models/agents/.env`
+- **[Replicate API token](https://replicate.com/account/api-tokens)** → `REPLICATE_API_TOKEN` in `models/mcp/.env`
+
+Everything else is already configured for local development. Database, S3, and Redis all run in Docker via `docker-compose.yaml` — the `.env.example` defaults point to them out of the box.
 
 ## 2. Start everything
 
