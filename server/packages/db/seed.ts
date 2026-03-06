@@ -5,8 +5,8 @@ import {
 	agentGraphEdges,
 	agentGraphNodes,
 	agentGraphNodeTools,
-	agentGraphRuns,
 	agentGraphRunSteps,
+	agentGraphRuns,
 	agentGraphs,
 	apikeys,
 	devices,
@@ -1244,7 +1244,11 @@ const seed = async () => {
 			seededQRDocuments: qrSeedDocumentsWithIds,
 			seededQRDescriptionCount: insertedQRDescriptions.length,
 			agentRuns: {
-				goodRun: { id: goodRun.id, document: "sharp-passport", verdict: "GOOD" },
+				goodRun: {
+					id: goodRun.id,
+					document: "sharp-passport",
+					verdict: "GOOD",
+				},
 				badRun: { id: badRun.id, document: "blurry-receipt", verdict: "BAD" },
 				darkRun: { id: darkRun.id, document: "dark-contract", verdict: "BAD" },
 			},
