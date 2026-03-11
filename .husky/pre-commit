@@ -1,1 +1,1 @@
-cd server && bunx biome check --staged --write
+cd server && bunx biome check --staged --write --no-errors-on-unmatched
