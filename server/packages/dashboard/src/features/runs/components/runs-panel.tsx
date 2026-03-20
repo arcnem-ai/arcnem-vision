@@ -1,6 +1,7 @@
+import { DASHBOARD_REALTIME_SCOPE } from "@arcnem-vision/shared";
 import { useServerFn } from "@tanstack/react-start";
 import { Activity, ChevronDown, Clock, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,8 +11,12 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { useDashboardRealtime } from "@/features/realtime/dashboard-realtime-provider";
 import { RunStepsDetail } from "@/features/runs/components/run-steps-detail";
-import { getAgentGraphRuns } from "@/features/runs/server/runs-data";
+import {
+	getAgentGraphRun,
+	getAgentGraphRuns,
+} from "@/features/runs/server/runs-data";
 import type { RunItem, RunsResponse } from "@/features/runs/types";
 import { cn } from "@/lib/utils";
 
@@ -58,14 +63,29 @@ function statusIcon(status: string) {
 	}
 }
 
+function mergeRuns(primary: RunItem[], secondary: RunItem[]): RunItem[] {
+	const runsById = new Map<string, RunItem>();
+	for (const run of secondary) {
+		runsById.set(run.id, run);
+	}
+	for (const run of primary) {
+		runsById.set(run.id, run);
+	}
+	return [...runsById.values()].sort(
+		(a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+	);
+}
+
 function RunRow({
 	run,
 	isExpanded,
 	onToggle,
+	refreshToken,
 }: {
 	run: RunItem;
 	isExpanded: boolean;
 	onToggle: () => void;
+	refreshToken: number;
 }) {
 	return (
 		<Card
@@ -131,7 +151,7 @@ function RunRow({
 			</button>
 			{isExpanded ? (
 				<CardContent className="px-4 pt-0 sm:px-6">
-					<RunStepsDetail runId={run.id} />
+					<RunStepsDetail runId={run.id} refreshToken={refreshToken} />
 				</CardContent>
 			) : null}
 		</Card>
@@ -145,6 +165,8 @@ export function RunsPanel({
 	initialData: RunsResponse;
 	organizationId: string;
 }) {
+	const { lastEvent, reconnectCount } = useDashboardRealtime();
+	const fetchRun = useServerFn(getAgentGraphRun);
 	const fetchRuns = useServerFn(getAgentGraphRuns);
 	const [runs, setRuns] = useState<RunItem[]>(initialData.runs);
 	const [nextCursor, setNextCursor] = useState<string | null>(
@@ -152,11 +174,70 @@ export function RunsPanel({
 	);
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
+	const [expandedRunRefreshToken, setExpandedRunRefreshToken] = useState(0);
 
 	useEffect(() => {
 		setRuns(initialData.runs);
 		setNextCursor(initialData.nextCursor);
 	}, [initialData.nextCursor, initialData.runs]);
+
+	const refreshRunById = useEffectEvent(async (runId: string) => {
+		try {
+			const run = await fetchRun({ data: { runId } });
+			if (!run) {
+				return null;
+			}
+			setRuns((prev) => mergeRuns([run], prev));
+			return run;
+		} catch {
+			return null;
+		}
+	});
+
+	const refreshRecentRuns = useEffectEvent(async () => {
+		try {
+			const result = await fetchRuns({
+				data: { organizationId },
+			});
+			setRuns((prev) => mergeRuns(result.runs, prev));
+			setNextCursor(result.nextCursor);
+			return result;
+		} catch {
+			return null;
+		}
+	});
+
+	useEffect(() => {
+		if (!lastEvent || lastEvent.scope !== DASHBOARD_REALTIME_SCOPE.runs) {
+			return;
+		}
+		if (!lastEvent.runId) {
+			return;
+		}
+
+		const runId = lastEvent.runId;
+
+		void (async () => {
+			await refreshRunById(runId);
+			if (expandedRunId === runId) {
+				setExpandedRunRefreshToken((token) => token + 1);
+			}
+		})();
+	}, [expandedRunId, lastEvent]);
+
+	useEffect(() => {
+		if (reconnectCount === 0) {
+			return;
+		}
+
+		void (async () => {
+			await refreshRecentRuns();
+			if (expandedRunId) {
+				await refreshRunById(expandedRunId);
+				setExpandedRunRefreshToken((token) => token + 1);
+			}
+		})();
+	}, [expandedRunId, reconnectCount]);
 
 	const loadMore = async () => {
 		if (!nextCursor || loadingMore) return;
@@ -165,7 +246,7 @@ export function RunsPanel({
 			const result = await fetchRuns({
 				data: { organizationId, cursor: nextCursor },
 			});
-			setRuns((prev) => [...prev, ...result.runs]);
+			setRuns((prev) => mergeRuns(prev, result.runs));
 			setNextCursor(result.nextCursor);
 		} catch {
 			// silently fail, user can retry
@@ -201,6 +282,7 @@ export function RunsPanel({
 					key={run.id}
 					run={run}
 					isExpanded={expandedRunId === run.id}
+					refreshToken={expandedRunRefreshToken}
 					onToggle={() =>
 						setExpandedRunId((prev) => (prev === run.id ? null : run.id))
 					}

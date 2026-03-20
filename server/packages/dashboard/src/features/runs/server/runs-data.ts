@@ -64,6 +64,49 @@ export const getAgentGraphRuns = createServerFn({ method: "GET" })
 		};
 	});
 
+export const getAgentGraphRun = createServerFn({ method: "GET" })
+	.inputValidator((input: { runId: string }) => input)
+	.handler(async ({ data }) => {
+		const db = getDB();
+		const organizationId = await requireOrganizationContext();
+
+		const [row] = await db
+			.select({
+				id: agentGraphRuns.id,
+				agentGraphId: agentGraphRuns.agentGraphId,
+				status: agentGraphRuns.status,
+				error: agentGraphRuns.error,
+				startedAt: agentGraphRuns.startedAt,
+				finishedAt: agentGraphRuns.finishedAt,
+				workflowName: agentGraphs.name,
+			})
+			.from(agentGraphRuns)
+			.innerJoin(agentGraphs, eq(agentGraphRuns.agentGraphId, agentGraphs.id))
+			.where(
+				and(
+					eq(agentGraphRuns.id, data.runId),
+					eq(agentGraphs.organizationId, organizationId),
+				),
+			)
+			.limit(1);
+
+		if (!row) {
+			return null;
+		}
+
+		return {
+			id: row.id,
+			agentGraphId: row.agentGraphId,
+			workflowName: row.workflowName,
+			status: row.status,
+			error: row.error,
+			startedAt: new Date(row.startedAt).toISOString(),
+			finishedAt: row.finishedAt
+				? new Date(row.finishedAt).toISOString()
+				: null,
+		};
+	});
+
 export const getAgentGraphRunSteps = createServerFn({ method: "GET" })
 	.inputValidator((input: { runId: string }) => input)
 	.handler(async ({ data }): Promise<RunStepsResponse> => {

@@ -77,7 +77,12 @@ func ProcessDocumentUpload(ctx context.Context, input inngestgo.Input[inputs.Pro
 			"temp_url":    tempURL,
 		}
 
-		tracker, err := graphs.NewRunTracker(db, result.GraphSnapshot.AgentGraph.ID, initialState)
+		tracker, err := graphs.NewRunTracker(
+			db,
+			result.GraphSnapshot.AgentGraph.ID,
+			result.GraphSnapshot.AgentGraph.OrganizationID,
+			initialState,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create run tracker: %w", err)
 		}

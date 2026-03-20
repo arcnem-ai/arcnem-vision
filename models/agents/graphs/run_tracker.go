@@ -10,6 +10,7 @@ import (
 	"time"
 
 	dbmodels "github.com/arcnem-ai/arcnem-vision/models/db/gen/models"
+	"github.com/arcnem-ai/arcnem-vision/models/shared/realtime"
 	"github.com/smallnest/langgraphgo/graph"
 	"gorm.io/gorm"
 )
@@ -19,16 +20,22 @@ var _ graph.TraceHook = (*RunTracker)(nil)
 
 // RunTracker records graph execution to the agent_graph_runs and agent_graph_run_steps tables.
 type RunTracker struct {
-	db        *gorm.DB
-	run       *dbmodels.AgentGraphRun
-	stepOrder atomic.Int32
-	mu        sync.Mutex
+	db             *gorm.DB
+	run            *dbmodels.AgentGraphRun
+	organizationID string
+	stepOrder      atomic.Int32
+	mu             sync.Mutex
 	// steps tracks in-flight steps by span ID so we can update them on end.
 	steps map[string]*dbmodels.AgentGraphRunStep
 }
 
 // NewRunTracker creates a new run record and returns a tracker.
-func NewRunTracker(db *gorm.DB, agentGraphID string, initialState map[string]any) (*RunTracker, error) {
+func NewRunTracker(
+	db *gorm.DB,
+	agentGraphID string,
+	organizationID string,
+	initialState map[string]any,
+) (*RunTracker, error) {
 	stateJSON, err := json.Marshal(initialState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode initial state: %w", err)
@@ -44,11 +51,16 @@ func NewRunTracker(db *gorm.DB, agentGraphID string, initialState map[string]any
 		return nil, fmt.Errorf("failed to create run record: %w", err)
 	}
 
-	return &RunTracker{
-		db:    db,
-		run:   run,
-		steps: make(map[string]*dbmodels.AgentGraphRunStep),
-	}, nil
+	tracker := &RunTracker{
+		db:             db,
+		run:            run,
+		organizationID: organizationID,
+		steps:          make(map[string]*dbmodels.AgentGraphRunStep),
+	}
+
+	tracker.publish(realtime.DashboardReasonRunCreated)
+
+	return tracker, nil
 }
 
 // OnEvent implements graph.TraceHook.
@@ -81,6 +93,7 @@ func (t *RunTracker) OnEvent(_ context.Context, span *graph.TraceSpan) {
 			order,
 			span.NodeName,
 		)
+		t.publish(realtime.DashboardReasonRunStepChanged)
 
 	case graph.TraceEventNodeEnd:
 		t.mu.Lock()
@@ -115,6 +128,7 @@ func (t *RunTracker) OnEvent(_ context.Context, span *graph.TraceSpan) {
 			span.Duration.Milliseconds(),
 			previewState(span.State),
 		)
+		t.publish(realtime.DashboardReasonRunStepChanged)
 
 	case graph.TraceEventNodeError:
 		t.mu.Lock()
@@ -161,6 +175,7 @@ func (t *RunTracker) OnEvent(_ context.Context, span *graph.TraceSpan) {
 			previewText(errText),
 			previewState(span.State),
 		)
+		t.publish(realtime.DashboardReasonRunStepChanged)
 
 	case graph.TraceEventGraphEnd:
 		now := time.Now()
@@ -183,6 +198,7 @@ func (t *RunTracker) OnEvent(_ context.Context, span *graph.TraceSpan) {
 				previewText(errStr),
 				previewState(span.State),
 			)
+			t.publish(realtime.DashboardReasonRunFinished)
 		} else {
 			updates := map[string]any{
 				"status":      "completed",
@@ -205,6 +221,7 @@ func (t *RunTracker) OnEvent(_ context.Context, span *graph.TraceSpan) {
 				t.run.ID,
 				previewState(span.State),
 			)
+			t.publish(realtime.DashboardReasonRunFinished)
 		}
 	}
 }
@@ -212,4 +229,18 @@ func (t *RunTracker) OnEvent(_ context.Context, span *graph.TraceSpan) {
 // RunID returns the ID of the tracked run.
 func (t *RunTracker) RunID() string {
 	return t.run.ID
+}
+
+func (t *RunTracker) publish(reason string) {
+	event := realtime.NewDashboardEvent(reason, t.organizationID)
+	event.RunID = t.run.ID
+
+	if err := realtime.PublishDashboardEvent(context.Background(), event); err != nil {
+		log.Printf(
+			"graph run realtime_publish_failed run_id=%s reason=%s err=%v",
+			t.run.ID,
+			reason,
+			err,
+		)
+	}
 }

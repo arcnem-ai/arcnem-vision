@@ -44,6 +44,7 @@ func RegisterCreateDocumentDescription(server *mcp.Server) {
 		}
 
 		out := CreateDocumentDescriptionOutput{DescriptionID: saved.ID, Text: saved.Text}
+		publishDashboardDescriptionEvent(ctx, db, input.DocumentID)
 		outJSON, _ := json.Marshal(out)
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{&mcp.TextContent{Text: string(outJSON)}},

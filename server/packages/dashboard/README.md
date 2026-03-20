@@ -32,6 +32,7 @@ Dev server runs on `http://localhost:3001`.
 - `API_URL`: API base URL (default local value: `http://localhost:3000`)
 - `DATABASE_URL`: local Postgres connection string
 - `DASHBOARD_SESSION_TOKEN`: optional local debug session token
+- `REDIS_URL`: Redis connection string for realtime dashboard updates
 
 ## Workflow editor notes
 

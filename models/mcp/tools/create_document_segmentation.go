@@ -225,6 +225,8 @@ func RegisterCreateDocumentSegmentation(server *mcp.Server) {
 			out.SegmentedTempURL = segmentedTempURL
 		}
 
+		publishDashboardSegmentationEvent(ctx, sourceDocument, segmentedDocumentID)
+
 		outJSON, _ := json.Marshal(out)
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{&mcp.TextContent{Text: string(outJSON)}},

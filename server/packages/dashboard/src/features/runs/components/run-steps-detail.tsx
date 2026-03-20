@@ -26,28 +26,35 @@ function JsonBlock({ data }: { data: unknown }) {
 	);
 }
 
-export function RunStepsDetail({ runId }: { runId: string }) {
+export function RunStepsDetail({
+	runId,
+	refreshToken = 0,
+}: {
+	runId: string;
+	refreshToken?: number;
+}) {
 	const fetchSteps = useServerFn(getAgentGraphRunSteps);
 	const [data, setData] = useState<RunStepsResponse | null>(null);
 	const [loading, setLoading] = useState(true);
 
 	useEffect(() => {
+		const refreshSequence = refreshToken;
 		let cancelled = false;
 		setLoading(true);
 		fetchSteps({ data: { runId } })
 			.then((result: RunStepsResponse) => {
-				if (!cancelled) setData(result);
+				if (!cancelled && refreshSequence === refreshToken) setData(result);
 			})
 			.catch(() => {
-				if (!cancelled) setData(null);
+				if (!cancelled && refreshSequence === refreshToken) setData(null);
 			})
 			.finally(() => {
-				if (!cancelled) setLoading(false);
+				if (!cancelled && refreshSequence === refreshToken) setLoading(false);
 			});
 		return () => {
 			cancelled = true;
 		};
-	}, [runId, fetchSteps]);
+	}, [fetchSteps, refreshToken, runId]);
 
 	if (loading) {
 		return (

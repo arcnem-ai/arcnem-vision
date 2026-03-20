@@ -1,7 +1,12 @@
 import { schema } from "@arcnem-vision/db";
+import {
+	createDashboardRealtimeEvent,
+	DASHBOARD_REALTIME_REASON,
+} from "@arcnem-vision/shared";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { ALLOWED_IMAGE_MIME_TYPES } from "@/constants/uploads";
+import { publishDashboardRealtimeEvent } from "@/lib/dashboard-realtime";
 import { requireAPIKey } from "@/middleware/requireAPIKey";
 import type { HonoServerContext } from "@/types/serverContext";
 
@@ -162,6 +167,14 @@ ackUploadRouter.post("/uploads/ack", requireAPIKey, async (c) => {
 	} catch {
 		return c.json({ message: "Failed to acknowledge upload" }, 409);
 	}
+
+	await publishDashboardRealtimeEvent(
+		createDashboardRealtimeEvent({
+			reason: DASHBOARD_REALTIME_REASON.documentCreated,
+			organizationId: uploadForKey.organizationId,
+			documentId: result.documentId,
+		}),
+	);
 
 	try {
 		await inngestClient.send({

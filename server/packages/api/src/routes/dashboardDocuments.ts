@@ -1,4 +1,8 @@
 import { schema } from "@arcnem-vision/db";
+import {
+	createDashboardRealtimeEvent,
+	DASHBOARD_REALTIME_REASON,
+} from "@arcnem-vision/shared";
 import { and, desc, eq, ilike, lt, or, sql } from "drizzle-orm";
 import { Hono, type Context as HonoContext } from "hono";
 import { getS3Client } from "@/clients/s3";
@@ -9,6 +13,7 @@ import {
 	PRESIGN_EXPIRES_IN_SECONDS,
 } from "@/constants/uploads";
 import { getAPIEnvVar } from "@/env/getAPIEnvVar";
+import { publishDashboardRealtimeEvent } from "@/lib/dashboard-realtime";
 import { requireSession } from "@/middleware/requireSession";
 import type { HonoServerContext } from "@/types/serverContext";
 
@@ -115,6 +120,47 @@ function toSegmentedResultItem(row: DocumentSegmentationRow) {
 		prompt: row.prompt,
 		document: toDocumentItem(row),
 	};
+}
+
+async function findDashboardDocumentById(
+	c: HonoContext<HonoServerContext>,
+	documentId: string,
+) {
+	const dbClient = c.get("dbClient");
+	const [targetDocument] = await dbClient
+		.select({
+			id: documents.id,
+			objectKey: documents.objectKey,
+			contentType: documents.contentType,
+			sizeBytes: documents.sizeBytes,
+			createdAt: documents.createdAt,
+			description: documentDescriptions.text,
+			projectId: documents.projectId,
+			deviceId: documents.deviceId,
+			organizationId: documents.organizationId,
+		})
+		.from(documents)
+		.leftJoin(
+			documentDescriptions,
+			eq(documents.id, documentDescriptions.documentId),
+		)
+		.where(and(eq(documents.id, documentId), topLevelDocumentCondition))
+		.limit(1);
+
+	if (!targetDocument) {
+		return null;
+	}
+
+	if (
+		!(await hasDashboardOrganizationAccess(c, targetDocument.organizationId))
+	) {
+		return null;
+	}
+
+	return toDocumentItem({
+		...targetDocument,
+		distance: null,
+	});
 }
 
 dashboardDocumentsRouter.post(
@@ -417,6 +463,14 @@ dashboardDocumentsRouter.post(
 			);
 		}
 
+		await publishDashboardRealtimeEvent(
+			createDashboardRealtimeEvent({
+				reason: DASHBOARD_REALTIME_REASON.documentCreated,
+				organizationId: uploadForKey.organizationId,
+				documentId: result.documentId,
+			}),
+		);
+
 		return c.json({
 			status: "verified",
 			documentId: result.documentId,
@@ -426,6 +480,24 @@ dashboardDocumentsRouter.post(
 				distance: null,
 			}),
 		});
+	},
+);
+
+dashboardDocumentsRouter.get(
+	"/dashboard/documents/:id",
+	requireSession,
+	async (c) => {
+		const documentId = c.req.param("id")?.trim() ?? "";
+		if (!documentId) {
+			return c.json({ message: "documentId is required" }, 400);
+		}
+
+		const document = await findDashboardDocumentById(c, documentId);
+		if (!document) {
+			return c.json({ message: "Document not found" }, 404);
+		}
+
+		return c.json(document);
 	},
 );
 

@@ -10,33 +10,43 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiRealtimeDashboardRouteImport } from './routes/api/realtime/dashboard'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRealtimeDashboardRoute = ApiRealtimeDashboardRouteImport.update({
+  id: '/api/realtime/dashboard',
+  path: '/api/realtime/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/realtime/dashboard': typeof ApiRealtimeDashboardRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/realtime/dashboard': typeof ApiRealtimeDashboardRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/realtime/dashboard': typeof ApiRealtimeDashboardRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/api/realtime/dashboard'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/api/realtime/dashboard'
+  id: '__root__' | '/' | '/api/realtime/dashboard'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiRealtimeDashboardRoute: typeof ApiRealtimeDashboardRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +58,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/realtime/dashboard': {
+      id: '/api/realtime/dashboard'
+      path: '/api/realtime/dashboard'
+      fullPath: '/api/realtime/dashboard'
+      preLoaderRoute: typeof ApiRealtimeDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiRealtimeDashboardRoute: ApiRealtimeDashboardRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

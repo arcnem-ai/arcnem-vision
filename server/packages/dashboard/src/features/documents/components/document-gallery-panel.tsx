@@ -1,10 +1,14 @@
-import { useRouter } from "@tanstack/react-router";
+import {
+	DASHBOARD_REALTIME_REASON,
+	DASHBOARD_REALTIME_SCOPE,
+} from "@arcnem-vision/shared";
 import { useServerFn } from "@tanstack/react-start";
 import { ImageIcon, Loader2, Play, Search, Upload, X } from "lucide-react";
 import {
 	type ChangeEvent,
 	type FormEvent,
 	useEffect,
+	useEffectEvent,
 	useMemo,
 	useRef,
 	useState,
@@ -34,6 +38,7 @@ import {
 	runDocumentWorkflow,
 } from "@/features/documents/server/document-mutations";
 import {
+	getDocument,
 	getDocumentSegmentations,
 	getDocuments,
 } from "@/features/documents/server/documents-data";
@@ -42,6 +47,7 @@ import type {
 	DocumentsResponse,
 	SegmentedResultItem,
 } from "@/features/documents/types";
+import { useDashboardRealtime } from "@/features/realtime/dashboard-realtime-provider";
 import { cn } from "@/lib/utils";
 
 function formatBytes(bytes: number): string {
@@ -74,6 +80,22 @@ function mergeDocuments(
 		seen.add(document.id);
 		return true;
 	});
+}
+
+function replaceDocument(
+	items: DocumentItem[],
+	nextDocument: DocumentItem,
+): DocumentItem[] {
+	let replaced = false;
+	const nextItems = items.map((document) => {
+		if (document.id !== nextDocument.id) {
+			return document;
+		}
+		replaced = true;
+		return nextDocument;
+	});
+
+	return replaced ? nextItems : items;
 }
 
 function getDocumentSourceLabel(deviceName: string | null | undefined) {
@@ -249,8 +271,9 @@ export function DocumentGalleryPanel({
 	devices: DashboardData["devices"];
 	workflows: DashboardData["workflows"];
 }) {
-	const router = useRouter();
+	const { lastEvent, reconnectCount } = useDashboardRealtime();
 	const fetchDocuments = useServerFn(getDocuments);
+	const fetchDocument = useServerFn(getDocument);
 	const fetchDocumentSegmentations = useServerFn(getDocumentSegmentations);
 	const requestUpload = useServerFn(createDocumentUpload);
 	const finalizeUpload = useServerFn(acknowledgeDocumentUpload);
@@ -320,6 +343,29 @@ export function DocumentGalleryPanel({
 		}
 	}, [projects, selectedProjectId]);
 
+	const refreshDocumentById = useEffectEvent(async (documentId: string) => {
+		try {
+			const nextDocument = await fetchDocument({ data: { documentId } });
+			setDocuments((prev) => replaceDocument(prev, nextDocument));
+			return nextDocument;
+		} catch {
+			return null;
+		}
+	});
+
+	const refreshRecentDocuments = useEffectEvent(async () => {
+		try {
+			const result = await fetchDocuments({
+				data: { organizationId },
+			});
+			setDocuments((prev) => mergeDocuments(result.documents, prev));
+			setNextCursor(result.nextCursor);
+			return result;
+		} catch {
+			return null;
+		}
+	});
+
 	const defaultWorkflowIdForDocument = (document: DocumentItem) => {
 		const assignedWorkflowId = document.deviceId
 			? (devicesById.get(document.deviceId)?.agentGraphId ?? "")
@@ -330,7 +376,7 @@ export function DocumentGalleryPanel({
 		return workflows[0]?.id ?? "";
 	};
 
-	const loadSegmentedResults = async (documentId: string) => {
+	const loadSegmentedResults = useEffectEvent(async (documentId: string) => {
 		const requestId = ++segmentationRequestIdRef.current;
 		setSegmentedResultsDocumentId(documentId);
 		setSegmentedResults([]);
@@ -355,7 +401,7 @@ export function DocumentGalleryPanel({
 				setLoadingSegmentedResults(false);
 			}
 		}
-	};
+	});
 
 	const selectDocument = (document: DocumentItem) => {
 		setSelectedDocumentId(document.id);
@@ -393,6 +439,61 @@ export function DocumentGalleryPanel({
 		Boolean(selectedDocument) &&
 		segmentedResultsDocumentId === selectedDocument?.id &&
 		loadingSegmentedResults;
+
+	useEffect(() => {
+		if (!lastEvent || lastEvent.scope !== DASHBOARD_REALTIME_SCOPE.documents) {
+			return;
+		}
+
+		void (async () => {
+			if (lastEvent.documentId) {
+				await refreshDocumentById(lastEvent.documentId);
+			}
+
+			if (
+				!isFiltering &&
+				lastEvent.reason === DASHBOARD_REALTIME_REASON.documentCreated
+			) {
+				await refreshRecentDocuments();
+			}
+
+			if (!selectedDocumentId) {
+				return;
+			}
+
+			const selectedDocumentWasUpdated =
+				lastEvent.documentId === selectedDocumentId;
+			const selectedDocumentSourceWasUpdated =
+				lastEvent.sourceDocumentId === selectedDocumentId;
+			const shouldRefreshSegmentedResults =
+				(lastEvent.reason === DASHBOARD_REALTIME_REASON.segmentationCreated &&
+					selectedDocumentSourceWasUpdated) ||
+				(lastEvent.reason === DASHBOARD_REALTIME_REASON.descriptionUpserted &&
+					selectedDocumentSourceWasUpdated &&
+					lastEvent.documentId !== selectedDocumentId);
+
+			if (selectedDocumentWasUpdated || shouldRefreshSegmentedResults) {
+				await loadSegmentedResults(selectedDocumentId);
+			}
+		})();
+	}, [isFiltering, lastEvent, selectedDocumentId]);
+
+	useEffect(() => {
+		if (reconnectCount === 0) {
+			return;
+		}
+
+		void (async () => {
+			if (!isFiltering) {
+				await refreshRecentDocuments();
+			}
+
+			if (selectedDocumentId) {
+				await refreshDocumentById(selectedDocumentId);
+				await loadSegmentedResults(selectedDocumentId);
+			}
+		})();
+	}, [isFiltering, reconnectCount, selectedDocumentId]);
 
 	const resetToRecentDocuments = async () => {
 		setSearching(true);
@@ -571,7 +672,6 @@ export function DocumentGalleryPanel({
 				tone: "success",
 				text: `${result.workflowName} queued. Check the Runs tab for progress.`,
 			});
-			await router.invalidate();
 		} catch (error) {
 			setStatusMessage({
 				tone: "error",

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
 import type {
+	DocumentItem,
 	DocumentSegmentationsResponse,
 	DocumentsResponse,
 } from "@/features/documents/types";
@@ -65,6 +66,31 @@ export const getDocumentSegmentations = createServerFn({ method: "GET" })
 		if (!response.ok) {
 			throw new Error(
 				`Failed to fetch segmented results: ${response.status} ${response.statusText}`,
+			);
+		}
+
+		return response.json();
+	});
+
+export const getDocument = createServerFn({ method: "GET" })
+	.inputValidator((input: { documentId: string }) => input)
+	.handler(async ({ data }): Promise<DocumentItem> => {
+		const sessionToken = getCookie("better-auth.session_token");
+		const headers: Record<string, string> = {
+			"Content-Type": "application/json",
+		};
+		if (sessionToken) {
+			headers.Cookie = `better-auth.session_token=${sessionToken}`;
+		}
+
+		const response = await fetch(
+			`${API_URL}/api/dashboard/documents/${encodeURIComponent(data.documentId)}`,
+			{ headers },
+		);
+
+		if (!response.ok) {
+			throw new Error(
+				`Failed to fetch document: ${response.status} ${response.statusText}`,
 			);
 		}
 
