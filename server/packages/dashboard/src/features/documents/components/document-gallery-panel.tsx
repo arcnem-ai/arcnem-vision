@@ -186,11 +186,7 @@ function LoadingSkeleton() {
 	);
 }
 
-function SegmentedResultCard({
-	result,
-}: {
-	result: SegmentedResultItem;
-}) {
+function SegmentedResultCard({ result }: { result: SegmentedResultItem }) {
 	const [imgError, setImgError] = useState(false);
 
 	return (
@@ -232,7 +228,8 @@ function SegmentedResultCard({
 					</p>
 				) : null}
 				<p className="line-clamp-2 text-sm leading-relaxed text-slate-600">
-					{result.document.description ?? "Segmented output with no description yet."}
+					{result.document.description ??
+						"Segmented output with no description yet."}
 				</p>
 			</div>
 		</div>

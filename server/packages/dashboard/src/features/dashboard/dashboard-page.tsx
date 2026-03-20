@@ -7,7 +7,7 @@ import {
 	MonitorSmartphone,
 	Workflow,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
 	Card,
 	CardContent,
@@ -21,7 +21,6 @@ import { ProjectDevicePanel } from "@/features/dashboard/components/project-devi
 import { WorkflowCanvasEditor } from "@/features/dashboard/components/workflow-canvas-editor";
 import { WorkflowLibraryPanel } from "@/features/dashboard/components/workflow-library-panel";
 import {
-	assignWorkflowToDevice,
 	createWorkflow,
 	updateWorkflow,
 } from "@/features/dashboard/server-fns";
@@ -65,25 +64,8 @@ export function DashboardPage({
 	runs: RunsResponse;
 }) {
 	const router = useRouter();
-	const assignWorkflow = useServerFn(assignWorkflowToDevice);
 	const createWorkflowFn = useServerFn(createWorkflow);
 	const updateWorkflowFn = useServerFn(updateWorkflow);
-
-	const [selectedProjectId, setSelectedProjectId] = useState(
-		dashboard.projects[0]?.id ?? "",
-	);
-	const [selectedByDevice, setSelectedByDevice] = useState<
-		Record<string, string>
-	>(
-		Object.fromEntries(
-			dashboard.devices.map((device) => [device.id, device.agentGraphId]),
-		),
-	);
-
-	const [savingDeviceId, setSavingDeviceId] = useState<string | null>(null);
-	const [assignMessage, setAssignMessage] = useState<StatusMessage | null>(
-		null,
-	);
 
 	const [creatingWorkflow, setCreatingWorkflow] = useState(false);
 	const [updatingWorkflowId, setUpdatingWorkflowId] = useState<string | null>(
@@ -94,46 +76,6 @@ export function DashboardPage({
 	);
 	const [canvasCreateMode, setCanvasCreateMode] = useState(false);
 	const [canvasWorkflowId, setCanvasWorkflowId] = useState<string | null>(null);
-
-	useEffect(() => {
-		setSelectedByDevice(
-			Object.fromEntries(
-				dashboard.devices.map((device) => [device.id, device.agentGraphId]),
-			),
-		);
-		if (
-			!dashboard.projects.some((project) => project.id === selectedProjectId)
-		) {
-			setSelectedProjectId(dashboard.projects[0]?.id ?? "");
-		}
-	}, [dashboard.devices, dashboard.projects, selectedProjectId]);
-
-	const assignToDevice = async (deviceId: string) => {
-		setSavingDeviceId(deviceId);
-		setAssignMessage(null);
-		try {
-			const selectedWorkflowId = selectedByDevice[deviceId];
-			if (!selectedWorkflowId) {
-				throw new Error("Select a workflow before applying.");
-			}
-			await assignWorkflow({
-				data: {
-					deviceId,
-					agentGraphId: selectedWorkflowId,
-				},
-			});
-			setAssignMessage({ tone: "success", text: "Workflow updated." });
-			await router.invalidate();
-		} catch (error) {
-			setAssignMessage({
-				tone: "error",
-				text:
-					error instanceof Error ? error.message : "Failed to update workflow.",
-			});
-		} finally {
-			setSavingDeviceId(null);
-		}
-	};
 
 	const createWorkflowDraft = async (draft: WorkflowDraft) => {
 		setCreatingWorkflow(true);
@@ -272,21 +214,7 @@ export function DashboardPage({
 					</TabsList>
 
 					<TabsContent value="project-view" className="mt-4">
-						<ProjectDevicePanel
-							dashboard={dashboard}
-							selectedProjectId={selectedProjectId}
-							selectedByDevice={selectedByDevice}
-							onSelectProject={setSelectedProjectId}
-							onSelectDeviceWorkflow={(deviceId, workflowId) =>
-								setSelectedByDevice((previous) => ({
-									...previous,
-									[deviceId]: workflowId,
-								}))
-							}
-							onAssignToDevice={assignToDevice}
-							savingDeviceId={savingDeviceId}
-							saveMessage={assignMessage}
-						/>
+						<ProjectDevicePanel dashboard={dashboard} />
 					</TabsContent>
 
 					<TabsContent value="workflow-view" className="mt-4">

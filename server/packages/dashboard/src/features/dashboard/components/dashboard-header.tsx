@@ -11,12 +11,12 @@ export function DashboardHeader() {
 					</Badge>
 				</div>
 				<h1 className="font-display text-balance text-2xl leading-tight sm:text-3xl lg:text-4xl">
-					Coordinate projects, devices, and agent workflows from one
-					approachable control room.
+					Launch projects, register devices, issue API keys, and steer workflows
+					from one approachable control room.
 				</h1>
 				<p className="max-w-2xl text-sm text-slate-600 sm:text-base">
-					Pick a project, check connected devices, then attach or design
-					workflows that best fit each device.
+					Spin up a project, add the hardware inside it, then hand each device
+					the workflow and credentials it needs to send data safely.
 				</p>
 			</div>
 		</section>

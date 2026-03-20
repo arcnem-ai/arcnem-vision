@@ -205,6 +205,24 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 						name: true,
 					},
 				},
+				apikeys: {
+					columns: {
+						id: true,
+						name: true,
+						start: true,
+						prefix: true,
+						enabled: true,
+						createdAt: true,
+						updatedAt: true,
+						lastRequest: true,
+						expiresAt: true,
+						requestCount: true,
+						rateLimitEnabled: true,
+						rateLimitMax: true,
+						rateLimitTimeWindow: true,
+					},
+					orderBy: (row, { desc, asc }) => [desc(row.createdAt), asc(row.id)],
+				},
 			},
 			orderBy: (row, { asc }) => [asc(row.name)],
 		});
@@ -262,10 +280,16 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 		});
 
 		const deviceCountByProjectId = new Map<string, number>();
+		const apiKeyCountByProjectId = new Map<string, number>();
 		for (const device of deviceRows) {
 			deviceCountByProjectId.set(
 				device.projectId,
 				(deviceCountByProjectId.get(device.projectId) ?? 0) + 1,
+			);
+			apiKeyCountByProjectId.set(
+				device.projectId,
+				(apiKeyCountByProjectId.get(device.projectId) ?? 0) +
+					device.apikeys.length,
 			);
 		}
 
@@ -280,6 +304,7 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 		const mappedProjects = projectRows.map((project) => ({
 			...project,
 			deviceCount: deviceCountByProjectId.get(project.id) ?? 0,
+			apiKeyCount: apiKeyCountByProjectId.get(project.id) ?? 0,
 		}));
 
 		const mappedDevices = deviceRows.map((device) => {
@@ -298,6 +323,22 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 				workflowName: device.agentGraphs?.name ?? null,
 				updatedAt: updatedAt.toISOString(),
 				status,
+				apiKeyCount: device.apikeys.length,
+				apiKeys: device.apikeys.map((apiKey) => ({
+					id: apiKey.id,
+					name: apiKey.name,
+					start: apiKey.start,
+					prefix: apiKey.prefix,
+					enabled: apiKey.enabled,
+					createdAt: apiKey.createdAt.toISOString(),
+					updatedAt: apiKey.updatedAt.toISOString(),
+					lastRequest: apiKey.lastRequest?.toISOString() ?? null,
+					expiresAt: apiKey.expiresAt?.toISOString() ?? null,
+					requestCount: apiKey.requestCount,
+					rateLimitEnabled: apiKey.rateLimitEnabled,
+					rateLimitMax: apiKey.rateLimitMax,
+					rateLimitTimeWindow: apiKey.rateLimitTimeWindow,
+				})),
 			};
 		});
 

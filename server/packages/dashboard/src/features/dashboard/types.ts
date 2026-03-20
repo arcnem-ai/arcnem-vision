@@ -41,6 +41,22 @@ export type WorkflowEdge = {
 	toNode: string;
 };
 
+export type DeviceAPIKey = {
+	id: string;
+	name: string | null;
+	start: string | null;
+	prefix: string | null;
+	enabled: boolean;
+	createdAt: string;
+	updatedAt: string;
+	lastRequest: string | null;
+	expiresAt: string | null;
+	requestCount: number;
+	rateLimitEnabled: boolean;
+	rateLimitMax: number;
+	rateLimitTimeWindow: number;
+};
+
 export type DashboardData = {
 	auth: {
 		state: "ready" | "missing";
@@ -59,6 +75,7 @@ export type DashboardData = {
 		name: string;
 		slug: string;
 		deviceCount: number;
+		apiKeyCount: number;
 	}>;
 	devices: Array<{
 		id: string;
@@ -69,6 +86,8 @@ export type DashboardData = {
 		workflowName: string | null;
 		updatedAt: string;
 		status: "connected" | "idle";
+		apiKeyCount: number;
+		apiKeys: DeviceAPIKey[];
 	}>;
 	workflows: Array<{
 		id: string;
@@ -99,6 +118,14 @@ export type DashboardData = {
 export type StatusMessage = {
 	tone: "success" | "error";
 	text: string;
+};
+
+export type GeneratedDeviceAPIKey = {
+	id: string;
+	name: string | null;
+	value: string;
+	start: string | null;
+	prefix: string | null;
 };
 
 export type WorkflowDraft = {

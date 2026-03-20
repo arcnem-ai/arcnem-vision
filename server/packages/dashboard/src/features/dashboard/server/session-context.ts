@@ -124,3 +124,18 @@ export async function requireOrganizationContext() {
 	}
 	return context.organizationId;
 }
+
+export async function requireDashboardActorContext() {
+	const context = await getSessionContext();
+	if (!context.session) {
+		throw new Error("No active session for dashboard mutation.");
+	}
+	if (!context.organizationId) {
+		throw new Error("No organization context for this session.");
+	}
+
+	return {
+		organizationId: context.organizationId,
+		userId: context.session.userId,
+	};
+}
