@@ -40,6 +40,19 @@ type DocumentRow = {
 	deviceId: string | null;
 };
 
+type DocumentSegmentationRow = DocumentRow & {
+	segmentationId: string;
+	segmentationCreatedAt: Date | string;
+	modelLabel: string;
+	prompt: string | null;
+};
+
+const topLevelDocumentCondition = sql`NOT EXISTS (
+	SELECT 1
+	FROM document_segmentations ds_hidden
+	WHERE ds_hidden.segmented_document_id = ${documents.id}
+)`;
+
 async function hasDashboardOrganizationAccess(
 	c: HonoContext<HonoServerContext>,
 	organizationId: string,
@@ -88,6 +101,19 @@ function toDocumentItem(row: DocumentRow) {
 			method: "GET",
 			expiresIn: PRESIGN_GET_EXPIRES_IN_SECONDS,
 		}),
+	};
+}
+
+function toSegmentedResultItem(row: DocumentSegmentationRow) {
+	return {
+		segmentationId: row.segmentationId,
+		segmentationCreatedAt:
+			row.segmentationCreatedAt instanceof Date
+				? row.segmentationCreatedAt.toISOString()
+				: row.segmentationCreatedAt,
+		modelLabel: row.modelLabel,
+		prompt: row.prompt,
+		document: toDocumentItem(row),
 	};
 }
 
@@ -491,6 +517,77 @@ dashboardDocumentsRouter.post(
 );
 
 dashboardDocumentsRouter.get(
+	"/dashboard/documents/:id/segmentations",
+	requireSession,
+	async (c) => {
+		const documentId = c.req.param("id")?.trim() ?? "";
+		if (!documentId) {
+			return c.json({ message: "documentId is required" }, 400);
+		}
+
+		const dbClient = c.get("dbClient");
+		const [sourceDocument] = await dbClient
+			.select({
+				id: documents.id,
+				organizationId: documents.organizationId,
+			})
+			.from(documents)
+			.where(eq(documents.id, documentId))
+			.limit(1);
+
+		if (!sourceDocument) {
+			return c.json({ message: "Document not found" }, 404);
+		}
+
+		if (
+			!(await hasDashboardOrganizationAccess(c, sourceDocument.organizationId))
+		) {
+			return c.json(
+				{ message: "documentId is not available for this session" },
+				403,
+			);
+		}
+
+		const segmentedRows = await dbClient.execute(sql`
+			SELECT
+				ds.id AS "segmentationId",
+				ds.created_at AS "segmentationCreatedAt",
+				CONCAT(m.provider, '/', m.name) AS "modelLabel",
+				COALESCE(ds.input ->> 'text_prompt', ds.input ->> 'prompt') AS prompt,
+				d.id,
+				d.object_key AS "objectKey",
+				d.content_type AS "contentType",
+				d.size_bytes AS "sizeBytes",
+				d.created_at AS "createdAt",
+				dd_latest.text AS description,
+				d.project_id AS "projectId",
+				d.device_id AS "deviceId"
+			FROM document_segmentations ds
+			INNER JOIN documents d
+				ON d.id = ds.segmented_document_id
+			INNER JOIN models m
+				ON m.id = ds.model_id
+			LEFT JOIN LATERAL (
+				SELECT dd.text
+				FROM document_descriptions dd
+				WHERE dd.document_id = d.id
+				ORDER BY dd.created_at DESC
+				LIMIT 1
+			) dd_latest ON TRUE
+			WHERE ds.source_document_id = ${documentId}
+				AND d.organization_id = ${sourceDocument.organizationId}
+			ORDER BY ds.created_at DESC, d.created_at DESC
+		`);
+
+		return c.json({
+			segmentedResults: segmentedRows.rows.map((row) =>
+				toSegmentedResultItem(row as DocumentSegmentationRow),
+			),
+		});
+	},
+);
+
+dashboardDocumentsRouter.get(
 	"/dashboard/documents",
 	requireSession,
 	async (c) => {
@@ -600,6 +697,11 @@ dashboardDocumentsRouter.get(
 							ON d.id = dd_target.document_id
 						WHERE dd_seed.id = ${seedDescriptionId}
 							AND d.organization_id = ${organizationId}
+							AND NOT EXISTS (
+								SELECT 1
+								FROM document_segmentations ds_hidden
+								WHERE ds_hidden.segmented_document_id = d.id
+							)
 						ORDER BY d.id, distance ASC
 					)
 					SELECT *
@@ -635,6 +737,7 @@ dashboardDocumentsRouter.get(
 				.where(
 					and(
 						eq(documents.organizationId, organizationId),
+						topLevelDocumentCondition,
 						or(
 							ilike(documentDescriptions.text, pattern),
 							ilike(documents.objectKey, pattern),
@@ -654,7 +757,10 @@ dashboardDocumentsRouter.get(
 			return c.json({ documents: docs, nextCursor: null });
 		}
 
-		const conditions = [eq(documents.organizationId, organizationId)];
+		const conditions = [
+			eq(documents.organizationId, organizationId),
+			topLevelDocumentCondition,
+		];
 		if (cursor) {
 			conditions.push(lt(documents.id, cursor));
 		}

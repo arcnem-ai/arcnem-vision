@@ -33,10 +33,14 @@ import {
 	createDocumentUpload,
 	runDocumentWorkflow,
 } from "@/features/documents/server/document-mutations";
-import { getDocuments } from "@/features/documents/server/documents-data";
+import {
+	getDocumentSegmentations,
+	getDocuments,
+} from "@/features/documents/server/documents-data";
 import type {
 	DocumentItem,
 	DocumentsResponse,
+	SegmentedResultItem,
 } from "@/features/documents/types";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +53,13 @@ function formatBytes(bytes: number): string {
 function formatSemanticMatch(distance: number): string {
 	const similarity = Math.max(0, Math.min(1, 1 - distance));
 	return `${Math.round(similarity * 100)}% match`;
+}
+
+function formatShortDate(value: string): string {
+	return new Date(value).toLocaleDateString(undefined, {
+		month: "short",
+		day: "numeric",
+	});
 }
 
 function mergeDocuments(
@@ -175,6 +186,59 @@ function LoadingSkeleton() {
 	);
 }
 
+function SegmentedResultCard({
+	result,
+}: {
+	result: SegmentedResultItem;
+}) {
+	const [imgError, setImgError] = useState(false);
+
+	return (
+		<div className="min-w-60 max-w-60 shrink-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+			<div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+				{imgError ? (
+					<div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-slate-300">
+						<ImageIcon className="size-7" />
+						<span className="text-xs">Unable to load</span>
+					</div>
+				) : (
+					<img
+						src={result.document.thumbnailUrl}
+						alt={result.document.description ?? "Segmented result"}
+						className="h-full w-full object-cover"
+						onError={() => setImgError(true)}
+					/>
+				)}
+			</div>
+			<div className="space-y-2 p-3">
+				<div className="flex items-center gap-2">
+					<Badge
+						variant="secondary"
+						className="max-w-40 truncate rounded-full text-[11px]"
+						title={result.modelLabel}
+					>
+						{result.modelLabel}
+					</Badge>
+					<span className="ml-auto text-[11px] text-slate-400">
+						{formatShortDate(result.segmentationCreatedAt)}
+					</span>
+				</div>
+				{result.prompt ? (
+					<p
+						className="line-clamp-1 text-xs font-medium uppercase tracking-[0.14em] text-amber-700"
+						title={result.prompt}
+					>
+						{result.prompt}
+					</p>
+				) : null}
+				<p className="line-clamp-2 text-sm leading-relaxed text-slate-600">
+					{result.document.description ?? "Segmented output with no description yet."}
+				</p>
+			</div>
+		</div>
+	);
+}
+
 export function DocumentGalleryPanel({
 	initialData,
 	organizationId,
@@ -190,10 +254,12 @@ export function DocumentGalleryPanel({
 }) {
 	const router = useRouter();
 	const fetchDocuments = useServerFn(getDocuments);
+	const fetchDocumentSegmentations = useServerFn(getDocumentSegmentations);
 	const requestUpload = useServerFn(createDocumentUpload);
 	const finalizeUpload = useServerFn(acknowledgeDocumentUpload);
 	const queueWorkflowRun = useServerFn(runDocumentWorkflow);
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
+	const segmentationRequestIdRef = useRef(0);
 
 	const [documents, setDocuments] = useState<DocumentItem[]>(
 		initialData.documents,
@@ -213,6 +279,16 @@ export function DocumentGalleryPanel({
 		null,
 	);
 	const [selectedWorkflowId, setSelectedWorkflowId] = useState("");
+	const [segmentedResults, setSegmentedResults] = useState<
+		SegmentedResultItem[]
+	>([]);
+	const [segmentedResultsDocumentId, setSegmentedResultsDocumentId] = useState<
+		string | null
+	>(null);
+	const [segmentedResultsError, setSegmentedResultsError] = useState<
+		string | null
+	>(null);
+	const [loadingSegmentedResults, setLoadingSegmentedResults] = useState(false);
 	const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
 		null,
 	);
@@ -257,10 +333,38 @@ export function DocumentGalleryPanel({
 		return workflows[0]?.id ?? "";
 	};
 
+	const loadSegmentedResults = async (documentId: string) => {
+		const requestId = ++segmentationRequestIdRef.current;
+		setSegmentedResultsDocumentId(documentId);
+		setSegmentedResults([]);
+		setSegmentedResultsError(null);
+		setLoadingSegmentedResults(true);
+
+		try {
+			const result = await fetchDocumentSegmentations({
+				data: { documentId },
+			});
+			if (segmentationRequestIdRef.current !== requestId) {
+				return;
+			}
+			setSegmentedResults(result.segmentedResults);
+		} catch {
+			if (segmentationRequestIdRef.current !== requestId) {
+				return;
+			}
+			setSegmentedResultsError("Unable to load segmented results.");
+		} finally {
+			if (segmentationRequestIdRef.current === requestId) {
+				setLoadingSegmentedResults(false);
+			}
+		}
+	};
+
 	const selectDocument = (document: DocumentItem) => {
 		setSelectedDocumentId(document.id);
 		setSelectedWorkflowId(defaultWorkflowIdForDocument(document));
 		setStatusMessage(null);
+		void loadSegmentedResults(document.id);
 	};
 
 	const selectedDocument = selectedDocumentId
@@ -280,6 +384,18 @@ export function DocumentGalleryPanel({
 	const selectedWorkflowName = selectedWorkflowId
 		? (workflowNameById.get(selectedWorkflowId) ?? null)
 		: null;
+	const selectedDocumentSegmentedResults =
+		selectedDocument && segmentedResultsDocumentId === selectedDocument.id
+			? segmentedResults
+			: [];
+	const selectedDocumentSegmentedResultsError =
+		selectedDocument && segmentedResultsDocumentId === selectedDocument.id
+			? segmentedResultsError
+			: null;
+	const isLoadingSelectedDocumentSegmentedResults =
+		Boolean(selectedDocument) &&
+		segmentedResultsDocumentId === selectedDocument?.id &&
+		loadingSegmentedResults;
 
 	const resetToRecentDocuments = async () => {
 		setSearching(true);
@@ -688,6 +804,58 @@ export function DocumentGalleryPanel({
 									{selectedDocument.description ??
 										"No description generated yet."}
 								</p>
+							</div>
+
+							<div className="space-y-2">
+								<div className="flex flex-wrap items-center justify-between gap-2">
+									<p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+										Related Segmented Results
+									</p>
+									<p className="text-xs text-slate-400">
+										Derived outputs stay nested under this source image.
+									</p>
+								</div>
+
+								{isLoadingSelectedDocumentSegmentedResults ? (
+									<div className="flex gap-3 overflow-x-auto pb-2">
+										{["seg-a", "seg-b", "seg-c"].map((key) => (
+											<div
+												key={key}
+												className="min-w-60 shrink-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white"
+											>
+												<Skeleton className="aspect-[4/3] w-full rounded-none" />
+												<div className="space-y-2 p-3">
+													<Skeleton className="h-4 w-24" />
+													<Skeleton className="h-4 w-32" />
+													<Skeleton className="h-4 w-full" />
+												</div>
+											</div>
+										))}
+									</div>
+								) : selectedDocumentSegmentedResultsError ? (
+									<p className="text-sm text-rose-600">
+										{selectedDocumentSegmentedResultsError}
+									</p>
+								) : selectedDocumentSegmentedResults.length > 0 ? (
+									<div className="flex gap-3 overflow-x-auto pb-2">
+										{selectedDocumentSegmentedResults.map((result) => (
+											<SegmentedResultCard
+												key={result.segmentationId}
+												result={result}
+											/>
+										))}
+									</div>
+								) : (
+									<div className="rounded-2xl border border-dashed border-slate-300/80 bg-slate-50/70 px-4 py-3">
+										<p className="text-sm text-slate-500">
+											No segmented results yet for this image.
+										</p>
+										<p className="mt-1 text-xs text-slate-400">
+											When a segmentation workflow creates derived images,
+											they&apos;ll appear here instead of the main gallery.
+										</p>
+									</div>
+								)}
 							</div>
 						</div>
 

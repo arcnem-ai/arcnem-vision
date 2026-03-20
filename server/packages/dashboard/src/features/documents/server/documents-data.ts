@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
-import type { DocumentsResponse } from "@/features/documents/types";
+import type {
+	DocumentSegmentationsResponse,
+	DocumentsResponse,
+} from "@/features/documents/types";
 
 const API_URL = process.env.API_URL ?? "http://localhost:3000";
 
@@ -37,6 +40,31 @@ export const getDocuments = createServerFn({ method: "GET" })
 		if (!response.ok) {
 			throw new Error(
 				`Failed to fetch documents: ${response.status} ${response.statusText}`,
+			);
+		}
+
+		return response.json();
+	});
+
+export const getDocumentSegmentations = createServerFn({ method: "GET" })
+	.inputValidator((input: { documentId: string }) => input)
+	.handler(async ({ data }): Promise<DocumentSegmentationsResponse> => {
+		const sessionToken = getCookie("better-auth.session_token");
+		const headers: Record<string, string> = {
+			"Content-Type": "application/json",
+		};
+		if (sessionToken) {
+			headers.Cookie = `better-auth.session_token=${sessionToken}`;
+		}
+
+		const response = await fetch(
+			`${API_URL}/api/dashboard/documents/${encodeURIComponent(data.documentId)}/segmentations`,
+			{ headers },
+		);
+
+		if (!response.ok) {
+			throw new Error(
+				`Failed to fetch segmented results: ${response.status} ${response.statusText}`,
 			);
 		}
 
