@@ -8,6 +8,7 @@ import {
 	normalizeGraphData,
 	normalizeWorkflowFields,
 } from "./workflow-normalization";
+import { buildWorkflowNameFromTemplate } from "./workflow-template-utils";
 
 type WorkflowNodeInput = {
 	id?: string;
@@ -45,9 +46,9 @@ type UpdateWorkflowInput = {
 	}>;
 };
 
-type DBTransaction = Parameters<
-	Parameters<ReturnType<typeof getDB>["transaction"]>[0]
->[0];
+type CreateWorkflowFromTemplateInput = {
+	templateId: string;
+};
 
 function buildNodeConfig(
 	node: Pick<WorkflowNodeInput, "x" | "y" | "config">,
@@ -68,58 +69,6 @@ function buildNodeConfig(
 	};
 }
 
-async function assertGraphReferencesExist(
-	tx: DBTransaction,
-	graph: {
-		nodes: Array<{
-			modelId: string | null;
-			toolIds: string[];
-		}>;
-	},
-) {
-	const referencedModelIds = Array.from(
-		new Set(
-			graph.nodes
-				.map((node) => node.modelId)
-				.filter((modelId): modelId is string => Boolean(modelId)),
-		),
-	);
-	if (referencedModelIds.length > 0) {
-		const modelRows = await tx
-			.select({ id: schema.models.id })
-			.from(schema.models)
-			.where(inArray(schema.models.id, referencedModelIds));
-		const foundModelIds = new Set(
-			modelRows.map((row: { id: string }) => row.id),
-		);
-		const missingModelIds = referencedModelIds.filter(
-			(modelId) => !foundModelIds.has(modelId),
-		);
-		if (missingModelIds.length > 0) {
-			throw new Error(
-				`Missing model references: ${missingModelIds.join(", ")}`,
-			);
-		}
-	}
-
-	const referencedToolIds = Array.from(
-		new Set(graph.nodes.flatMap((node) => node.toolIds)),
-	);
-	if (referencedToolIds.length > 0) {
-		const toolRows = await tx
-			.select({ id: schema.tools.id })
-			.from(schema.tools)
-			.where(inArray(schema.tools.id, referencedToolIds));
-		const foundToolIds = new Set(toolRows.map((row: { id: string }) => row.id));
-		const missingToolIds = referencedToolIds.filter(
-			(toolId) => !foundToolIds.has(toolId),
-		);
-		if (missingToolIds.length > 0) {
-			throw new Error(`Missing tool references: ${missingToolIds.join(", ")}`);
-		}
-	}
-}
-
 export const createWorkflow = createServerFn({ method: "POST" })
 	.inputValidator((input: CreateWorkflowInput) => input)
 	.handler(async ({ data }) => {
@@ -133,8 +82,6 @@ export const createWorkflow = createServerFn({ method: "POST" })
 		});
 
 		const workflowId = await db.transaction(async (tx) => {
-			await assertGraphReferencesExist(tx, graph);
-
 			const [createdWorkflow] = await tx
 				.insert(schema.agentGraphs)
 				.values({
@@ -226,7 +173,6 @@ export const updateWorkflow = createServerFn({ method: "POST" })
 			if (!workflow) {
 				throw new Error("Workflow not found in your organization.");
 			}
-			await assertGraphReferencesExist(tx, graph);
 
 			const existingNodes = await tx.query.agentGraphNodes.findMany({
 				where: (row, { eq }) => eq(row.agentGraphId, data.workflowId),
@@ -350,4 +296,146 @@ export const updateWorkflow = createServerFn({ method: "POST" })
 		});
 
 		return { id: data.workflowId };
+	});
+
+export const createWorkflowFromTemplate = createServerFn({ method: "POST" })
+	.inputValidator((input: CreateWorkflowFromTemplateInput) => input)
+	.handler(async ({ data }) => {
+		const db = getDB();
+		const organizationId = await requireOrganizationContext();
+
+		return db.transaction(async (tx) => {
+			const template = await tx.query.agentGraphTemplates.findFirst({
+				where: (row, { and, eq, isNull, or }) =>
+					and(
+						eq(row.id, data.templateId),
+						or(
+							eq(row.organizationId, organizationId),
+							and(isNull(row.organizationId), eq(row.visibility, "public")),
+						),
+					),
+				columns: {
+					id: true,
+					name: true,
+					description: true,
+					version: true,
+					entryNode: true,
+					stateSchema: true,
+				},
+				with: {
+					agentGraphTemplateNodes: {
+						columns: {
+							id: true,
+							nodeKey: true,
+							nodeType: true,
+							inputKey: true,
+							outputKey: true,
+							modelId: true,
+							config: true,
+						},
+						with: {
+							agentGraphTemplateNodeTools: {
+								columns: {
+									toolId: true,
+								},
+							},
+						},
+					},
+					agentGraphTemplateEdges: {
+						columns: {
+							fromNode: true,
+							toNode: true,
+						},
+					},
+				},
+			});
+
+			if (!template) {
+				throw new Error("Workflow template not found in your organization.");
+			}
+
+			const existingWorkflowNames = await tx.query.agentGraphs.findMany({
+				where: (row, { eq }) => eq(row.organizationId, organizationId),
+				columns: {
+					name: true,
+				},
+			});
+
+			const workflowName = buildWorkflowNameFromTemplate(
+				template.name,
+				existingWorkflowNames.map((workflow) => workflow.name),
+			);
+
+			const [createdWorkflow] = await tx
+				.insert(schema.agentGraphs)
+				.values({
+					name: workflowName,
+					description: template.description,
+					entryNode: template.entryNode,
+					stateSchema: template.stateSchema ?? null,
+					organizationId,
+					agentGraphTemplateId: template.id,
+					agentGraphTemplateVersion: template.version,
+				})
+				.returning({
+					id: schema.agentGraphs.id,
+					name: schema.agentGraphs.name,
+				});
+
+			if (!createdWorkflow) {
+				throw new Error("Failed to create workflow from template.");
+			}
+
+			if (template.agentGraphTemplateNodes.length > 0) {
+				const insertedNodes = await tx
+					.insert(schema.agentGraphNodes)
+					.values(
+						template.agentGraphTemplateNodes.map((node) => ({
+							nodeKey: node.nodeKey,
+							nodeType: node.nodeType,
+							inputKey: node.inputKey,
+							outputKey: node.outputKey,
+							modelId: node.modelId,
+							config: node.config ?? {},
+							agentGraphId: createdWorkflow.id,
+						})),
+					)
+					.returning({
+						id: schema.agentGraphNodes.id,
+						nodeKey: schema.agentGraphNodes.nodeKey,
+					});
+
+				const nodeIdByKey = new Map(
+					insertedNodes.map((node) => [node.nodeKey, node.id]),
+				);
+				const nextNodeToolRows = template.agentGraphTemplateNodes.flatMap(
+					(node) => {
+						const nodeId = nodeIdByKey.get(node.nodeKey);
+						if (!nodeId) {
+							return [];
+						}
+
+						return node.agentGraphTemplateNodeTools.map((toolLink) => ({
+							agentGraphNodeId: nodeId,
+							toolId: toolLink.toolId,
+						}));
+					},
+				);
+				if (nextNodeToolRows.length > 0) {
+					await tx.insert(schema.agentGraphNodeTools).values(nextNodeToolRows);
+				}
+			}
+
+			if (template.agentGraphTemplateEdges.length > 0) {
+				await tx.insert(schema.agentGraphEdges).values(
+					template.agentGraphTemplateEdges.map((edge) => ({
+						fromNode: edge.fromNode,
+						toNode: edge.toNode,
+						agentGraphId: createdWorkflow.id,
+					})),
+				);
+			}
+
+			return createdWorkflow;
+		});
 	});

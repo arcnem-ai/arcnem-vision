@@ -7,7 +7,7 @@ import {
 	MonitorSmartphone,
 	Workflow,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
 	Card,
 	CardContent,
@@ -22,6 +22,7 @@ import { WorkflowCanvasEditor } from "@/features/dashboard/components/workflow-c
 import { WorkflowLibraryPanel } from "@/features/dashboard/components/workflow-library-panel";
 import {
 	createWorkflow,
+	createWorkflowFromTemplate,
 	updateWorkflow,
 } from "@/features/dashboard/server-fns";
 import type {
@@ -66,9 +67,13 @@ export function DashboardPage({
 }) {
 	const router = useRouter();
 	const createWorkflowFn = useServerFn(createWorkflow);
+	const createWorkflowFromTemplateFn = useServerFn(createWorkflowFromTemplate);
 	const updateWorkflowFn = useServerFn(updateWorkflow);
 
 	const [creatingWorkflow, setCreatingWorkflow] = useState(false);
+	const [startingTemplateId, setStartingTemplateId] = useState<string | null>(
+		null,
+	);
 	const [updatingWorkflowId, setUpdatingWorkflowId] = useState<string | null>(
 		null,
 	);
@@ -77,6 +82,9 @@ export function DashboardPage({
 	);
 	const [canvasCreateMode, setCanvasCreateMode] = useState(false);
 	const [canvasWorkflowId, setCanvasWorkflowId] = useState<string | null>(null);
+	const [pendingCanvasWorkflowId, setPendingCanvasWorkflowId] = useState<
+		string | null
+	>(null);
 
 	const createWorkflowDraft = async (draft: WorkflowDraft) => {
 		setCreatingWorkflow(true);
@@ -139,6 +147,52 @@ export function DashboardPage({
 			throw error;
 		} finally {
 			setUpdatingWorkflowId(null);
+		}
+	};
+
+	useEffect(() => {
+		if (!pendingCanvasWorkflowId) {
+			return;
+		}
+
+		const workflowExists = dashboard.workflows.some(
+			(workflow) => workflow.id === pendingCanvasWorkflowId,
+		);
+		if (!workflowExists) {
+			return;
+		}
+
+		setCanvasCreateMode(false);
+		setCanvasWorkflowId(pendingCanvasWorkflowId);
+		setPendingCanvasWorkflowId(null);
+	}, [dashboard.workflows, pendingCanvasWorkflowId]);
+
+	const startWorkflowFromTemplate = async (templateId: string) => {
+		setStartingTemplateId(templateId);
+		setWorkflowMessage(null);
+		try {
+			const workflow = await createWorkflowFromTemplateFn({
+				data: {
+					templateId,
+				},
+			});
+			setPendingCanvasWorkflowId(workflow.id);
+			setWorkflowMessage({
+				tone: "success",
+				text: `${workflow.name} created from the selected template.`,
+			});
+			await router.invalidate();
+		} catch (error) {
+			setWorkflowMessage({
+				tone: "error",
+				text:
+					error instanceof Error
+						? error.message
+						: "Failed to create workflow from template.",
+			});
+			throw error;
+		} finally {
+			setStartingTemplateId(null);
 		}
 	};
 
@@ -223,17 +277,24 @@ export function DashboardPage({
 
 						<TabsContent value="workflow-view" className="mt-4">
 							<WorkflowLibraryPanel
+								workflowTemplates={dashboard.workflowTemplates}
 								workflows={dashboard.workflows}
+								startingTemplateId={startingTemplateId}
 								onOpenCreate={() => {
 									setCanvasCreateMode(true);
 									setCanvasWorkflowId(null);
+									setPendingCanvasWorkflowId(null);
 									setWorkflowMessage(null);
 								}}
 								onOpenEdit={(workflow) => {
 									setCanvasCreateMode(false);
 									setCanvasWorkflowId(workflow.id);
+									setPendingCanvasWorkflowId(null);
 									setWorkflowMessage(null);
 								}}
+								onStartFromTemplate={(template) =>
+									startWorkflowFromTemplate(template.id)
+								}
 							/>
 						</TabsContent>
 

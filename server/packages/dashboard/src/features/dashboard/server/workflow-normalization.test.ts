@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { normalizeGraphData } from "./workflow-normalization";
 
+const modelId = "019d666d-dfc2-7ec6-8796-c44cff2bbb0a";
+const toolId = "019d666d-dfc7-7746-8536-1bc78967bc18";
+
 describe("normalizeGraphData", () => {
 	test("accepts a valid worker graph", () => {
 		const result = normalizeGraphData({
@@ -11,7 +14,7 @@ describe("normalizeGraphData", () => {
 					nodeType: "worker",
 					x: 120,
 					y: 80,
-					modelId: "00000000-0000-4000-8000-000000000001",
+					modelId,
 					config: {
 						system_message: "process the image",
 						max_iterations: 3,
@@ -35,7 +38,7 @@ describe("normalizeGraphData", () => {
 						nodeType: "supervisor",
 						x: 0,
 						y: 0,
-						modelId: "00000000-0000-4000-8000-000000000001",
+						modelId,
 						config: {
 							members: ["worker_a", "worker_a"],
 						},
@@ -45,7 +48,7 @@ describe("normalizeGraphData", () => {
 						nodeType: "worker",
 						x: 120,
 						y: 0,
-						modelId: "00000000-0000-4000-8000-000000000001",
+						modelId,
 						config: {},
 					},
 				],
@@ -67,7 +70,7 @@ describe("normalizeGraphData", () => {
 						nodeType: "worker",
 						x: 0,
 						y: 0,
-						modelId: "00000000-0000-4000-8000-000000000001",
+						modelId,
 						config: {},
 					},
 					{
@@ -75,7 +78,7 @@ describe("normalizeGraphData", () => {
 						nodeType: "worker",
 						x: 100,
 						y: 0,
-						modelId: "00000000-0000-4000-8000-000000000001",
+						modelId,
 						config: {},
 					},
 				],
@@ -93,7 +96,7 @@ describe("normalizeGraphData", () => {
 					nodeType: "tool",
 					x: 0,
 					y: 0,
-					toolIds: ["00000000-0000-4000-8000-000000000002"],
+					toolIds: [toolId],
 					config: {},
 				},
 				{
@@ -115,7 +118,7 @@ describe("normalizeGraphData", () => {
 					nodeType: "worker",
 					x: 300,
 					y: 0,
-					modelId: "00000000-0000-4000-8000-000000000001",
+					modelId,
 					config: {},
 				},
 				{
@@ -123,7 +126,7 @@ describe("normalizeGraphData", () => {
 					nodeType: "worker",
 					x: 300,
 					y: 100,
-					modelId: "00000000-0000-4000-8000-000000000001",
+					modelId,
 					config: {},
 				},
 			],
@@ -137,5 +140,48 @@ describe("normalizeGraphData", () => {
 		});
 
 		expect(result.nodes[1]?.nodeType).toBe("condition");
+	});
+
+	test("accepts document pipeline-style graphs with uuidv7 model and tool ids", () => {
+		const result = normalizeGraphData({
+			entryNode: "describe",
+			nodes: [
+				{
+					nodeKey: "describe",
+					nodeType: "worker",
+					x: 0,
+					y: 0,
+					inputKey: "temp_url",
+					outputKey: "description",
+					modelId,
+					config: {
+						system_message: "describe the document",
+						max_iterations: 3,
+					},
+				},
+				{
+					nodeKey: "save_description",
+					nodeType: "tool",
+					x: 200,
+					y: 0,
+					toolIds: [toolId],
+					config: {
+						input_mapping: {
+							text: "description",
+						},
+						output_mapping: {
+							description_id: "document_description_id",
+						},
+					},
+				},
+			],
+			edges: [
+				{ fromNode: "describe", toNode: "save_description" },
+				{ fromNode: "save_description", toNode: "END" },
+			],
+		});
+
+		expect(result.nodes[0]?.modelId).toBe(modelId);
+		expect(result.nodes[1]?.toolIds).toEqual([toolId]);
 	});
 });

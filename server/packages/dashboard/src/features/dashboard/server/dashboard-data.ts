@@ -1,34 +1,34 @@
 import { getDB } from "@arcnem-vision/db/server";
 import { createServerFn } from "@tanstack/react-start";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type {
 	DashboardData,
 	WorkflowNodeConfig,
+	WorkflowNodeTypeCounts,
 	WorkflowToolOption,
 } from "@/features/dashboard/types";
 import { getSessionContext } from "./session-context";
 import { parseCanvasPosition } from "./workflow-normalization";
 
-function normalizeJSONSchema(schema: unknown): unknown {
+function normalizeToolSchema(schema: unknown): Record<string, unknown> {
 	if (typeof schema === "string") {
 		try {
-			return JSON.parse(schema);
+			const parsed = JSON.parse(schema);
+			if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+				return parsed as Record<string, unknown>;
+			}
 		} catch {
-			return schema;
+			return {};
 		}
 	}
-	return schema;
+	if (schema && typeof schema === "object" && !Array.isArray(schema)) {
+		return schema as Record<string, unknown>;
+	}
+	return {};
 }
 
-function schemaFieldNames(schema: unknown) {
-	const normalized = normalizeJSONSchema(schema);
-	if (
-		!normalized ||
-		typeof normalized !== "object" ||
-		Array.isArray(normalized)
-	) {
-		return [] as string[];
-	}
-	const properties = (normalized as { properties?: unknown }).properties;
+function schemaFieldNames(schema: Record<string, unknown>) {
+	const properties = schema.properties;
 	if (
 		!properties ||
 		typeof properties !== "object" ||
@@ -68,8 +68,8 @@ function toToolOption(tool: {
 	inputSchema: unknown;
 	outputSchema: unknown;
 }): WorkflowToolOption {
-	const inputSchema = normalizeJSONSchema(tool.inputSchema);
-	const outputSchema = normalizeJSONSchema(tool.outputSchema);
+	const inputSchema = normalizeToolSchema(tool.inputSchema);
+	const outputSchema = normalizeToolSchema(tool.outputSchema);
 	return {
 		id: tool.id,
 		name: tool.name,
@@ -79,6 +79,42 @@ function toToolOption(tool: {
 		inputFields: schemaFieldNames(inputSchema),
 		outputFields: schemaFieldNames(outputSchema),
 	};
+}
+
+function countNodeTypes(
+	nodes: Array<{
+		nodeType: string;
+	}>,
+): WorkflowNodeTypeCounts {
+	const nodeTypeCounts: WorkflowNodeTypeCounts = {
+		worker: 0,
+		supervisor: 0,
+		condition: 0,
+		tool: 0,
+		other: 0,
+	};
+
+	for (const node of nodes) {
+		switch (node.nodeType) {
+			case "worker":
+				nodeTypeCounts.worker += 1;
+				break;
+			case "supervisor":
+				nodeTypeCounts.supervisor += 1;
+				break;
+			case "condition":
+				nodeTypeCounts.condition += 1;
+				break;
+			case "tool":
+				nodeTypeCounts.tool += 1;
+				break;
+			default:
+				nodeTypeCounts.other += 1;
+				break;
+		}
+	}
+
+	return nodeTypeCounts;
 }
 
 export const getDashboardData = createServerFn({ method: "GET" }).handler(
@@ -115,6 +151,9 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 			label: `${model.provider} / ${model.name}`,
 		}));
 		const toolCatalog = toolRows.map((tool) => toToolOption(tool));
+		const toolOptionById = new Map(
+			toolCatalog.map((tool) => [tool.id, tool] as const),
+		);
 
 		if (!context.session) {
 			return {
@@ -129,6 +168,7 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 				projects: [],
 				devices: [],
 				workflows: [],
+				workflowTemplates: [],
 				modelCatalog,
 				toolCatalog,
 			};
@@ -147,6 +187,7 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 				projects: [],
 				devices: [],
 				workflows: [],
+				workflowTemplates: [],
 				modelCatalog,
 				toolCatalog,
 			};
@@ -174,6 +215,7 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 				projects: [],
 				devices: [],
 				workflows: [],
+				workflowTemplates: [],
 				modelCatalog,
 				toolCatalog,
 			};
@@ -234,8 +276,16 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 				name: true,
 				description: true,
 				entryNode: true,
+				agentGraphTemplateId: true,
+				agentGraphTemplateVersion: true,
 			},
 			with: {
+				agentGraphTemplates: {
+					columns: {
+						id: true,
+						name: true,
+					},
+				},
 				agentGraphNodes: {
 					columns: {
 						id: true,
@@ -279,6 +329,79 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 			orderBy: (row, { asc }) => [asc(row.name)],
 		});
 
+		const templateRows = await db.query.agentGraphTemplates.findMany({
+			where: (row) =>
+				or(
+					eq(row.organizationId, organizationId),
+					and(isNull(row.organizationId), eq(row.visibility, "public")),
+				),
+			columns: {
+				id: true,
+				name: true,
+				description: true,
+				version: true,
+				visibility: true,
+				entryNode: true,
+			},
+			with: {
+				agentGraphTemplateNodes: {
+					columns: {
+						id: true,
+						nodeKey: true,
+						nodeType: true,
+						inputKey: true,
+						outputKey: true,
+						modelId: true,
+						config: true,
+					},
+					with: {
+						models: {
+							columns: {
+								provider: true,
+								name: true,
+							},
+						},
+					},
+				},
+				agentGraphTemplateEdges: {
+					columns: {
+						id: true,
+						fromNode: true,
+						toNode: true,
+					},
+				},
+			},
+			orderBy: (row, { asc, desc }) => [asc(row.name), desc(row.version)],
+		});
+
+		const templateNodeIds = templateRows.flatMap((template) =>
+			template.agentGraphTemplateNodes.map((node) => node.id),
+		);
+		const templateNodeToolRows =
+			templateNodeIds.length === 0
+				? []
+				: await db.query.agentGraphTemplateNodeTools.findMany({
+						where: (row) =>
+							inArray(row.agentGraphTemplateNodeId, templateNodeIds),
+						columns: {
+							agentGraphTemplateNodeId: true,
+							toolId: true,
+						},
+					});
+		const templateToolIdsByNodeId = new Map<string, string[]>();
+		for (const link of templateNodeToolRows) {
+			const current = templateToolIdsByNodeId.get(
+				link.agentGraphTemplateNodeId,
+			);
+			if (current) {
+				current.push(link.toolId);
+			} else {
+				templateToolIdsByNodeId.set(link.agentGraphTemplateNodeId, [
+					link.toolId,
+				]);
+			}
+		}
+
 		const deviceCountByProjectId = new Map<string, number>();
 		const apiKeyCountByProjectId = new Map<string, number>();
 		for (const device of deviceRows) {
@@ -298,6 +421,19 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 			attachedDeviceCountByWorkflowId.set(
 				device.agentGraphId,
 				(attachedDeviceCountByWorkflowId.get(device.agentGraphId) ?? 0) + 1,
+			);
+		}
+
+		const startedWorkflowCountByTemplateId = new Map<string, number>();
+		for (const workflow of workflowRows) {
+			if (!workflow.agentGraphTemplateId) {
+				continue;
+			}
+
+			startedWorkflowCountByTemplateId.set(
+				workflow.agentGraphTemplateId,
+				(startedWorkflowCountByTemplateId.get(workflow.agentGraphTemplateId) ??
+					0) + 1,
 			);
 		}
 
@@ -368,33 +504,6 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 				};
 			});
 
-			const nodeTypeCounts = {
-				worker: 0,
-				supervisor: 0,
-				condition: 0,
-				tool: 0,
-				other: 0,
-			};
-			for (const node of nodes) {
-				switch (node.nodeType) {
-					case "worker":
-						nodeTypeCounts.worker += 1;
-						break;
-					case "supervisor":
-						nodeTypeCounts.supervisor += 1;
-						break;
-					case "condition":
-						nodeTypeCounts.condition += 1;
-						break;
-					case "tool":
-						nodeTypeCounts.tool += 1;
-						break;
-					default:
-						nodeTypeCounts.other += 1;
-						break;
-				}
-			}
-
 			return {
 				id: workflow.id,
 				name: workflow.name,
@@ -403,9 +512,69 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 				edgeCount: workflow.agentGraphEdges.length,
 				attachedDeviceCount:
 					attachedDeviceCountByWorkflowId.get(workflow.id) ?? 0,
-				nodeTypeCounts,
+				template: workflow.agentGraphTemplates
+					? {
+							id: workflow.agentGraphTemplates.id,
+							name: workflow.agentGraphTemplates.name,
+							version: workflow.agentGraphTemplateVersion,
+						}
+					: null,
+				nodeTypeCounts: countNodeTypes(nodes),
 				nodes,
 				edges: workflow.agentGraphEdges.map((edge) => ({
+					id: edge.id,
+					fromNode: edge.fromNode,
+					toNode: edge.toNode,
+				})),
+				nodeSamples: nodes.slice(0, 6).map((node) => ({
+					id: node.id,
+					nodeKey: node.nodeKey,
+					nodeType: node.nodeType,
+					toolNames: node.toolNames,
+				})),
+			};
+		});
+
+		const mappedWorkflowTemplates = templateRows.map((template) => {
+			const nodes = template.agentGraphTemplateNodes.map((node, index) => {
+				const position = parseCanvasPosition(node.config, index);
+				const toolIds = templateToolIdsByNodeId.get(node.id) ?? [];
+				const tools = toolIds
+					.map((toolId) => toolOptionById.get(toolId))
+					.filter((tool): tool is WorkflowToolOption => Boolean(tool));
+
+				return {
+					id: node.id,
+					nodeKey: node.nodeKey,
+					nodeType: node.nodeType,
+					x: position.x,
+					y: position.y,
+					inputKey: node.inputKey,
+					outputKey: node.outputKey,
+					modelId: node.modelId,
+					modelLabel: node.models
+						? `${node.models.provider} / ${node.models.name}`
+						: null,
+					toolIds,
+					tools,
+					toolNames: tools.map((tool) => tool.name),
+					config: normalizeNodeConfig(node.config),
+				};
+			});
+
+			return {
+				id: template.id,
+				name: template.name,
+				description: template.description,
+				version: template.version,
+				visibility: template.visibility,
+				entryNode: template.entryNode,
+				edgeCount: template.agentGraphTemplateEdges.length,
+				startedWorkflowCount:
+					startedWorkflowCountByTemplateId.get(template.id) ?? 0,
+				nodeTypeCounts: countNodeTypes(nodes),
+				nodes,
+				edges: template.agentGraphTemplateEdges.map((edge) => ({
 					id: edge.id,
 					fromNode: edge.fromNode,
 					toNode: edge.toNode,
@@ -431,6 +600,7 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 			projects: mappedProjects,
 			devices: mappedDevices,
 			workflows: mappedWorkflows,
+			workflowTemplates: mappedWorkflowTemplates,
 			modelCatalog,
 			toolCatalog,
 		};

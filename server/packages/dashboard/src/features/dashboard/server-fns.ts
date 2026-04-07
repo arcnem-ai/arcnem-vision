@@ -5,6 +5,7 @@ export {
 	createDeviceAPIKey,
 	createProject,
 	createWorkflow,
+	createWorkflowFromTemplate,
 	deleteDeviceAPIKey,
 	updateDevice,
 	updateDeviceAPIKey,

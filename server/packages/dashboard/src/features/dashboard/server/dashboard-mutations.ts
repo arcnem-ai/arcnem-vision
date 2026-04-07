@@ -7,4 +7,8 @@ export {
 	updateDevice,
 	updateDeviceAPIKey,
 } from "./project-management-mutations";
-export { createWorkflow, updateWorkflow } from "./workflow-graph-mutations";
+export {
+	createWorkflow,
+	createWorkflowFromTemplate,
+	updateWorkflow,
+} from "./workflow-graph-mutations";

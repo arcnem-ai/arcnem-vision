@@ -1,7 +1,7 @@
 import { extname } from "node:path";
 import { createEnvVarGetter } from "@arcnem-vision/shared";
 import { S3Client } from "bun";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
 	agentGraphEdges,
 	agentGraphNodes,
@@ -9,6 +9,10 @@ import {
 	agentGraphRunSteps,
 	agentGraphRuns,
 	agentGraphs,
+	agentGraphTemplateEdges,
+	agentGraphTemplateNodes,
+	agentGraphTemplateNodeTools,
+	agentGraphTemplates,
 	apikeys,
 	devices,
 	documentDescriptionEmbeddings,
@@ -27,6 +31,7 @@ import {
 import { getDB } from "./src/server";
 
 const db = getDB();
+type SeedTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const now = new Date();
 const plainPipelineApiKey =
 	"seed_X9x8U7v6W5u4T3s2R1q0P9o8N7m6L5k4J3i2H1g0F9e8D7c6B5a4Z3y2X1w0";
@@ -434,6 +439,144 @@ const uploadSeedDocumentsToS3 = async (
 	);
 };
 
+const cloneWorkflowToTemplate = async (
+	tx: SeedTransaction,
+	input: {
+		workflowId: string;
+		organizationId: string;
+		visibility?: string;
+	},
+) => {
+	const sourceWorkflow = await tx.query.agentGraphs.findFirst({
+		where: (row, { eq }) => eq(row.id, input.workflowId),
+		columns: {
+			id: true,
+			name: true,
+			description: true,
+			entryNode: true,
+			stateSchema: true,
+		},
+		with: {
+			agentGraphNodes: {
+				columns: {
+					id: true,
+					nodeKey: true,
+					nodeType: true,
+					inputKey: true,
+					outputKey: true,
+					modelId: true,
+					config: true,
+				},
+				with: {
+					agentGraphNodeTools: {
+						columns: {
+							toolId: true,
+						},
+					},
+				},
+			},
+			agentGraphEdges: {
+				columns: {
+					fromNode: true,
+					toNode: true,
+				},
+			},
+		},
+	});
+
+	if (!sourceWorkflow) {
+		throw new Error(
+			`Failed to load workflow ${input.workflowId} for template seeding`,
+		);
+	}
+
+	const [template] = await tx
+		.insert(agentGraphTemplates)
+		.values({
+			name: sourceWorkflow.name,
+			description: sourceWorkflow.description,
+			version: 1,
+			visibility: input.visibility ?? "organization",
+			entryNode: sourceWorkflow.entryNode,
+			stateSchema: sourceWorkflow.stateSchema ?? null,
+			organizationId: input.organizationId,
+		})
+		.returning({
+			id: agentGraphTemplates.id,
+			version: agentGraphTemplates.version,
+		});
+	if (!template) {
+		throw new Error(
+			`Failed to create template for workflow ${sourceWorkflow.name}`,
+		);
+	}
+
+	if (sourceWorkflow.agentGraphNodes.length > 0) {
+		const insertedTemplateNodes = await tx
+			.insert(agentGraphTemplateNodes)
+			.values(
+				sourceWorkflow.agentGraphNodes.map((node) => ({
+					nodeKey: node.nodeKey,
+					nodeType: node.nodeType,
+					inputKey: node.inputKey,
+					outputKey: node.outputKey,
+					modelId: node.modelId,
+					config: node.config ?? {},
+					agentGraphTemplateId: template.id,
+				})),
+			)
+			.returning({
+				id: agentGraphTemplateNodes.id,
+				nodeKey: agentGraphTemplateNodes.nodeKey,
+			});
+
+		const templateNodeIdByKey = new Map(
+			insertedTemplateNodes.map((node) => [node.nodeKey, node.id]),
+		);
+		const templateNodeToolRows = sourceWorkflow.agentGraphNodes.flatMap(
+			(node) => {
+				const templateNodeId = templateNodeIdByKey.get(node.nodeKey);
+				if (!templateNodeId) {
+					return [];
+				}
+
+				return node.agentGraphNodeTools.map((toolLink) => ({
+					agentGraphTemplateNodeId: templateNodeId,
+					toolId: toolLink.toolId,
+				}));
+			},
+		);
+		if (templateNodeToolRows.length > 0) {
+			await tx.insert(agentGraphTemplateNodeTools).values(templateNodeToolRows);
+		}
+	}
+
+	if (sourceWorkflow.agentGraphEdges.length > 0) {
+		await tx.insert(agentGraphTemplateEdges).values(
+			sourceWorkflow.agentGraphEdges.map((edge) => ({
+				fromNode: edge.fromNode,
+				toNode: edge.toNode,
+				agentGraphTemplateId: template.id,
+			})),
+		);
+	}
+
+	await tx
+		.update(agentGraphs)
+		.set({
+			agentGraphTemplateId: template.id,
+			agentGraphTemplateVersion: template.version,
+		})
+		.where(eq(agentGraphs.id, sourceWorkflow.id));
+
+	return {
+		id: template.id,
+		name: sourceWorkflow.name,
+		version: template.version,
+		sourceWorkflowId: sourceWorkflow.id,
+	};
+};
+
 const seed = async () => {
 	const hashedPipelineApiKey = await hashApiKey(plainPipelineApiKey);
 	const hashedQualityReviewApiKey = await hashApiKey(plainQualityReviewApiKey);
@@ -480,6 +623,10 @@ const seed = async () => {
 			TRUNCATE TABLE
 				"agent_graph_run_steps",
 				"agent_graph_runs",
+				"agent_graph_template_edges",
+				"agent_graph_template_node_tools",
+				"agent_graph_template_nodes",
+				"agent_graph_templates",
 				"agent_graph_edges",
 				"agent_graph_node_tools",
 				"agent_graph_nodes",
@@ -3038,6 +3185,33 @@ const seed = async () => {
 			},
 		]);
 
+		const workflowTemplates = [
+			await cloneWorkflowToTemplate(tx, {
+				workflowId: pipelineGraph.id,
+				organizationId: organization.id,
+			}),
+			await cloneWorkflowToTemplate(tx, {
+				workflowId: qualityReviewGraph.id,
+				organizationId: organization.id,
+			}),
+			await cloneWorkflowToTemplate(tx, {
+				workflowId: segmentationGraph.id,
+				organizationId: organization.id,
+			}),
+			await cloneWorkflowToTemplate(tx, {
+				workflowId: semanticSegmentationGraph.id,
+				organizationId: organization.id,
+			}),
+			await cloneWorkflowToTemplate(tx, {
+				workflowId: ocrConditionGraph.id,
+				organizationId: organization.id,
+			}),
+			await cloneWorkflowToTemplate(tx, {
+				workflowId: ocrSupervisorGraph.id,
+				organizationId: organization.id,
+			}),
+		];
+
 		return {
 			user,
 			dashboardSession,
@@ -3067,6 +3241,7 @@ const seed = async () => {
 			langSegmentationModel,
 			deepseekOCRModel,
 			dotsOCRModel,
+			workflowTemplates,
 			seededDocuments: seedDocumentsWithIds,
 			seededDescriptionCount: insertedDescriptions.length,
 			seededQRDocuments: qrSeedDocumentsWithIds,
@@ -3174,6 +3349,12 @@ const seed = async () => {
 	console.log(
 		`Agent Graph (workflow 6, OCR supervisor): ${result.ocrSupervisorGraph.id}`,
 	);
+	console.log("\nSeeded workflow templates:");
+	for (const workflowTemplate of result.workflowTemplates) {
+		console.log(
+			`  ${workflowTemplate.name} v${workflowTemplate.version}: ${workflowTemplate.id} (source workflow ${workflowTemplate.sourceWorkflowId})`,
+		);
+	}
 	console.log(`CLIP Model: ${result.clipModel.id}`);
 	console.log(`GPT-4.1 Mini Model: ${result.gpt41MiniModel.id}`);
 	console.log(

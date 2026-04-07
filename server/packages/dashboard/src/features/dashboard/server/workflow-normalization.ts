@@ -2,8 +2,6 @@ import type { WorkflowNodeConfig } from "@/features/dashboard/types";
 
 const NODE_KEY_PATTERN = /^[a-zA-Z0-9._:-]+$/;
 const STATE_KEY_PATTERN = /^[a-zA-Z0-9._:-]+$/;
-const UUID_PATTERN =
-	/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const WORKFLOW_NODE_TYPES = new Set([
 	"worker",
@@ -51,14 +49,10 @@ function normalizeOptionalStateKey(
 
 function normalizeOptionalUuid(
 	value: string | null | undefined,
-	label: string,
 ): string | null {
 	if (!value) return null;
 	const normalized = value.trim();
 	if (!normalized) return null;
-	if (!UUID_PATTERN.test(normalized)) {
-		throw new Error(`${label} is invalid.`);
-	}
 	return normalized;
 }
 
@@ -271,10 +265,7 @@ export function normalizeGraphData(input: {
 			node.outputKey,
 			`Output key for node "${nodeKey}"`,
 		);
-		const modelId = normalizeOptionalUuid(
-			node.modelId,
-			`Model id for node "${nodeKey}"`,
-		);
+		const modelId = normalizeOptionalUuid(node.modelId);
 		const toolIds = Array.from(
 			new Set(
 				(node.toolIds ?? [])
@@ -282,11 +273,6 @@ export function normalizeGraphData(input: {
 					.filter((toolId) => toolId.length > 0),
 			),
 		);
-		for (const toolId of toolIds) {
-			if (!UUID_PATTERN.test(toolId)) {
-				throw new Error(`Tool id "${toolId}" on node "${nodeKey}" is invalid.`);
-			}
-		}
 
 		const config = normalizeNodeConfig(node.config);
 

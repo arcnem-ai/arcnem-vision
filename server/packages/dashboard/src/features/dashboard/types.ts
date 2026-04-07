@@ -10,8 +10,8 @@ export type WorkflowToolOption = {
 	id: string;
 	name: string;
 	description: string;
-	inputSchema: unknown;
-	outputSchema: unknown;
+	inputSchema: Record<string, unknown>;
+	outputSchema: Record<string, unknown>;
 	inputFields: string[];
 	outputFields: string[];
 };
@@ -39,6 +39,36 @@ export type WorkflowEdge = {
 	id: string;
 	fromNode: string;
 	toNode: string;
+};
+
+export type WorkflowNodeTypeCounts = {
+	worker: number;
+	supervisor: number;
+	condition: number;
+	tool: number;
+	other: number;
+};
+
+export type WorkflowNodeSample = {
+	id: string;
+	nodeKey: string;
+	nodeType: string;
+	toolNames: string[];
+};
+
+export type WorkflowTemplateSummary = {
+	id: string;
+	name: string;
+	description: string | null;
+	version: number;
+	visibility: string;
+	entryNode: string;
+	edgeCount: number;
+	startedWorkflowCount: number;
+	nodeTypeCounts: WorkflowNodeTypeCounts;
+	nodes: WorkflowNode[];
+	edges: WorkflowEdge[];
+	nodeSamples: WorkflowNodeSample[];
 };
 
 export type DeviceAPIKey = {
@@ -96,22 +126,17 @@ export type DashboardData = {
 		entryNode: string;
 		edgeCount: number;
 		attachedDeviceCount: number;
-		nodeTypeCounts: {
-			worker: number;
-			supervisor: number;
-			condition: number;
-			tool: number;
-			other: number;
-		};
+		template: {
+			id: string;
+			name: string;
+			version: number | null;
+		} | null;
+		nodeTypeCounts: WorkflowNodeTypeCounts;
 		nodes: WorkflowNode[];
 		edges: WorkflowEdge[];
-		nodeSamples: Array<{
-			id: string;
-			nodeKey: string;
-			nodeType: string;
-			toolNames: string[];
-		}>;
+		nodeSamples: WorkflowNodeSample[];
 	}>;
+	workflowTemplates: WorkflowTemplateSummary[];
 	modelCatalog: WorkflowModelOption[];
 	toolCatalog: WorkflowToolOption[];
 };
