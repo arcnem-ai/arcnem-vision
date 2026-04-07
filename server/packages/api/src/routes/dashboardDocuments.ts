@@ -3,7 +3,7 @@ import {
 	createDashboardRealtimeEvent,
 	DASHBOARD_REALTIME_REASON,
 } from "@arcnem-vision/shared";
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
 import { Hono, type Context as HonoContext } from "hono";
 import { getApiMcpClient } from "@/clients/apiMcpClient";
 import { getS3Client } from "@/clients/s3";
@@ -234,6 +234,11 @@ async function searchDashboardDocumentsByMeaning(
 	organizationId: string,
 	query: string,
 	limit: number,
+	filters: {
+		projectId?: string;
+		deviceId?: string;
+		dashboardUploadsOnly?: boolean;
+	},
 ) {
 	const response = await getApiMcpClient().callTool<unknown>(
 		"search_documents_in_scope",
@@ -246,9 +251,20 @@ async function searchDashboardDocumentsByMeaning(
 		},
 	);
 
-	return parseDashboardDocumentSearchMatches(response).map(
-		mapDashboardSearchMatchToRow,
-	);
+	return parseDashboardDocumentSearchMatches(response)
+		.filter((match) => {
+			if (filters.projectId && match.projectId !== filters.projectId) {
+				return false;
+			}
+			if (filters.dashboardUploadsOnly) {
+				return match.deviceId == null;
+			}
+			if (filters.deviceId) {
+				return match.deviceId === filters.deviceId;
+			}
+			return true;
+		})
+		.map(mapDashboardSearchMatchToRow);
 }
 
 async function findDashboardDocumentById(
@@ -898,7 +914,19 @@ dashboardDocumentsRouter.get(
 		const limitParam = c.req.query("limit");
 		const cursor = c.req.query("cursor");
 		const query = c.req.query("query")?.trim() ?? "";
+		const projectId = c.req.query("projectId")?.trim() ?? "";
+		const deviceId = c.req.query("deviceId")?.trim() ?? "";
+		const dashboardUploadsOnly = c.req.query("dashboardUploadsOnly") === "true";
 		const limit = Math.min(Math.max(Number(limitParam) || 20, 1), 100);
+
+		if (deviceId && dashboardUploadsOnly) {
+			return c.json(
+				{
+					message: "deviceId cannot be combined with dashboardUploadsOnly",
+				},
+				400,
+			);
+		}
 
 		if (query.length > 0) {
 			if (query.length > 160) {
@@ -912,6 +940,11 @@ dashboardDocumentsRouter.get(
 				organizationId,
 				query,
 				limit,
+				{
+					projectId: projectId || undefined,
+					deviceId: deviceId || undefined,
+					dashboardUploadsOnly,
+				},
 			);
 			const docs = searchRows.map((row) => toDocumentItem(row));
 
@@ -922,6 +955,14 @@ dashboardDocumentsRouter.get(
 			eq(documents.organizationId, organizationId),
 			topLevelDocumentCondition,
 		];
+		if (projectId) {
+			conditions.push(eq(documents.projectId, projectId));
+		}
+		if (dashboardUploadsOnly) {
+			conditions.push(isNull(documents.deviceId));
+		} else if (deviceId) {
+			conditions.push(eq(documents.deviceId, deviceId));
+		}
 		if (cursor) {
 			conditions.push(lt(documents.id, cursor));
 		}

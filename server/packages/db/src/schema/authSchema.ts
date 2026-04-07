@@ -249,6 +249,7 @@ export const projects = pgTable(
 		organizationId: uuid("organization_id")
 			.notNull()
 			.references(() => organizations.id, { onDelete: "cascade" }),
+		archivedAt: timestamp("archived_at"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at")
 			.defaultNow()
@@ -261,6 +262,10 @@ export const projects = pgTable(
 			table.slug,
 		),
 		index("projects_organizationId_idx").on(table.organizationId),
+		index("projects_organizationId_archivedAt_idx").on(
+			table.organizationId,
+			table.archivedAt,
+		),
 	],
 );
 
@@ -279,6 +284,7 @@ export const devices = pgTable(
 		agentGraphId: uuid("agent_graph_id")
 			.notNull()
 			.references(() => agentGraphs.id),
+		archivedAt: timestamp("archived_at"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at")
 			.defaultNow()
@@ -289,5 +295,9 @@ export const devices = pgTable(
 		uniqueIndex("devices_projectId_slug_uidx").on(table.projectId, table.slug),
 		index("devices_organizationId_idx").on(table.organizationId),
 		index("devices_projectId_idx").on(table.projectId),
+		index("devices_organizationId_archivedAt_idx").on(
+			table.organizationId,
+			table.archivedAt,
+		),
 	],
 );

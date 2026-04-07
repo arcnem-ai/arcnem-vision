@@ -1,3 +1,5 @@
+import type { WorkflowTemplateVisibility } from "@/features/dashboard/types";
+
 export function buildWorkflowNameFromTemplate(
 	templateName: string,
 	existingWorkflowNames: string[],
@@ -17,4 +19,10 @@ export function buildWorkflowNameFromTemplate(
 	}
 
 	return `${baseName} ${suffix}`;
+}
+
+export function normalizeWorkflowTemplateVisibility(
+	value: string | null | undefined,
+): WorkflowTemplateVisibility {
+	return value?.trim().toLowerCase() === "public" ? "public" : "organization";
 }

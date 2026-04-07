@@ -19,6 +19,10 @@ export type EditorNode = WorkflowDraft["nodes"][number] & {
 export const CANVAS_NODE_WIDTH = 210;
 export const CANVAS_NODE_HEIGHT = 100;
 
+type EditableCanvasGraph =
+	| DashboardData["workflows"][number]
+	| DashboardData["workflowTemplates"][number];
+
 export function makeLocalId() {
 	if (
 		typeof crypto !== "undefined" &&
@@ -44,16 +48,14 @@ export function getNodeTypeTone(nodeType: string) {
 	}
 }
 
-export function initialDraftFromWorkflow(
-	workflow: DashboardData["workflows"][number] | null,
-): {
+export function initialDraftFromGraph(graph: EditableCanvasGraph | null): {
 	name: string;
 	description: string;
 	entryNode: string;
 	nodes: EditorNode[];
 	edges: WorkflowDraft["edges"];
 } {
-	if (!workflow) {
+	if (!graph) {
 		const rootId = makeLocalId();
 		return {
 			name: "",
@@ -85,10 +87,10 @@ export function initialDraftFromWorkflow(
 	}
 
 	return {
-		name: workflow.name,
-		description: workflow.description ?? "",
-		entryNode: workflow.entryNode,
-		nodes: workflow.nodes.map((node) => ({
+		name: graph.name,
+		description: graph.description ?? "",
+		entryNode: graph.entryNode,
+		nodes: graph.nodes.map((node) => ({
 			localId: node.id,
 			id: node.id,
 			nodeKey: node.nodeKey,
@@ -104,7 +106,7 @@ export function initialDraftFromWorkflow(
 			toolNames: node.toolNames,
 			modelLabel: node.modelLabel,
 		})),
-		edges: workflow.edges.map((edge) => ({
+		edges: graph.edges.map((edge) => ({
 			fromNode: edge.fromNode,
 			toNode: edge.toNode,
 		})),

@@ -54,6 +54,11 @@ import { DocumentCollectionChat } from "@/features/documents-chat/components/doc
 import { useDashboardRealtime } from "@/features/realtime/dashboard-realtime-provider";
 import { cn } from "@/lib/utils";
 
+const ALL_PROJECTS_FILTER = "all-projects";
+const ALL_SOURCES_FILTER = "all-sources";
+const DASHBOARD_UPLOADS_FILTER = "dashboard-uploads";
+const DEVICE_SOURCE_FILTER_PREFIX = "device:";
+
 function formatBytes(bytes: number): string {
 	if (bytes < 1024) return `${bytes} B`;
 	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -104,6 +109,16 @@ function replaceDocument(
 
 function getDocumentSourceLabel(deviceName: string | null | undefined) {
 	return deviceName ?? "Dashboard Upload";
+}
+
+function getDeviceSourceFilterValue(deviceId: string) {
+	return `${DEVICE_SOURCE_FILTER_PREFIX}${deviceId}`;
+}
+
+function getDeviceIdFromSourceFilterValue(value: string) {
+	return value.startsWith(DEVICE_SOURCE_FILTER_PREFIX)
+		? value.slice(DEVICE_SOURCE_FILTER_PREFIX.length)
+		: null;
 }
 
 function StatusNotice({
@@ -792,6 +807,7 @@ export function DocumentGalleryPanel({
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
 	const ocrRequestIdRef = useRef(0);
 	const segmentationRequestIdRef = useRef(0);
+	const hasAppliedInitialScopeRef = useRef(false);
 
 	const [documents, setDocuments] = useState<DocumentItem[]>(
 		initialData.documents,
@@ -804,9 +820,11 @@ export function DocumentGalleryPanel({
 	const [activeQuery, setActiveQuery] = useState("");
 	const [searchError, setSearchError] = useState<string | null>(null);
 	const [searching, setSearching] = useState(false);
-	const [selectedProjectId, setSelectedProjectId] = useState(
-		projects[0]?.id ?? "",
-	);
+	const [uploadProjectId, setUploadProjectId] = useState(projects[0]?.id ?? "");
+	const [selectedProjectFilterId, setSelectedProjectFilterId] =
+		useState(ALL_PROJECTS_FILTER);
+	const [selectedSourceFilterValue, setSelectedSourceFilterValue] =
+		useState(ALL_SOURCES_FILTER);
 	const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
 		null,
 	);
@@ -836,7 +854,7 @@ export function DocumentGalleryPanel({
 		null,
 	);
 
-	const isFiltering = activeQuery.length > 0;
+	const isSearching = activeQuery.length > 0;
 
 	const projectNameById = useMemo(
 		() => new Map(projects.map((project) => [project.id, project.name])),
@@ -850,6 +868,14 @@ export function DocumentGalleryPanel({
 		() => new Map(workflows.map((workflow) => [workflow.id, workflow.name])),
 		[workflows],
 	);
+	const filteredDevices = useMemo(() => {
+		if (selectedProjectFilterId === ALL_PROJECTS_FILTER) {
+			return devices;
+		}
+		return devices.filter(
+			(device) => device.projectId === selectedProjectFilterId,
+		);
+	}, [devices, selectedProjectFilterId]);
 
 	useEffect(() => {
 		setDocuments(initialData.documents);
@@ -857,10 +883,127 @@ export function DocumentGalleryPanel({
 	}, [initialData.documents, initialData.nextCursor]);
 
 	useEffect(() => {
-		if (!projects.some((project) => project.id === selectedProjectId)) {
-			setSelectedProjectId(projects[0]?.id ?? "");
+		if (!projects.some((project) => project.id === uploadProjectId)) {
+			setUploadProjectId(projects[0]?.id ?? "");
 		}
-	}, [projects, selectedProjectId]);
+	}, [projects, uploadProjectId]);
+
+	useEffect(() => {
+		if (
+			selectedProjectFilterId !== ALL_PROJECTS_FILTER &&
+			!projects.some((project) => project.id === selectedProjectFilterId)
+		) {
+			setSelectedProjectFilterId(ALL_PROJECTS_FILTER);
+		}
+	}, [projects, selectedProjectFilterId]);
+
+	useEffect(() => {
+		const selectedDeviceId = getDeviceIdFromSourceFilterValue(
+			selectedSourceFilterValue,
+		);
+		if (
+			selectedDeviceId &&
+			!filteredDevices.some((device) => device.id === selectedDeviceId)
+		) {
+			setSelectedSourceFilterValue(ALL_SOURCES_FILTER);
+		}
+	}, [filteredDevices, selectedSourceFilterValue]);
+
+	const onProjectFilterChange = (projectFilterId: string) => {
+		setSelectedProjectFilterId(projectFilterId);
+
+		const selectedDeviceId = getDeviceIdFromSourceFilterValue(
+			selectedSourceFilterValue,
+		);
+		if (!selectedDeviceId) {
+			return;
+		}
+
+		const deviceStillAvailable = devices.some(
+			(device) =>
+				device.id === selectedDeviceId &&
+				(projectFilterId === ALL_PROJECTS_FILTER ||
+					device.projectId === projectFilterId),
+		);
+		if (!deviceStillAvailable) {
+			setSelectedSourceFilterValue(ALL_SOURCES_FILTER);
+		}
+	};
+
+	const buildDocumentsRequestData = ({
+		cursor,
+		limit,
+		projectFilterId = selectedProjectFilterId,
+		query: nextQuery,
+		sourceFilterValue = selectedSourceFilterValue,
+	}: {
+		cursor?: string;
+		limit?: number;
+		projectFilterId?: string;
+		query?: string;
+		sourceFilterValue?: string;
+	}) => {
+		const deviceId = getDeviceIdFromSourceFilterValue(sourceFilterValue);
+
+		return {
+			organizationId,
+			...(cursor ? { cursor } : {}),
+			...(limit ? { limit } : {}),
+			...(nextQuery?.trim() ? { query: nextQuery.trim() } : {}),
+			...(projectFilterId !== ALL_PROJECTS_FILTER
+				? { projectId: projectFilterId }
+				: {}),
+			...(deviceId ? { deviceId } : {}),
+			...(sourceFilterValue === DASHBOARD_UPLOADS_FILTER
+				? { dashboardUploadsOnly: true }
+				: {}),
+		};
+	};
+
+	const loadDocumentsForScope = useEffectEvent(
+		async ({
+			projectFilterId = selectedProjectFilterId,
+			query: nextQuery = activeQuery,
+			sourceFilterValue = selectedSourceFilterValue,
+		}: {
+			projectFilterId?: string;
+			query?: string;
+			sourceFilterValue?: string;
+		} = {}) => {
+			setSearching(true);
+			setSearchError(null);
+			try {
+				const result = await fetchDocuments({
+					data: buildDocumentsRequestData({
+						projectFilterId,
+						query: nextQuery,
+						sourceFilterValue,
+						limit: nextQuery?.trim() ? 36 : undefined,
+					}),
+				});
+				setDocuments(result.documents);
+				setNextCursor(result.nextCursor);
+				if (
+					selectedDocumentId &&
+					!result.documents.some(
+						(document) => document.id === selectedDocumentId,
+					)
+				) {
+					closeSelectedDocument();
+				}
+				return result;
+			} catch {
+				setSearchError(
+					nextQuery?.trim()
+						? "Search failed. Please try again."
+						: "Unable to refresh documents.",
+				);
+				return null;
+			} finally {
+				setSearching(false);
+			}
+		},
+	);
 
 	const refreshDocumentById = useEffectEvent(async (documentId: string) => {
 		try {
@@ -875,7 +1018,7 @@ export function DocumentGalleryPanel({
 	const refreshRecentDocuments = useEffectEvent(async () => {
 		try {
 			const result = await fetchDocuments({
-				data: { organizationId },
+				data: buildDocumentsRequestData({}),
 			});
 			setDocuments((prev) => mergeDocuments(result.documents, prev));
 			setNextCursor(result.nextCursor);
@@ -1010,7 +1153,7 @@ export function DocumentGalleryPanel({
 			}
 
 			if (
-				!isFiltering &&
+				!isSearching &&
 				lastEvent.reason === DASHBOARD_REALTIME_REASON.documentCreated
 			) {
 				await refreshRecentDocuments();
@@ -1041,7 +1184,7 @@ export function DocumentGalleryPanel({
 				await loadOCRResults(selectedDocumentId);
 			}
 		})();
-	}, [isFiltering, lastEvent, selectedDocumentId]);
+	}, [isSearching, lastEvent, selectedDocumentId]);
 
 	useEffect(() => {
 		if (reconnectCount === 0) {
@@ -1049,7 +1192,7 @@ export function DocumentGalleryPanel({
 		}
 
 		void (async () => {
-			if (!isFiltering) {
+			if (!isSearching) {
 				await refreshRecentDocuments();
 			}
 
@@ -1059,22 +1202,12 @@ export function DocumentGalleryPanel({
 				await loadSegmentedResults(selectedDocumentId);
 			}
 		})();
-	}, [isFiltering, reconnectCount, selectedDocumentId]);
+	}, [isSearching, reconnectCount, selectedDocumentId]);
 
 	const resetToRecentDocuments = async () => {
-		setSearching(true);
-		setSearchError(null);
-		try {
-			const result = await fetchDocuments({
-				data: { organizationId },
-			});
-			setDocuments(result.documents);
-			setNextCursor(result.nextCursor);
+		const result = await loadDocumentsForScope({ query: "" });
+		if (result) {
 			setActiveQuery("");
-		} catch {
-			setSearchError("Unable to refresh documents.");
-		} finally {
-			setSearching(false);
 		}
 	};
 
@@ -1085,19 +1218,9 @@ export function DocumentGalleryPanel({
 			return;
 		}
 
-		setSearching(true);
-		setSearchError(null);
-		try {
-			const result = await fetchDocuments({
-				data: { organizationId, query: normalized, limit: 36 },
-			});
-			setDocuments(result.documents);
-			setNextCursor(result.nextCursor);
+		const result = await loadDocumentsForScope({ query: normalized });
+		if (result) {
 			setActiveQuery(normalized);
-		} catch {
-			setSearchError("Search failed. Please try again.");
-		} finally {
-			setSearching(false);
 		}
 	};
 
@@ -1108,16 +1231,16 @@ export function DocumentGalleryPanel({
 
 	const clearSearch = async () => {
 		setQuery("");
-		if (!isFiltering) return;
+		if (!isSearching) return;
 		await resetToRecentDocuments();
 	};
 
 	const loadMore = async () => {
-		if (!nextCursor || loadingMore || isFiltering) return;
+		if (!nextCursor || loadingMore || isSearching) return;
 		setLoadingMore(true);
 		try {
 			const result = await fetchDocuments({
-				data: { organizationId, cursor: nextCursor },
+				data: buildDocumentsRequestData({ cursor: nextCursor }),
 			});
 			setDocuments((prev) => mergeDocuments(prev, result.documents));
 			setNextCursor(result.nextCursor);
@@ -1137,7 +1260,7 @@ export function DocumentGalleryPanel({
 		event.target.value = "";
 		if (!file) return;
 
-		if (!selectedProjectId) {
+		if (!uploadProjectId) {
 			setUploadStatusMessage({
 				tone: "error",
 				text: "Choose a project before uploading.",
@@ -1150,7 +1273,7 @@ export function DocumentGalleryPanel({
 		try {
 			const presignedUpload = await requestUpload({
 				data: {
-					projectId: selectedProjectId,
+					projectId: uploadProjectId,
 					contentType: file.type,
 					size: file.size,
 				},
@@ -1179,7 +1302,10 @@ export function DocumentGalleryPanel({
 			let refreshedCursor = nextCursor;
 			try {
 				const latest = await fetchDocuments({
-					data: { organizationId },
+					data: buildDocumentsRequestData({
+						projectFilterId: acknowledgedUpload.document.projectId,
+						sourceFilterValue: DASHBOARD_UPLOADS_FILTER,
+					}),
 				});
 				refreshedDocuments = mergeDocuments(
 					[acknowledgedUpload.document],
@@ -1190,6 +1316,8 @@ export function DocumentGalleryPanel({
 				// Keep the optimistic document list when refresh fails.
 			}
 
+			setSelectedProjectFilterId(acknowledgedUpload.document.projectId);
+			setSelectedSourceFilterValue(DASHBOARD_UPLOADS_FILTER);
 			setDocuments(refreshedDocuments);
 			setNextCursor(refreshedCursor);
 			setActiveQuery("");
@@ -1258,6 +1386,28 @@ export function DocumentGalleryPanel({
 		setWorkflowStatusMessage(null);
 	};
 
+	useEffect(() => {
+		if (
+			selectedDocumentId &&
+			!documents.some((doc) => doc.id === selectedDocumentId)
+		) {
+			setSelectedDocumentId(null);
+			setSelectedWorkflowId("");
+			setWorkflowStatusMessage(null);
+		}
+	}, [documents, selectedDocumentId]);
+
+	useEffect(() => {
+		if (!hasAppliedInitialScopeRef.current) {
+			hasAppliedInitialScopeRef.current = true;
+			return;
+		}
+		void loadDocumentsForScope({
+			projectFilterId: selectedProjectFilterId,
+			sourceFilterValue: selectedSourceFilterValue,
+		});
+	}, [selectedProjectFilterId, selectedSourceFilterValue]);
+
 	return (
 		<div className="space-y-4">
 			<div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
@@ -1307,7 +1457,7 @@ export function DocumentGalleryPanel({
 								Search stays focused on discovery. Upload is handled separately
 								in the intake panel.
 							</p>
-							{isFiltering ? (
+							{isSearching ? (
 								<p className="text-xs text-slate-500">
 									Showing semantic matches for{" "}
 									<span className="font-medium text-slate-700">
@@ -1319,6 +1469,64 @@ export function DocumentGalleryPanel({
 									Browse recent images or search by description.
 								</p>
 							)}
+						</div>
+
+						<div className="grid gap-3 md:grid-cols-2">
+							<div className="space-y-1.5">
+								<p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">
+									Project Filter
+								</p>
+								<Select
+									value={selectedProjectFilterId}
+									onValueChange={onProjectFilterChange}
+								>
+									<SelectTrigger className="border-slate-300 bg-white">
+										<SelectValue placeholder="All projects" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value={ALL_PROJECTS_FILTER}>
+											All projects
+										</SelectItem>
+										{projects.map((project) => (
+											<SelectItem key={project.id} value={project.id}>
+												{project.name}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
+
+							<div className="space-y-1.5">
+								<p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">
+									Source Filter
+								</p>
+								<Select
+									value={selectedSourceFilterValue}
+									onValueChange={setSelectedSourceFilterValue}
+								>
+									<SelectTrigger className="border-slate-300 bg-white">
+										<SelectValue placeholder="All sources" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value={ALL_SOURCES_FILTER}>
+											All sources
+										</SelectItem>
+										<SelectItem value={DASHBOARD_UPLOADS_FILTER}>
+											Dashboard uploads
+										</SelectItem>
+										{filteredDevices.map((device) => (
+											<SelectItem
+												key={device.id}
+												value={getDeviceSourceFilterValue(device.id)}
+											>
+												{selectedProjectFilterId === ALL_PROJECTS_FILTER
+													? `${device.name} · ${projectNameById.get(device.projectId) ?? "Unknown project"}`
+													: device.name}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
 						</div>
 
 						{searchError ? (
@@ -1358,8 +1566,8 @@ export function DocumentGalleryPanel({
 								Project Destination
 							</p>
 							<Select
-								value={selectedProjectId}
-								onValueChange={setSelectedProjectId}
+								value={uploadProjectId}
+								onValueChange={setUploadProjectId}
 								disabled={projects.length === 0}
 							>
 								<SelectTrigger
@@ -1391,7 +1599,7 @@ export function DocumentGalleryPanel({
 								<Button
 									type="button"
 									onClick={onUploadRequested}
-									disabled={!selectedProjectId || uploading}
+									disabled={!uploadProjectId || uploading}
 									size="sm"
 									className="min-w-36 bg-slate-900 text-white hover:bg-slate-800"
 								>
@@ -1431,12 +1639,12 @@ export function DocumentGalleryPanel({
 							</div>
 							<div>
 								<p className="text-lg font-medium text-slate-500">
-									{isFiltering
+									{isSearching
 										? "No semantic matches found"
 										: "No documents uploaded yet"}
 								</p>
 								<p className="mt-1 text-sm text-slate-400">
-									{isFiltering
+									{isSearching
 										? "Try a different phrase or clear the search."
 										: "Upload an image here or wait for device uploads to appear."}
 								</p>
@@ -1465,7 +1673,7 @@ export function DocumentGalleryPanel({
 						))}
 					</div>
 
-					{nextCursor && !isFiltering ? (
+					{nextCursor && !isSearching ? (
 						<div className="flex justify-center pt-2">
 							<Button
 								type="button"

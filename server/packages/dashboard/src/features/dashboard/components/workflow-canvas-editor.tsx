@@ -9,31 +9,44 @@ import type {
 	DashboardData,
 	StatusMessage,
 	WorkflowDraft,
+	WorkflowTemplateDraft,
 } from "@/features/dashboard/types";
 
 export function WorkflowCanvasEditor({
 	isOpen,
+	mode,
 	workflow,
+	template,
 	modelCatalog,
 	toolCatalog,
 	saveMessage,
 	creatingWorkflow,
 	updatingWorkflowId,
+	updatingTemplateId,
 	onClose,
 	onCreateWorkflow,
 	onUpdateWorkflow,
+	onUpdateTemplate,
 }: {
 	isOpen: boolean;
+	mode: "workflow-create" | "workflow-edit" | "template-edit";
 	workflow: DashboardData["workflows"][number] | null;
+	template: DashboardData["workflowTemplates"][number] | null;
 	modelCatalog: DashboardData["modelCatalog"];
 	toolCatalog: DashboardData["toolCatalog"];
 	saveMessage: StatusMessage | null;
 	creatingWorkflow: boolean;
 	updatingWorkflowId: string | null;
+	updatingTemplateId: string | null;
 	onClose: () => void;
 	onCreateWorkflow: (draft: WorkflowDraft) => Promise<void>;
 	onUpdateWorkflow: (workflowId: string, draft: WorkflowDraft) => Promise<void>;
+	onUpdateTemplate: (
+		templateId: string,
+		draft: WorkflowTemplateDraft,
+	) => Promise<void>;
 }) {
+	const activeGraph = workflow ?? template;
 	const {
 		canvasRef,
 		viewport,
@@ -48,9 +61,11 @@ export function WorkflowCanvasEditor({
 		selectedNode,
 		localError,
 		nodeValidationMessage,
+		templateVisibility,
 		setName,
 		setDescription,
 		setEntryNode,
+		setTemplateVisibility,
 		addNode,
 		removeNode,
 		updateSelectedNode,
@@ -67,30 +82,56 @@ export function WorkflowCanvasEditor({
 		saveGraph,
 	} = useWorkflowCanvasEditorState({
 		isOpen,
-		workflow,
+		mode,
+		graph: activeGraph,
 		modelCatalog,
 		toolCatalog,
 		onCreateWorkflow,
 		onUpdateWorkflow,
+		onUpdateTemplate,
 		onClose,
 	});
 
 	if (!isOpen) return null;
 
-	const isSaving = workflow
-		? updatingWorkflowId === workflow.id
-		: creatingWorkflow;
+	const isSaving =
+		mode === "template-edit"
+			? template !== null && updatingTemplateId === template.id
+			: mode === "workflow-edit"
+				? workflow !== null && updatingWorkflowId === workflow.id
+				: creatingWorkflow;
+	const editorLabel =
+		mode === "template-edit"
+			? template
+				? `Editing ${template.name}`
+				: "Editing template"
+			: workflow
+				? "Editing workflow graph"
+				: "Create workflow graph";
+	const saveLabel =
+		mode === "template-edit" && template
+			? "Publish New Version"
+			: mode === "template-edit"
+				? "Publish New Version"
+				: "Save workflow";
+	const versioningHint =
+		mode === "template-edit" && template
+			? `Current version is v${template.version}. Saving publishes v${template.version + 1} as the new current version and keeps older versions intact.`
+			: null;
 
 	return (
-		<div className="fixed inset-0 z-[80] bg-slate-950/70 backdrop-blur-sm">
+		<div className="fixed inset-0 z-80 bg-slate-950/70 backdrop-blur-sm">
 			<div className="absolute inset-3 overflow-hidden rounded-2xl border border-slate-200/70 bg-[linear-gradient(150deg,#fffdf5_0%,#f5fbff_65%,#f3fff9_100%)] shadow-[0_20px_80px_rgba(2,6,23,0.5)]">
 				<div className="flex items-center justify-between border-b border-slate-900/10 bg-white/75 px-4 py-3 backdrop-blur">
 					<div className="flex items-center gap-2">
 						<Badge className="rounded-full bg-slate-900 text-white hover:bg-slate-900">
-							Canvas Editor
+							{mode === "template-edit" ? "Template Editor" : "Canvas Editor"}
 						</Badge>
+						{mode === "template-edit" && template ? (
+							<Badge variant="outline">Current v{template.version}</Badge>
+						) : null}
 						<span className="text-sm font-medium text-slate-700">
-							{workflow ? "Editing workflow graph" : "Create workflow graph"}
+							{editorLabel}
 						</span>
 					</div>
 					<Button
@@ -137,6 +178,9 @@ export function WorkflowCanvasEditor({
 						entryNode={entryNode}
 						nodes={nodes}
 						edges={edges}
+						templateVisibility={templateVisibility}
+						showTemplateVisibility={mode === "template-edit"}
+						versioningHint={versioningHint}
 						saveMessage={saveMessage}
 						localError={localError}
 						isSaving={isSaving}
@@ -147,11 +191,13 @@ export function WorkflowCanvasEditor({
 						onChangeName={setName}
 						onChangeDescription={setDescription}
 						onChangeEntryNode={setEntryNode}
+						onChangeTemplateVisibility={setTemplateVisibility}
 						onChangeSelectedNode={updateSelectedNode}
 						onRemoveEdge={removeEdge}
 						onAddEdgeToEnd={addEdgeToEnd}
 						onSave={saveGraph}
 						onCancel={onClose}
+						saveLabel={saveLabel}
 					/>
 				</div>
 			</div>

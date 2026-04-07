@@ -1,6 +1,7 @@
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
+	Archive,
 	Copy,
 	FolderOpen,
 	FolderPlus,
@@ -11,6 +12,16 @@ import {
 	Workflow,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +45,8 @@ import {
 	createDeviceAPIKey,
 	createProject,
 	deleteDeviceAPIKey,
+	setDeviceArchived,
+	setProjectArchived,
 	updateDevice,
 	updateDeviceAPIKey,
 } from "@/features/dashboard/server-fns";
@@ -53,6 +66,25 @@ type APIKeyDraft = {
 	name: string;
 	enabled: boolean;
 };
+
+type PendingConfirmation =
+	| {
+			kind: "project-archive";
+			projectId: string;
+			projectName: string;
+			archived: boolean;
+	  }
+	| {
+			kind: "device-archive";
+			deviceId: string;
+			deviceName: string;
+			archived: boolean;
+	  }
+	| {
+			kind: "api-key-delete";
+			apiKeyId: string;
+			keyLabel: string;
+	  };
 
 function relativeTime(iso: string | null): string {
 	if (!iso) return "never used";
@@ -112,8 +144,10 @@ function formatKeyLabel(
 
 export function ProjectDevicePanel({
 	dashboard,
+	showArchived,
 }: {
 	dashboard: DashboardData;
+	showArchived: boolean;
 }) {
 	const router = useRouter();
 	const createProjectFn = useServerFn(createProject);
@@ -122,6 +156,8 @@ export function ProjectDevicePanel({
 	const createDeviceAPIKeyFn = useServerFn(createDeviceAPIKey);
 	const updateDeviceAPIKeyFn = useServerFn(updateDeviceAPIKey);
 	const deleteDeviceAPIKeyFn = useServerFn(deleteDeviceAPIKey);
+	const setProjectArchivedFn = useServerFn(setProjectArchived);
+	const setDeviceArchivedFn = useServerFn(setDeviceArchived);
 
 	const [selectedProjectId, setSelectedProjectId] = useState(
 		dashboard.projects[0]?.id ?? "",
@@ -154,6 +190,17 @@ export function ProjectDevicePanel({
 	>(null);
 	const [savingApiKeyId, setSavingApiKeyId] = useState<string | null>(null);
 	const [deletingApiKeyId, setDeletingApiKeyId] = useState<string | null>(null);
+	const [settingProjectArchiveId, setSettingProjectArchiveId] = useState<
+		string | null
+	>(null);
+	const [settingDeviceArchiveId, setSettingDeviceArchiveId] = useState<
+		string | null
+	>(null);
+	const [changingArchiveVisibility, setChangingArchiveVisibility] =
+		useState(false);
+	const [pendingConfirmation, setPendingConfirmation] =
+		useState<PendingConfirmation | null>(null);
+	const [confirmingAction, setConfirmingAction] = useState(false);
 
 	useEffect(() => {
 		setSelectedProjectId((current) =>
@@ -241,14 +288,41 @@ export function ProjectDevicePanel({
 	const revealedKeyDeviceName = revealedKey
 		? (deviceNameByKeyId.get(revealedKey.id) ?? "Selected device")
 		: null;
+	const selectedProjectIsArchived = Boolean(selectedProject?.archivedAt);
 
 	const canCreateDevice =
-		Boolean(selectedProject) && dashboard.workflows.length > 0;
+		Boolean(selectedProject) &&
+		!selectedProjectIsArchived &&
+		dashboard.workflows.length > 0;
 	const canSubmitProject = Boolean(
 		dashboard.organization && newProjectName.trim(),
 	);
 	const canSubmitDevice =
 		Boolean(canCreateDevice) && newDeviceName.trim().length > 0;
+
+	const handleArchiveVisibilityChange = async (pressed: boolean) => {
+		setChangingArchiveVisibility(true);
+		setPanelMessage(null);
+
+		try {
+			await router.navigate({
+				to: "/",
+				search: pressed ? { showArchived: true } : {},
+				replace: true,
+				resetScroll: false,
+			});
+		} catch (error) {
+			setPanelMessage({
+				tone: "error",
+				text:
+					error instanceof Error
+						? error.message
+						: "Failed to update the archive filter.",
+			});
+		} finally {
+			setChangingArchiveVisibility(false);
+		}
+	};
 
 	const handleCreateProject = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
@@ -285,6 +359,13 @@ export function ProjectDevicePanel({
 			setPanelMessage({
 				tone: "error",
 				text: "Create or select a project before adding a device.",
+			});
+			return;
+		}
+		if (selectedProjectIsArchived) {
+			setPanelMessage({
+				tone: "error",
+				text: "Restore this project before adding new devices.",
 			});
 			return;
 		}
@@ -325,6 +406,74 @@ export function ProjectDevicePanel({
 			});
 		} finally {
 			setCreatingDevice(false);
+		}
+	};
+
+	const handleSetProjectArchived = async (
+		projectId: string,
+		projectName: string,
+		archived: boolean,
+	) => {
+		setSettingProjectArchiveId(projectId);
+		setPanelMessage(null);
+		try {
+			await setProjectArchivedFn({
+				data: {
+					projectId,
+					archived,
+				},
+			});
+			setPanelMessage({
+				tone: "success",
+				text: archived
+					? `Project ${projectName} archived.`
+					: `Project ${projectName} restored.`,
+			});
+			await router.invalidate();
+		} catch (error) {
+			setPanelMessage({
+				tone: "error",
+				text:
+					error instanceof Error
+						? error.message
+						: "Failed to update the project archive state.",
+			});
+		} finally {
+			setSettingProjectArchiveId(null);
+		}
+	};
+
+	const handleSetDeviceArchived = async (
+		deviceId: string,
+		deviceName: string,
+		archived: boolean,
+	) => {
+		setSettingDeviceArchiveId(deviceId);
+		setPanelMessage(null);
+		try {
+			await setDeviceArchivedFn({
+				data: {
+					deviceId,
+					archived,
+				},
+			});
+			setPanelMessage({
+				tone: "success",
+				text: archived
+					? `Device ${deviceName} archived.`
+					: `Device ${deviceName} restored.`,
+			});
+			await router.invalidate();
+		} catch (error) {
+			setPanelMessage({
+				tone: "error",
+				text:
+					error instanceof Error
+						? error.message
+						: "Failed to update the device archive state.",
+			});
+		} finally {
+			setSettingDeviceArchiveId(null);
 		}
 	};
 
@@ -421,10 +570,6 @@ export function ProjectDevicePanel({
 	};
 
 	const handleDeleteAPIKey = async (apiKeyId: string) => {
-		if (!window.confirm("Delete this API key? This cannot be undone.")) {
-			return;
-		}
-
 		setDeletingApiKeyId(apiKeyId);
 		setPanelMessage(null);
 		try {
@@ -450,6 +595,125 @@ export function ProjectDevicePanel({
 			});
 		} finally {
 			setDeletingApiKeyId(null);
+		}
+	};
+
+	const requestProjectArchiveConfirmation = (
+		projectId: string,
+		projectName: string,
+		archived: boolean,
+	) => {
+		setPendingConfirmation({
+			kind: "project-archive",
+			projectId,
+			projectName,
+			archived,
+		});
+	};
+
+	const requestDeviceArchiveConfirmation = (
+		deviceId: string,
+		deviceName: string,
+		archived: boolean,
+	) => {
+		setPendingConfirmation({
+			kind: "device-archive",
+			deviceId,
+			deviceName,
+			archived,
+		});
+	};
+
+	const requestDeleteAPIKeyConfirmation = (
+		apiKeyId: string,
+		keyLabel: string,
+	) => {
+		setPendingConfirmation({
+			kind: "api-key-delete",
+			apiKeyId,
+			keyLabel,
+		});
+	};
+
+	const confirmationCopy = useMemo(() => {
+		if (!pendingConfirmation) {
+			return null;
+		}
+
+		switch (pendingConfirmation.kind) {
+			case "project-archive":
+				return pendingConfirmation.archived
+					? {
+							title: `Archive ${pendingConfirmation.projectName}?`,
+							description:
+								"This will archive the project and all of its devices. Archived items are hidden by default, but you can restore them later.",
+							actionLabel: "Archive project",
+							actionClassName: "",
+						}
+					: {
+							title: `Restore ${pendingConfirmation.projectName}?`,
+							description:
+								"This will move the project and its devices back into the active dashboard lists.",
+							actionLabel: "Restore project",
+							actionClassName: "",
+						};
+			case "device-archive":
+				return pendingConfirmation.archived
+					? {
+							title: `Archive ${pendingConfirmation.deviceName}?`,
+							description:
+								"This device will move out of the active list and its key-management controls will stay locked until you restore it.",
+							actionLabel: "Archive device",
+							actionClassName: "",
+						}
+					: {
+							title: `Restore ${pendingConfirmation.deviceName}?`,
+							description:
+								"This device will return to the active list so you can edit its workflow and keys again.",
+							actionLabel: "Restore device",
+							actionClassName: "",
+						};
+			case "api-key-delete":
+				return {
+					title: `Delete key ${pendingConfirmation.keyLabel}?`,
+					description:
+						"This permanently removes the API key from the device. The secret cannot be recovered after deletion.",
+					actionLabel: "Delete key",
+					actionClassName:
+						"bg-rose-600 text-white hover:bg-rose-700 focus-visible:ring-rose-200",
+				};
+		}
+	}, [pendingConfirmation]);
+
+	const handleConfirmPendingAction = async () => {
+		if (!pendingConfirmation) {
+			return;
+		}
+
+		setConfirmingAction(true);
+		try {
+			switch (pendingConfirmation.kind) {
+				case "project-archive":
+					await handleSetProjectArchived(
+						pendingConfirmation.projectId,
+						pendingConfirmation.projectName,
+						pendingConfirmation.archived,
+					);
+					break;
+				case "device-archive":
+					await handleSetDeviceArchived(
+						pendingConfirmation.deviceId,
+						pendingConfirmation.deviceName,
+						pendingConfirmation.archived,
+					);
+					break;
+				case "api-key-delete":
+					await handleDeleteAPIKey(pendingConfirmation.apiKeyId);
+					break;
+			}
+		} finally {
+			setConfirmingAction(false);
+			setPendingConfirmation(null);
 		}
 	};
 
@@ -482,18 +746,71 @@ export function ProjectDevicePanel({
 
 	return (
 		<div className="grid gap-4 xl:grid-cols-[340px_1fr]">
+			<AlertDialog
+				open={pendingConfirmation !== null}
+				onOpenChange={(open) => {
+					if (!open && !confirmingAction) {
+						setPendingConfirmation(null);
+					}
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>{confirmationCopy?.title}</AlertDialogTitle>
+						<AlertDialogDescription>
+							{confirmationCopy?.description}
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={confirmingAction}>
+							Cancel
+						</AlertDialogCancel>
+						<AlertDialogAction
+							className={confirmationCopy?.actionClassName}
+							onClick={(event) => {
+								event.preventDefault();
+								void handleConfirmPendingAction();
+							}}
+							disabled={confirmingAction}
+						>
+							{confirmingAction
+								? "Working..."
+								: (confirmationCopy?.actionLabel ?? "Confirm")}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
 			<Card className="border-slate-900/10 bg-white/85 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
 				<CardHeader className="space-y-4 px-4 sm:px-6">
-					<div className="flex items-center gap-2">
-						<div className="rounded-xl bg-slate-900 p-2 text-white">
-							<FolderOpen className="size-4" />
+					<div className="flex flex-wrap items-start justify-between gap-3">
+						<div className="flex items-center gap-2">
+							<div className="rounded-xl bg-slate-900 p-2 text-white">
+								<FolderOpen className="size-4" />
+							</div>
+							<div>
+								<CardTitle className="font-display text-xl">Projects</CardTitle>
+								<CardDescription>
+									Create a project, then attach devices and keys inside it.
+								</CardDescription>
+							</div>
 						</div>
-						<div>
-							<CardTitle className="font-display text-xl">Projects</CardTitle>
-							<CardDescription>
-								Create a project, then attach devices and keys inside it.
-							</CardDescription>
-						</div>
+						<Toggle
+							pressed={showArchived}
+							onPressedChange={(pressed) =>
+								void handleArchiveVisibilityChange(pressed)
+							}
+							disabled={changingArchiveVisibility}
+							variant="outline"
+							size="sm"
+							className="rounded-full px-4"
+						>
+							{changingArchiveVisibility
+								? "Updating..."
+								: showArchived
+									? "Showing archived"
+									: "Show archived"}
+						</Toggle>
 					</div>
 
 					<form
@@ -533,30 +850,54 @@ export function ProjectDevicePanel({
 						<div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 px-4 py-10 text-center">
 							<FolderOpen className="mx-auto size-8 text-slate-300" />
 							<p className="mt-3 text-sm font-medium text-slate-600">
-								No projects yet
+								{showArchived ? "No projects yet" : "No active projects"}
 							</p>
 							<p className="mt-1 text-xs text-muted-foreground">
-								Create the first project to start registering devices.
+								{showArchived
+									? "Create the first project to start registering devices."
+									: "Create a project or show archived items to revisit older work."}
 							</p>
 						</div>
 					) : (
 						dashboard.projects.map((project) => {
 							const isSelected = project.id === selectedProjectId;
+							const projectIsArchived = Boolean(project.archivedAt);
 							return (
-								<button
-									type="button"
+								<div
 									key={project.id}
-									onClick={() => setSelectedProjectId(project.id)}
 									className={cn(
-										"group w-full rounded-2xl border px-3 py-3 text-left transition-all",
+										"rounded-2xl border px-3 py-3 transition-all",
 										isSelected
 											? "border-slate-900/15 bg-slate-900 text-white shadow-md"
 											: "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm",
+										projectIsArchived &&
+											(isSelected
+												? "bg-slate-800 text-white"
+												: "border-slate-300 bg-slate-50/90"),
 									)}
 								>
 									<div className="flex items-start justify-between gap-3">
-										<div className="min-w-0">
-											<p className="truncate font-semibold">{project.name}</p>
+										<button
+											type="button"
+											onClick={() => setSelectedProjectId(project.id)}
+											className="min-w-0 flex-1 text-left"
+										>
+											<div className="flex flex-wrap items-center gap-2">
+												<p className="truncate font-semibold">{project.name}</p>
+												{projectIsArchived ? (
+													<Badge
+														variant="outline"
+														className={cn(
+															"rounded-full",
+															isSelected
+																? "border-white/20 bg-white/10 text-white"
+																: "border-slate-300 bg-slate-100 text-slate-600",
+														)}
+													>
+														Archived
+													</Badge>
+												) : null}
+											</div>
 											<p
 												className={cn(
 													"mt-1 truncate text-xs",
@@ -565,18 +906,41 @@ export function ProjectDevicePanel({
 											>
 												{project.slug}
 											</p>
+										</button>
+										<div className="flex shrink-0 items-center gap-2">
+											<Badge
+												variant="outline"
+												className={cn(
+													"rounded-full",
+													isSelected
+														? "border-white/20 bg-white/10 text-white"
+														: "border-slate-200 bg-slate-50 text-slate-600",
+												)}
+											>
+												{project.deviceCount} devices
+											</Badge>
+											<Button
+												type="button"
+												variant={isSelected ? "secondary" : "outline"}
+												size="sm"
+												onClick={() =>
+													requestProjectArchiveConfirmation(
+														project.id,
+														project.name,
+														!projectIsArchived,
+													)
+												}
+												disabled={settingProjectArchiveId === project.id}
+												className="rounded-full px-3"
+											>
+												<Archive className="size-4" />
+												{settingProjectArchiveId === project.id
+													? "Saving..."
+													: projectIsArchived
+														? "Restore"
+														: "Archive"}
+											</Button>
 										</div>
-										<Badge
-											variant="outline"
-											className={cn(
-												"shrink-0 rounded-full",
-												isSelected
-													? "border-white/20 bg-white/10 text-white"
-													: "border-slate-200 bg-slate-50 text-slate-600",
-											)}
-										>
-											{project.deviceCount} devices
-										</Badge>
 									</div>
 									<p
 										className={cn(
@@ -584,9 +948,11 @@ export function ProjectDevicePanel({
 											isSelected ? "text-slate-300" : "text-slate-500",
 										)}
 									>
-										{project.apiKeyCount} keys issued for this project
+										{projectIsArchived && project.archivedAt
+											? `Archived ${formatDateTime(project.archivedAt)}`
+											: `${project.apiKeyCount} keys issued for this project`}
 									</p>
-								</button>
+								</div>
 							);
 						})
 					)}
@@ -653,19 +1019,33 @@ export function ProjectDevicePanel({
 									<div className="rounded-xl bg-emerald-600 p-2 text-white">
 										<MonitorSmartphone className="size-4" />
 									</div>
-									<CardTitle className="font-display text-xl">
-										{selectedProject
-											? `${selectedProject.name} control room`
-											: "Project devices"}
-									</CardTitle>
+									<div className="flex flex-wrap items-center gap-2">
+										<CardTitle className="font-display text-xl">
+											{selectedProject
+												? `${selectedProject.name} control room`
+												: "Project devices"}
+										</CardTitle>
+										{selectedProjectIsArchived ? (
+											<Badge
+												variant="outline"
+												className="rounded-full border-slate-300 bg-slate-100 text-slate-700"
+											>
+												Archived
+											</Badge>
+										) : null}
+									</div>
 								</div>
 								<CardDescription className="mt-2 max-w-2xl">
-									Wire each device to a workflow, then issue the API keys it
-									needs for uploads.
+									{selectedProjectIsArchived
+										? "This project is archived. Restore it to add devices or issue new keys."
+										: "Wire each device to a workflow, then issue the API keys it needs for uploads."}
 								</CardDescription>
 							</div>
 							{selectedProject ? (
-								<div className="grid min-w-[220px] grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 text-sm">
+								<div
+									className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 text-sm"
+									style={{ minWidth: 220 }}
+								>
 									<div>
 										<p className="text-xs uppercase tracking-[0.2em] text-slate-400">
 											Slug
@@ -682,6 +1062,18 @@ export function ProjectDevicePanel({
 											{selectedProject.apiKeyCount}
 										</p>
 									</div>
+									{selectedProjectIsArchived ? (
+										<div className="col-span-2">
+											<p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+												Archived
+											</p>
+											<p className="mt-1 font-medium text-slate-700">
+												{selectedProject.archivedAt
+													? formatDateTime(selectedProject.archivedAt)
+													: "Yes"}
+											</p>
+										</div>
+									) : null}
 								</div>
 							) : null}
 						</div>
@@ -692,7 +1084,9 @@ export function ProjectDevicePanel({
 						>
 							<div className="flex items-center gap-2 text-sm font-medium text-slate-700">
 								<Plus className="size-4 text-emerald-600" />
-								New device inside this project
+								{selectedProjectIsArchived
+									? "Project archived"
+									: "New device inside this project"}
 							</div>
 							<div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(200px,0.8fr)_auto]">
 								<Input
@@ -726,9 +1120,11 @@ export function ProjectDevicePanel({
 								</Button>
 							</div>
 							<p className="mt-3 text-xs text-slate-500">
-								{dashboard.workflows.length === 0
-									? "Create a workflow first, then devices can be registered here."
-									: "Each new device gets a stable slug automatically and can be re-pointed later."}
+								{selectedProjectIsArchived
+									? "Restore this project to register new devices or rotate keys."
+									: dashboard.workflows.length === 0
+										? "Create a workflow first, then devices can be registered here."
+										: "Each new device gets a stable slug automatically and can be re-pointed later."}
 							</p>
 						</form>
 					</CardHeader>
@@ -752,7 +1148,9 @@ export function ProjectDevicePanel({
 									No devices in {selectedProject.name} yet
 								</p>
 								<p className="mt-1 text-xs text-muted-foreground">
-									Add the first device above, then issue API keys for it here.
+									{selectedProjectIsArchived
+										? "Restore the project or show archived items elsewhere to keep working with old devices."
+										: "Add the first device above, then issue API keys for it here."}
 								</p>
 							</div>
 						) : (
@@ -761,15 +1159,21 @@ export function ProjectDevicePanel({
 									name: device.name,
 									agentGraphId: device.agentGraphId,
 								};
+								const deviceIsArchived = Boolean(device.archivedAt);
 								const deviceIsDirty =
 									draft.name !== device.name ||
 									draft.agentGraphId !== device.agentGraphId;
 								const isConnected = device.status === "connected";
+								const canRestoreDevice = !selectedProjectIsArchived;
 
 								return (
 									<div
 										key={device.id}
-										className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.96))] shadow-[0_12px_35px_rgba(15,23,42,0.05)]"
+										className={cn(
+											"overflow-hidden rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.96))] shadow-[0_12px_35px_rgba(15,23,42,0.05)]",
+											deviceIsArchived &&
+												"border-slate-300 bg-[linear-gradient(180deg,rgba(248,250,252,0.98),rgba(241,245,249,0.98))]",
+										)}
 									>
 										<div className="border-b border-slate-200/80 px-4 py-4 sm:px-5">
 											<div className="flex flex-wrap items-start justify-between gap-3">
@@ -791,9 +1195,19 @@ export function ProjectDevicePanel({
 															/>
 														</div>
 														<div>
-															<p className="font-display text-lg text-slate-900">
-																{device.name}
-															</p>
+															<div className="flex flex-wrap items-center gap-2">
+																<p className="font-display text-lg text-slate-900">
+																	{device.name}
+																</p>
+																{deviceIsArchived ? (
+																	<Badge
+																		variant="outline"
+																		className="rounded-full border-slate-300 bg-slate-100 text-slate-700"
+																	>
+																		Archived
+																	</Badge>
+																) : null}
+															</div>
 															<p className="text-xs text-slate-500">
 																Slug: {device.slug}
 															</p>
@@ -818,6 +1232,30 @@ export function ProjectDevicePanel({
 													>
 														{device.apiKeyCount} keys
 													</Badge>
+													<Button
+														type="button"
+														variant="outline"
+														size="sm"
+														onClick={() =>
+															requestDeviceArchiveConfirmation(
+																device.id,
+																device.name,
+																!deviceIsArchived,
+															)
+														}
+														disabled={
+															settingDeviceArchiveId === device.id ||
+															(deviceIsArchived && !canRestoreDevice)
+														}
+														className="rounded-full px-3"
+													>
+														<Archive className="size-4" />
+														{settingDeviceArchiveId === device.id
+															? "Saving..."
+															: deviceIsArchived
+																? "Restore"
+																: "Archive"}
+													</Button>
 												</div>
 											</div>
 
@@ -834,6 +1272,7 @@ export function ProjectDevicePanel({
 														}))
 													}
 													placeholder="Device name"
+													disabled={deviceIsArchived}
 												/>
 												<Select
 													value={draft.agentGraphId}
@@ -846,6 +1285,7 @@ export function ProjectDevicePanel({
 															},
 														}))
 													}
+													disabled={deviceIsArchived}
 												>
 													<SelectTrigger className="h-9 bg-white">
 														<SelectValue placeholder="Choose a workflow" />
@@ -862,6 +1302,7 @@ export function ProjectDevicePanel({
 													type="button"
 													onClick={() => void handleSaveDevice(device.id)}
 													disabled={
+														deviceIsArchived ||
 														!deviceIsDirty ||
 														draft.name.trim().length === 0 ||
 														savingDeviceId === device.id
@@ -879,6 +1320,16 @@ export function ProjectDevicePanel({
 													{device.workflowName ?? "No workflow"}
 												</span>
 												<span>Updated {relativeTime(device.updatedAt)}</span>
+												{deviceIsArchived && device.archivedAt ? (
+													<span>
+														Archived {formatDateTime(device.archivedAt)}
+													</span>
+												) : null}
+												{deviceIsArchived && !canRestoreDevice ? (
+													<span>
+														Restore the project before restoring this device.
+													</span>
+												) : null}
 											</div>
 										</div>
 
@@ -898,12 +1349,14 @@ export function ProjectDevicePanel({
 															}))
 														}
 														placeholder={`${device.name} upload key`}
+														disabled={deviceIsArchived}
 													/>
 													<Button
 														type="button"
 														variant="outline"
 														onClick={() => void handleCreateAPIKey(device.id)}
 														disabled={
+															deviceIsArchived ||
 															creatingKeyForDeviceId === device.id ||
 															(newKeyNamesByDevice[device.id] ?? "").trim()
 																.length === 0
@@ -916,8 +1369,9 @@ export function ProjectDevicePanel({
 													</Button>
 												</div>
 												<p className="mt-3 text-xs text-slate-500">
-													The generated secret is shown once, then only the
-													public identifier remains visible here.
+													{deviceIsArchived
+														? "Restore this device before issuing another key."
+														: "The generated secret is shown once, then only the public identifier remains visible here."}
 												</p>
 											</div>
 
@@ -980,9 +1434,19 @@ export function ProjectDevicePanel({
 																	variant="ghost"
 																	size="sm"
 																	onClick={() =>
-																		void handleDeleteAPIKey(apiKey.id)
+																		requestDeleteAPIKeyConfirmation(
+																			apiKey.id,
+																			formatKeyLabel(
+																				apiKey.start,
+																				apiKey.prefix,
+																				apiKey.id,
+																			),
+																		)
 																	}
-																	disabled={deletingApiKeyId === apiKey.id}
+																	disabled={
+																		deviceIsArchived ||
+																		deletingApiKeyId === apiKey.id
+																	}
 																	className="text-slate-500 hover:text-rose-600"
 																>
 																	{deletingApiKeyId === apiKey.id
@@ -1004,6 +1468,7 @@ export function ProjectDevicePanel({
 																		}))
 																	}
 																	placeholder="API key name"
+																	disabled={deviceIsArchived}
 																/>
 																<Toggle
 																	pressed={apiKeyDraft.enabled}
@@ -1019,6 +1484,7 @@ export function ProjectDevicePanel({
 																	variant="outline"
 																	size="sm"
 																	className="rounded-full px-4"
+																	disabled={deviceIsArchived}
 																>
 																	{apiKeyDraft.enabled ? "Enabled" : "Disabled"}
 																</Toggle>
@@ -1029,6 +1495,7 @@ export function ProjectDevicePanel({
 																		void handleSaveAPIKey(apiKey.id)
 																	}
 																	disabled={
+																		deviceIsArchived ||
 																		!apiKeyIsDirty ||
 																		apiKeyDraft.name.trim().length === 0 ||
 																		savingApiKeyId === apiKey.id

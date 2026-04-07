@@ -28,6 +28,43 @@ describe("normalizeGraphData", () => {
 		expect(result.edges).toEqual([{ fromNode: "start", toNode: "END" }]);
 	});
 
+	test("accepts a supervisor graph without explicit END edges", () => {
+		const result = normalizeGraphData({
+			entryNode: "quality_review_supervisor",
+			nodes: [
+				{
+					nodeKey: "quality_review_supervisor",
+					nodeType: "supervisor",
+					x: 0,
+					y: 0,
+					modelId,
+					config: {
+						members: ["image_quality_good_worker", "image_quality_bad_worker"],
+					},
+				},
+				{
+					nodeKey: "image_quality_good_worker",
+					nodeType: "worker",
+					x: 160,
+					y: 0,
+					modelId,
+					config: {},
+				},
+				{
+					nodeKey: "image_quality_bad_worker",
+					nodeType: "worker",
+					x: 160,
+					y: 100,
+					modelId,
+					config: {},
+				},
+			],
+			edges: [],
+		});
+
+		expect(result.edges).toEqual([]);
+	});
+
 	test("rejects duplicate supervisor members", () => {
 		expect(() =>
 			normalizeGraphData({

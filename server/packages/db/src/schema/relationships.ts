@@ -6,10 +6,8 @@ import {
 	agentGraphRunSteps,
 	agentGraphRuns,
 	agentGraphs,
-	agentGraphTemplateEdges,
-	agentGraphTemplateNodes,
-	agentGraphTemplateNodeTools,
 	agentGraphTemplates,
+	agentGraphTemplateVersions,
 	tools,
 } from "./agentGraphSchemas";
 import {
@@ -188,7 +186,6 @@ export const modelsRelations = relations(models, ({ many }) => ({
 	documentOCRResults: many(documentOCRResults),
 	documentSegmentations: many(documentSegmentations),
 	documentDescriptionEmbeddings: many(documentDescriptionEmbeddings),
-	agentGraphTemplateNodes: many(agentGraphTemplateNodes),
 	agentGraphNodes: many(agentGraphNodes),
 }));
 
@@ -270,7 +267,6 @@ export const documentDescriptionEmbeddingsRelations = relations(
 );
 
 export const toolsRelations = relations(tools, ({ many }) => ({
-	agentGraphTemplateNodeTools: many(agentGraphTemplateNodeTools),
 	agentGraphNodeTools: many(agentGraphNodeTools),
 }));
 
@@ -281,75 +277,28 @@ export const agentGraphTemplatesRelations = relations(
 			fields: [agentGraphTemplates.organizationId],
 			references: [organizations.id],
 		}),
-		agentGraphTemplateNodes: many(agentGraphTemplateNodes),
-		agentGraphTemplateEdges: many(agentGraphTemplateEdges),
+		currentVersion: one(agentGraphTemplateVersions, {
+			fields: [agentGraphTemplates.currentVersionId],
+			references: [agentGraphTemplateVersions.id],
+			relationName: "template_current_version",
+		}),
+		agentGraphTemplateVersions: many(agentGraphTemplateVersions, {
+			relationName: "template_versions",
+		}),
 		agentGraphs: many(agentGraphs),
 	}),
 );
 
-export const agentGraphTemplateNodesRelations = relations(
-	agentGraphTemplateNodes,
+export const agentGraphTemplateVersionsRelations = relations(
+	agentGraphTemplateVersions,
 	({ one, many }) => ({
 		agentGraphTemplates: one(agentGraphTemplates, {
-			fields: [agentGraphTemplateNodes.agentGraphTemplateId],
+			fields: [agentGraphTemplateVersions.agentGraphTemplateId],
 			references: [agentGraphTemplates.id],
+			relationName: "template_versions",
 		}),
-		models: one(models, {
-			fields: [agentGraphTemplateNodes.modelId],
-			references: [models.id],
-		}),
-		agentGraphTemplateNodeTools: many(agentGraphTemplateNodeTools),
-		fromEdges: many(agentGraphTemplateEdges, {
-			relationName: "template_from_node",
-		}),
-		toEdges: many(agentGraphTemplateEdges, {
-			relationName: "template_to_node",
-		}),
-	}),
-);
-
-export const agentGraphTemplateNodeToolsRelations = relations(
-	agentGraphTemplateNodeTools,
-	({ one }) => ({
-		agentGraphTemplateNodes: one(agentGraphTemplateNodes, {
-			fields: [agentGraphTemplateNodeTools.agentGraphTemplateNodeId],
-			references: [agentGraphTemplateNodes.id],
-		}),
-		tools: one(tools, {
-			fields: [agentGraphTemplateNodeTools.toolId],
-			references: [tools.id],
-		}),
-	}),
-);
-
-export const agentGraphTemplateEdgesRelations = relations(
-	agentGraphTemplateEdges,
-	({ one }) => ({
-		agentGraphTemplates: one(agentGraphTemplates, {
-			fields: [agentGraphTemplateEdges.agentGraphTemplateId],
-			references: [agentGraphTemplates.id],
-		}),
-		fromNodeRef: one(agentGraphTemplateNodes, {
-			relationName: "template_from_node",
-			fields: [
-				agentGraphTemplateEdges.agentGraphTemplateId,
-				agentGraphTemplateEdges.fromNode,
-			],
-			references: [
-				agentGraphTemplateNodes.agentGraphTemplateId,
-				agentGraphTemplateNodes.nodeKey,
-			],
-		}),
-		toNodeRef: one(agentGraphTemplateNodes, {
-			relationName: "template_to_node",
-			fields: [
-				agentGraphTemplateEdges.agentGraphTemplateId,
-				agentGraphTemplateEdges.toNode,
-			],
-			references: [
-				agentGraphTemplateNodes.agentGraphTemplateId,
-				agentGraphTemplateNodes.nodeKey,
-			],
+		currentForTemplate: many(agentGraphTemplates, {
+			relationName: "template_current_version",
 		}),
 	}),
 );
@@ -362,6 +311,10 @@ export const agentGraphsRelations = relations(agentGraphs, ({ one, many }) => ({
 	agentGraphTemplates: one(agentGraphTemplates, {
 		fields: [agentGraphs.agentGraphTemplateId],
 		references: [agentGraphTemplates.id],
+	}),
+	agentGraphTemplateVersions: one(agentGraphTemplateVersions, {
+		fields: [agentGraphs.agentGraphTemplateVersionId],
+		references: [agentGraphTemplateVersions.id],
 	}),
 	agentGraphNodes: many(agentGraphNodes),
 	agentGraphEdges: many(agentGraphEdges),

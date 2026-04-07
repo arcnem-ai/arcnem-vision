@@ -9,10 +9,8 @@ import {
 	agentGraphRunSteps,
 	agentGraphRuns,
 	agentGraphs,
-	agentGraphTemplateEdges,
-	agentGraphTemplateNodes,
-	agentGraphTemplateNodeTools,
 	agentGraphTemplates,
+	agentGraphTemplateVersions,
 	apikeys,
 	devices,
 	documentDescriptionEmbeddings,
@@ -47,6 +45,8 @@ const plainOCRSupervisorApiKey =
 	"seed_ocr_sup_G7n4Q1r8S5t2U9v6W3x0Y7z4A1b8C5d2E9f6G3h0J7k4";
 const seedDashboardSessionToken =
 	"seed_dashboard_session_s4M8xR2vJ7nK1qP5wL9cD3fH6tY0uB4";
+const seededDashboardUserEmail =
+	process.env.SEED_DASHBOARD_USER_EMAIL?.trim().toLowerCase() ?? "";
 const seedDocumentEmbeddingDim = 768;
 const semanticSegmentAnythingVersion =
 	"b2691db53f2d96add0051a4a98e7a3861bd21bf5972031119d344d956d2f8256";
@@ -439,11 +439,49 @@ const uploadSeedDocumentsToS3 = async (
 	);
 };
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	if (!value || typeof value !== "object" || Array.isArray(value)) {
+		return false;
+	}
+
+	const prototype = Object.getPrototypeOf(value);
+	return prototype === Object.prototype || prototype === null;
+}
+
+function normalizeSeedNodeConfig(config: unknown) {
+	if (!isPlainObject(config)) {
+		return {};
+	}
+
+	const normalized = { ...config };
+	delete normalized.uiPosition;
+	return normalized;
+}
+
+function parseSeedCanvasPosition(config: unknown, fallbackIndex: number) {
+	const fallback = {
+		x: 80 + (fallbackIndex % 4) * 220,
+		y: 80 + Math.floor(fallbackIndex / 4) * 140,
+	};
+
+	if (!isPlainObject(config) || !isPlainObject(config.uiPosition)) {
+		return fallback;
+	}
+
+	const x = config.uiPosition.x;
+	const y = config.uiPosition.y;
+
+	return {
+		x: typeof x === "number" ? Math.round(x) : fallback.x,
+		y: typeof y === "number" ? Math.round(y) : fallback.y,
+	};
+}
+
 const cloneWorkflowToTemplate = async (
 	tx: SeedTransaction,
 	input: {
 		workflowId: string;
-		organizationId: string;
+		organizationId?: string | null;
 		visibility?: string;
 	},
 ) => {
@@ -490,20 +528,41 @@ const cloneWorkflowToTemplate = async (
 		);
 	}
 
+	const snapshot = {
+		name: sourceWorkflow.name,
+		description: sourceWorkflow.description,
+		entryNode: sourceWorkflow.entryNode,
+		stateSchema: isPlainObject(sourceWorkflow.stateSchema)
+			? sourceWorkflow.stateSchema
+			: null,
+		nodes: sourceWorkflow.agentGraphNodes.map((node, index) => {
+			const position = parseSeedCanvasPosition(node.config, index);
+			return {
+				nodeKey: node.nodeKey,
+				nodeType: node.nodeType,
+				x: position.x,
+				y: position.y,
+				inputKey: node.inputKey,
+				outputKey: node.outputKey,
+				modelId: node.modelId,
+				toolIds: node.agentGraphNodeTools.map((toolLink) => toolLink.toolId),
+				config: normalizeSeedNodeConfig(node.config),
+			};
+		}),
+		edges: sourceWorkflow.agentGraphEdges.map((edge) => ({
+			fromNode: edge.fromNode,
+			toNode: edge.toNode,
+		})),
+	};
+
 	const [template] = await tx
 		.insert(agentGraphTemplates)
 		.values({
-			name: sourceWorkflow.name,
-			description: sourceWorkflow.description,
-			version: 1,
 			visibility: input.visibility ?? "organization",
-			entryNode: sourceWorkflow.entryNode,
-			stateSchema: sourceWorkflow.stateSchema ?? null,
-			organizationId: input.organizationId,
+			organizationId: input.organizationId ?? null,
 		})
 		.returning({
 			id: agentGraphTemplates.id,
-			version: agentGraphTemplates.version,
 		});
 	if (!template) {
 		throw new Error(
@@ -511,68 +570,43 @@ const cloneWorkflowToTemplate = async (
 		);
 	}
 
-	if (sourceWorkflow.agentGraphNodes.length > 0) {
-		const insertedTemplateNodes = await tx
-			.insert(agentGraphTemplateNodes)
-			.values(
-				sourceWorkflow.agentGraphNodes.map((node) => ({
-					nodeKey: node.nodeKey,
-					nodeType: node.nodeType,
-					inputKey: node.inputKey,
-					outputKey: node.outputKey,
-					modelId: node.modelId,
-					config: node.config ?? {},
-					agentGraphTemplateId: template.id,
-				})),
-			)
-			.returning({
-				id: agentGraphTemplateNodes.id,
-				nodeKey: agentGraphTemplateNodes.nodeKey,
-			});
+	const [templateVersion] = await tx
+		.insert(agentGraphTemplateVersions)
+		.values({
+			agentGraphTemplateId: template.id,
+			version: 1,
+			snapshot,
+		})
+		.returning({
+			id: agentGraphTemplateVersions.id,
+			version: agentGraphTemplateVersions.version,
+		});
 
-		const templateNodeIdByKey = new Map(
-			insertedTemplateNodes.map((node) => [node.nodeKey, node.id]),
-		);
-		const templateNodeToolRows = sourceWorkflow.agentGraphNodes.flatMap(
-			(node) => {
-				const templateNodeId = templateNodeIdByKey.get(node.nodeKey);
-				if (!templateNodeId) {
-					return [];
-				}
-
-				return node.agentGraphNodeTools.map((toolLink) => ({
-					agentGraphTemplateNodeId: templateNodeId,
-					toolId: toolLink.toolId,
-				}));
-			},
-		);
-		if (templateNodeToolRows.length > 0) {
-			await tx.insert(agentGraphTemplateNodeTools).values(templateNodeToolRows);
-		}
-	}
-
-	if (sourceWorkflow.agentGraphEdges.length > 0) {
-		await tx.insert(agentGraphTemplateEdges).values(
-			sourceWorkflow.agentGraphEdges.map((edge) => ({
-				fromNode: edge.fromNode,
-				toNode: edge.toNode,
-				agentGraphTemplateId: template.id,
-			})),
+	if (!templateVersion) {
+		throw new Error(
+			`Failed to create template version for workflow ${sourceWorkflow.name}`,
 		);
 	}
+
+	await tx
+		.update(agentGraphTemplates)
+		.set({
+			currentVersionId: templateVersion.id,
+		})
+		.where(eq(agentGraphTemplates.id, template.id));
 
 	await tx
 		.update(agentGraphs)
 		.set({
 			agentGraphTemplateId: template.id,
-			agentGraphTemplateVersion: template.version,
+			agentGraphTemplateVersionId: templateVersion.id,
 		})
 		.where(eq(agentGraphs.id, sourceWorkflow.id));
 
 	return {
 		id: template.id,
 		name: sourceWorkflow.name,
-		version: template.version,
+		version: templateVersion.version,
 		sourceWorkflowId: sourceWorkflow.id,
 	};
 };
@@ -623,9 +657,7 @@ const seed = async () => {
 			TRUNCATE TABLE
 				"agent_graph_run_steps",
 				"agent_graph_runs",
-				"agent_graph_template_edges",
-				"agent_graph_template_node_tools",
-				"agent_graph_template_nodes",
+				"agent_graph_template_versions",
 				"agent_graph_templates",
 				"agent_graph_edges",
 				"agent_graph_node_tools",
@@ -678,16 +710,79 @@ const seed = async () => {
 			})
 			.returning({
 				id: organizations.id,
+				name: organizations.name,
 				slug: organizations.slug,
 			});
 		if (!organization) throw new Error("Failed to create seed organization");
 
-		await tx.insert(members).values({
-			organizationId: organization.id,
-			userId: user.id,
-			role: "owner",
-			createdAt: now,
-		});
+		const [secondaryOrganization] = await tx
+			.insert(organizations)
+			.values({
+				name: "Seed Ventures",
+				slug: "seed-ventures",
+				createdAt: now,
+			})
+			.returning({
+				id: organizations.id,
+				name: organizations.name,
+				slug: organizations.slug,
+			});
+		if (!secondaryOrganization) {
+			throw new Error("Failed to create secondary seed organization");
+		}
+
+		await tx.insert(members).values([
+			{
+				organizationId: organization.id,
+				userId: user.id,
+				role: "owner",
+				createdAt: now,
+			},
+			{
+				organizationId: secondaryOrganization.id,
+				userId: user.id,
+				role: "owner",
+				createdAt: now,
+			},
+		]);
+
+		let seededLoginUser: {
+			id: string;
+			email: string;
+		} | null = null;
+		if (seededDashboardUserEmail && seededDashboardUserEmail !== user.email) {
+			const [insertedSeededLoginUser] = await tx
+				.insert(users)
+				.values({
+					name: "Seeded Dashboard User",
+					email: seededDashboardUserEmail,
+					emailVerified: true,
+				})
+				.returning({
+					id: users.id,
+					email: users.email,
+				});
+			if (!insertedSeededLoginUser) {
+				throw new Error("Failed to create seeded dashboard login user");
+			}
+
+			await tx.insert(members).values([
+				{
+					organizationId: organization.id,
+					userId: insertedSeededLoginUser.id,
+					role: "owner",
+					createdAt: now,
+				},
+				{
+					organizationId: secondaryOrganization.id,
+					userId: insertedSeededLoginUser.id,
+					role: "owner",
+					createdAt: now,
+				},
+			]);
+
+			seededLoginUser = insertedSeededLoginUser;
+		}
 
 		const sessionExpiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 30);
 
@@ -720,9 +815,28 @@ const seed = async () => {
 			})
 			.returning({
 				id: projects.id,
+				name: projects.name,
+				organizationId: projects.organizationId,
 				slug: projects.slug,
 			});
 		if (!project) throw new Error("Failed to create seed project");
+
+		const [secondaryProject] = await tx
+			.insert(projects)
+			.values({
+				name: "Seed Ventures Project",
+				slug: "seed-ventures-project",
+				organizationId: secondaryOrganization.id,
+			})
+			.returning({
+				id: projects.id,
+				name: projects.name,
+				organizationId: projects.organizationId,
+				slug: projects.slug,
+			});
+		if (!secondaryProject) {
+			throw new Error("Failed to create secondary seed project");
+		}
 
 		// ── Models ──
 
@@ -3185,14 +3299,19 @@ const seed = async () => {
 			},
 		]);
 
+		// Seed a mix of organization-only and organization-owned public templates.
+		// Public templates remain owned by Seed Organization so the data matches
+		// the intended sharing model in the dashboard.
 		const workflowTemplates = [
 			await cloneWorkflowToTemplate(tx, {
 				workflowId: pipelineGraph.id,
 				organizationId: organization.id,
+				visibility: "public",
 			}),
 			await cloneWorkflowToTemplate(tx, {
 				workflowId: qualityReviewGraph.id,
 				organizationId: organization.id,
+				visibility: "public",
 			}),
 			await cloneWorkflowToTemplate(tx, {
 				workflowId: segmentationGraph.id,
@@ -3205,18 +3324,23 @@ const seed = async () => {
 			await cloneWorkflowToTemplate(tx, {
 				workflowId: ocrConditionGraph.id,
 				organizationId: organization.id,
+				visibility: "public",
 			}),
 			await cloneWorkflowToTemplate(tx, {
 				workflowId: ocrSupervisorGraph.id,
 				organizationId: organization.id,
+				visibility: "public",
 			}),
 		];
 
 		return {
 			user,
+			seededLoginUser,
 			dashboardSession,
 			organization,
+			secondaryOrganization,
 			project,
+			secondaryProject,
 			pipelineDevice,
 			pipelineApiKey,
 			pipelineGraph,
@@ -3295,12 +3419,31 @@ const seed = async () => {
 		`Session Expires At: ${result.dashboardSession.expiresAt.toISOString()}`,
 	);
 	console.log(
-		"Use cookie `better-auth.session_token` with the session token for local dashboard auth.",
+		"Use this raw session token as DASHBOARD_SESSION_TOKEN in the API env for local debug session bootstrap.",
 	);
 	console.log(
 		`Organization: ${result.organization.slug} (${result.organization.id})`,
 	);
 	console.log(`Project: ${result.project.slug} (${result.project.id})`);
+	console.log(
+		`Organization (secondary): ${result.secondaryOrganization.slug} (${result.secondaryOrganization.id})`,
+	);
+	console.log(
+		`Project (secondary): ${result.secondaryProject.slug} (${result.secondaryProject.id})`,
+	);
+	if (result.seededLoginUser) {
+		console.log(
+			`Seeded OTP Login User: ${result.seededLoginUser.email} (${result.seededLoginUser.id})`,
+		);
+	} else if (seededDashboardUserEmail) {
+		console.log(
+			`Seeded OTP Login User: skipped because ${seededDashboardUserEmail} already matches the primary seed user`,
+		);
+	} else {
+		console.log(
+			"Seeded OTP Login User: not created (set SEED_DASHBOARD_USER_EMAIL to enable)",
+		);
+	}
 	console.log(
 		`Device (workflow 1): ${result.pipelineDevice.slug} (${result.pipelineDevice.id})`,
 	);

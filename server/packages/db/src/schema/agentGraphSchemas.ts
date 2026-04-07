@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+	type AnyPgColumn,
 	check,
 	index,
 	integer,
@@ -35,13 +36,11 @@ export const agentGraphTemplates = pgTable(
 	"agent_graph_templates",
 	{
 		id: uuid("id").primaryKey().default(sql`uuidv7()`),
-		name: text().notNull(),
-		description: text(),
-		version: integer().notNull().default(1),
 		visibility: text().notNull(),
-		entryNode: text().notNull(),
-		stateSchema: jsonb(),
 		organizationId: uuid("organization_id").references(() => organizations.id),
+		currentVersionId: uuid("current_version_id").references(
+			(): AnyPgColumn => agentGraphTemplateVersions.id,
+		),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at")
 			.defaultNow()
@@ -50,101 +49,32 @@ export const agentGraphTemplates = pgTable(
 	},
 	(t) => [
 		index("agent_graph_templates_organization_id_idx").on(t.organizationId),
+		index("agent_graph_templates_current_version_id_idx").on(
+			t.currentVersionId,
+		),
 	],
 );
 
-export const agentGraphTemplateNodes = pgTable(
-	"agent_graph_template_nodes",
+export const agentGraphTemplateVersions = pgTable(
+	"agent_graph_template_versions",
 	{
 		id: uuid("id").primaryKey().default(sql`uuidv7()`),
-		nodeKey: text().notNull(),
-		nodeType: text().notNull(),
-		inputKey: text(),
-		outputKey: text(),
-		config: jsonb().notNull().default("{}"),
 		agentGraphTemplateId: uuid("agent_graph_template_id")
 			.notNull()
-			.references(() => agentGraphTemplates.id, { onDelete: "cascade" }),
-		modelId: uuid("model_id").references(() => models.id),
+			.references((): AnyPgColumn => agentGraphTemplates.id, {
+				onDelete: "cascade",
+			}),
+		version: integer().notNull(),
+		snapshot: jsonb().notNull(),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
-		updatedAt: timestamp("updated_at")
-			.defaultNow()
-			.$onUpdate(() => /* @__PURE__ */ new Date())
-			.notNull(),
 	},
 	(t) => [
-		unique().on(t.agentGraphTemplateId, t.nodeKey),
-		index("agent_graph_template_nodes_model_id_idx").on(t.modelId),
-	],
-);
-
-export const agentGraphTemplateNodeTools = pgTable(
-	"agent_graph_template_node_tools",
-	{
-		id: uuid("id").primaryKey().default(sql`uuidv7()`),
-		agentGraphTemplateNodeId: uuid("agent_graph_template_node_id")
-			.notNull()
-			.references(() => agentGraphTemplateNodes.id, { onDelete: "cascade" }),
-		toolId: uuid("tool_id")
-			.notNull()
-			.references(() => tools.id),
-		createdAt: timestamp("created_at").defaultNow().notNull(),
-		updatedAt: timestamp("updated_at")
-			.defaultNow()
-			.$onUpdate(() => /* @__PURE__ */ new Date())
-			.notNull(),
-	},
-	(t) => [
-		unique("agent_graph_template_node_tools_node_tool_unique").on(
-			t.agentGraphTemplateNodeId,
-			t.toolId,
-		),
-		index("agent_graph_template_node_tools_template_node_id_idx").on(
-			t.agentGraphTemplateNodeId,
-		),
-		index("agent_graph_template_node_tools_tool_id_idx").on(t.toolId),
-	],
-);
-
-export const agentGraphTemplateEdges = pgTable(
-	"agent_graph_template_edges",
-	{
-		id: uuid("id").primaryKey().default(sql`uuidv7()`),
-		fromNode: text().notNull(),
-		toNode: text().notNull(),
-		agentGraphTemplateId: uuid("agent_graph_template_id")
-			.notNull()
-			.references(() => agentGraphTemplates.id, { onDelete: "cascade" }),
-		createdAt: timestamp("created_at").defaultNow().notNull(),
-		updatedAt: timestamp("updated_at")
-			.defaultNow()
-			.$onUpdate(() => /* @__PURE__ */ new Date())
-			.notNull(),
-	},
-	(t) => [
-		uniqueIndex("agent_graph_template_edges_graph_from_to_uidx").on(
+		uniqueIndex("agent_graph_template_versions_template_version_uidx").on(
 			t.agentGraphTemplateId,
-			t.fromNode,
-			t.toNode,
+			t.version,
 		),
-		index("agent_graph_template_edges_template_id_idx").on(
+		index("agent_graph_template_versions_template_id_idx").on(
 			t.agentGraphTemplateId,
-		),
-		index("agent_graph_template_edges_template_from_node_idx").on(
-			t.agentGraphTemplateId,
-			t.fromNode,
-		),
-		index("agent_graph_template_edges_template_to_node_idx").on(
-			t.agentGraphTemplateId,
-			t.toNode,
-		),
-		check(
-			"agent_graph_template_edges_from_not_end",
-			sql`${t.fromNode} <> 'END'`,
-		),
-		check(
-			"agent_graph_template_edges_no_self_ref",
-			sql`${t.fromNode} <> ${t.toNode}`,
 		),
 	],
 );
@@ -160,7 +90,9 @@ export const agentGraphs = pgTable(
 		agentGraphTemplateId: uuid("agent_graph_template_id").references(
 			() => agentGraphTemplates.id,
 		),
-		agentGraphTemplateVersion: integer(),
+		agentGraphTemplateVersionId: uuid(
+			"agent_graph_template_version_id",
+		).references(() => agentGraphTemplateVersions.id),
 		organizationId: uuid("organization_id")
 			.notNull()
 			.references(() => organizations.id, {
@@ -175,6 +107,9 @@ export const agentGraphs = pgTable(
 	(t) => [
 		index("agent_graphs_organization_id_idx").on(t.organizationId),
 		index("agent_graphs_template_id_idx").on(t.agentGraphTemplateId),
+		index("agent_graphs_template_version_id_idx").on(
+			t.agentGraphTemplateVersionId,
+		),
 	],
 );
 

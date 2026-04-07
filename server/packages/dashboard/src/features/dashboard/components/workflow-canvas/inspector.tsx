@@ -11,6 +11,7 @@ import {
 import type {
 	StatusMessage,
 	WorkflowModelOption,
+	WorkflowTemplateVisibility,
 	WorkflowToolOption,
 } from "@/features/dashboard/types";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,9 @@ export function WorkflowCanvasInspector({
 	entryNode,
 	nodes,
 	edges,
+	templateVisibility,
+	showTemplateVisibility,
+	versioningHint,
 	saveMessage,
 	localError,
 	isSaving,
@@ -34,17 +38,22 @@ export function WorkflowCanvasInspector({
 	onChangeName,
 	onChangeDescription,
 	onChangeEntryNode,
+	onChangeTemplateVisibility,
 	onChangeSelectedNode,
 	onRemoveEdge,
 	onAddEdgeToEnd,
 	onSave,
 	onCancel,
+	saveLabel,
 }: {
 	name: string;
 	description: string;
 	entryNode: string;
 	nodes: EditorNode[];
 	edges: Array<{ fromNode: string; toNode: string }>;
+	templateVisibility: WorkflowTemplateVisibility;
+	showTemplateVisibility: boolean;
+	versioningHint: string | null;
 	saveMessage: StatusMessage | null;
 	localError: string | null;
 	isSaving: boolean;
@@ -55,11 +64,13 @@ export function WorkflowCanvasInspector({
 	onChangeName: (value: string) => void;
 	onChangeDescription: (value: string) => void;
 	onChangeEntryNode: (value: string) => void;
+	onChangeTemplateVisibility: (value: WorkflowTemplateVisibility) => void;
 	onChangeSelectedNode: (changes: Partial<EditorNode>) => void;
 	onRemoveEdge: (edgeKey: string) => void;
 	onAddEdgeToEnd: (fromNode: string) => void;
 	onSave: () => void;
 	onCancel: () => void;
+	saveLabel: string;
 }) {
 	return (
 		<div className="overflow-y-auto border-l border-slate-900/10 bg-white/80 p-4">
@@ -88,13 +99,15 @@ export function WorkflowCanvasInspector({
 						htmlFor="canvas-workflow-name"
 						className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600"
 					>
-						Workflow name
+						{showTemplateVisibility ? "Template name" : "Workflow name"}
 					</label>
 					<Input
 						id="canvas-workflow-name"
 						value={name}
 						onChange={(event) => onChangeName(event.target.value)}
-						placeholder="Workflow name"
+						placeholder={
+							showTemplateVisibility ? "Template name" : "Workflow name"
+						}
 					/>
 				</div>
 
@@ -132,6 +145,35 @@ export function WorkflowCanvasInspector({
 					</Select>
 				</div>
 
+				{showTemplateVisibility ? (
+					<div className="space-y-2">
+						<p className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+							Template visibility
+						</p>
+						<Select
+							value={templateVisibility}
+							onValueChange={(value) =>
+								onChangeTemplateVisibility(value as WorkflowTemplateVisibility)
+							}
+						>
+							<SelectTrigger>
+								<SelectValue placeholder="Select visibility" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="organization">
+									Internal to your organization
+								</SelectItem>
+								<SelectItem value="public">Shared with everyone</SelectItem>
+							</SelectContent>
+						</Select>
+						{versioningHint ? (
+							<p className="text-xs leading-5 text-slate-500">
+								{versioningHint}
+							</p>
+						) : null}
+					</div>
+				) : null}
+
 				<hr className="border-slate-200" />
 
 				{selectedNode ? (
@@ -155,7 +197,7 @@ export function WorkflowCanvasInspector({
 
 				<div className="mt-4 flex gap-2">
 					<Button type="button" onClick={onSave} disabled={isSaving}>
-						{isSaving ? "Saving..." : "Save workflow"}
+						{isSaving ? "Saving..." : saveLabel}
 					</Button>
 					<Button type="button" variant="outline" onClick={onCancel}>
 						Cancel

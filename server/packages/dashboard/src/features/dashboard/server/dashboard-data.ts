@@ -1,33 +1,40 @@
 import { getDB } from "@arcnem-vision/db/server";
+import { getAuthFeatureFlags } from "@arcnem-vision/shared";
 import { createServerFn } from "@tanstack/react-start";
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type {
-	DashboardData,
-	WorkflowNodeConfig,
 	WorkflowNodeTypeCounts,
+	WorkflowSchemaObject,
+	WorkflowTemplateSummary,
 	WorkflowToolOption,
 } from "@/features/dashboard/types";
 import { getSessionContext } from "./session-context";
 import { parseCanvasPosition } from "./workflow-normalization";
+import { buildWorkflowTemplateAccessCondition } from "./workflow-template-access";
+import {
+	normalizePersistedWorkflowNodeConfig,
+	parseWorkflowTemplateSnapshot,
+} from "./workflow-template-snapshot";
+import { normalizeWorkflowTemplateVisibility } from "./workflow-template-utils";
 
-function normalizeToolSchema(schema: unknown): Record<string, unknown> {
+function normalizeToolSchema(schema: unknown): WorkflowSchemaObject {
 	if (typeof schema === "string") {
 		try {
 			const parsed = JSON.parse(schema);
 			if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-				return parsed as Record<string, unknown>;
+				return parsed as WorkflowSchemaObject;
 			}
 		} catch {
 			return {};
 		}
 	}
 	if (schema && typeof schema === "object" && !Array.isArray(schema)) {
-		return schema as Record<string, unknown>;
+		return schema as WorkflowSchemaObject;
 	}
 	return {};
 }
 
-function schemaFieldNames(schema: Record<string, unknown>) {
+function schemaFieldNames(schema: WorkflowSchemaObject) {
 	const properties = schema.properties;
 	if (
 		!properties ||
@@ -36,29 +43,7 @@ function schemaFieldNames(schema: Record<string, unknown>) {
 	) {
 		return [] as string[];
 	}
-	return Object.keys(properties as Record<string, unknown>);
-}
-
-function normalizeNodeConfig(config: unknown): WorkflowNodeConfig {
-	if (typeof config === "string") {
-		try {
-			const parsed = JSON.parse(config);
-			if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-				return {};
-			}
-			const normalized = { ...(parsed as WorkflowNodeConfig) };
-			delete normalized.uiPosition;
-			return normalized;
-		} catch {
-			return {};
-		}
-	}
-	if (!config || typeof config !== "object" || Array.isArray(config)) {
-		return {};
-	}
-	const normalized = { ...(config as WorkflowNodeConfig) };
-	delete normalized.uiPosition;
-	return normalized;
+	return Object.keys(properties as WorkflowSchemaObject);
 }
 
 function toToolOption(tool: {
@@ -117,11 +102,89 @@ function countNodeTypes(
 	return nodeTypeCounts;
 }
 
-export const getDashboardData = createServerFn({ method: "GET" }).handler(
-	async (): Promise<DashboardData> => {
+function mapTemplateSummaryFromSnapshot(input: {
+	templateId: string;
+	versionId: string;
+	version: number;
+	versionCount: number;
+	snapshot: NonNullable<ReturnType<typeof parseWorkflowTemplateSnapshot>>;
+	visibility: ReturnType<typeof normalizeWorkflowTemplateVisibility>;
+	canEdit: boolean;
+	startedWorkflowCount: number;
+	modelLabelById: Map<string, string>;
+	toolOptionById: Map<string, WorkflowToolOption>;
+}): WorkflowTemplateSummary {
+	const nodes = input.snapshot.nodes.map((node) => {
+		const tools = node.toolIds
+			.map((toolId) => input.toolOptionById.get(toolId))
+			.filter((tool): tool is WorkflowToolOption => Boolean(tool));
+
+		return {
+			id: `${input.versionId}:${node.nodeKey}`,
+			nodeKey: node.nodeKey,
+			nodeType: node.nodeType,
+			x: node.x,
+			y: node.y,
+			inputKey: node.inputKey,
+			outputKey: node.outputKey,
+			modelId: node.modelId,
+			modelLabel: node.modelId
+				? (input.modelLabelById.get(node.modelId) ?? null)
+				: null,
+			toolIds: node.toolIds,
+			tools,
+			toolNames: tools.map((tool) => tool.name),
+			config: node.config,
+		};
+	});
+
+	return {
+		id: input.templateId,
+		name: input.snapshot.name,
+		description: input.snapshot.description,
+		version: input.version,
+		versionCount: input.versionCount,
+		visibility: input.visibility,
+		canEdit: input.canEdit,
+		entryNode: input.snapshot.entryNode,
+		edgeCount: input.snapshot.edges.length,
+		startedWorkflowCount: input.startedWorkflowCount,
+		nodeTypeCounts: countNodeTypes(nodes),
+		nodes,
+		edges: input.snapshot.edges.map((edge) => ({
+			id: `${input.versionId}:${edge.fromNode}->${edge.toNode}`,
+			fromNode: edge.fromNode,
+			toNode: edge.toNode,
+		})),
+		nodeSamples: nodes.slice(0, 6).map((node) => ({
+			id: node.id,
+			nodeKey: node.nodeKey,
+			nodeType: node.nodeType,
+			toolNames: node.toolNames,
+		})),
+	};
+}
+
+const debugSessionBootstrapEnabled = process.env.API_DEBUG === "true";
+
+type GetDashboardDataInput = {
+	includeArchived?: boolean;
+};
+
+export const getDashboardData = createServerFn({ method: "GET" })
+	.inputValidator((input: GetDashboardDataInput | undefined) => input ?? {})
+	.handler(async ({ data }) => {
 		const db = getDB();
+		const authFeatureFlags = getAuthFeatureFlags();
 		const context = await getSessionContext();
 		const organizationId = context.organizationId;
+		const includeArchived = data.includeArchived === true;
+		const organizationOptions = context.organizations.map((organization) => ({
+			id: organization.organizationId,
+			name: organization.name,
+			slug: organization.slug,
+			role: organization.role,
+		}));
 
 		const modelRows = await db.query.models.findMany({
 			columns: {
@@ -150,6 +213,9 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 			type: model.type,
 			label: `${model.provider} / ${model.name}`,
 		}));
+		const modelLabelById = new Map(
+			modelCatalog.map((model) => [model.id, model.label] as const),
+		);
 		const toolCatalog = toolRows.map((tool) => toToolOption(tool));
 		const toolOptionById = new Map(
 			toolCatalog.map((tool) => [tool.id, tool] as const),
@@ -163,7 +229,13 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 					sessionPreview: context.sessionPreview,
 					userName: null,
 					userEmail: null,
+					activeOrganizationId: null,
+					signUpEnabled: authFeatureFlags.signUpEnabled,
+					organizationCreationEnabled:
+						authFeatureFlags.organizationCreationEnabled,
+					debugSessionBootstrapEnabled,
 				},
+				organizations: [],
 				organization: null,
 				projects: [],
 				devices: [],
@@ -182,7 +254,13 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 					sessionPreview: context.sessionPreview,
 					userName: context.user?.name ?? null,
 					userEmail: context.user?.email ?? null,
+					activeOrganizationId: context.session.activeOrganizationId,
+					signUpEnabled: authFeatureFlags.signUpEnabled,
+					organizationCreationEnabled:
+						authFeatureFlags.organizationCreationEnabled,
+					debugSessionBootstrapEnabled,
 				},
+				organizations: organizationOptions,
 				organization: null,
 				projects: [],
 				devices: [],
@@ -210,7 +288,13 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 					sessionPreview: context.sessionPreview,
 					userName: context.user?.name ?? null,
 					userEmail: context.user?.email ?? null,
+					activeOrganizationId: context.session.activeOrganizationId,
+					signUpEnabled: authFeatureFlags.signUpEnabled,
+					organizationCreationEnabled:
+						authFeatureFlags.organizationCreationEnabled,
+					debugSessionBootstrapEnabled,
 				},
+				organizations: organizationOptions,
 				organization: null,
 				projects: [],
 				devices: [],
@@ -222,23 +306,31 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 		}
 
 		const projectRows = await db.query.projects.findMany({
-			where: (row, { eq }) => eq(row.organizationId, organizationId),
+			where: (row) =>
+				includeArchived
+					? eq(row.organizationId, organizationId)
+					: and(eq(row.organizationId, organizationId), isNull(row.archivedAt)),
 			columns: {
 				id: true,
 				name: true,
 				slug: true,
+				archivedAt: true,
 			},
 			orderBy: (row, { asc }) => [asc(row.name)],
 		});
 
 		const deviceRows = await db.query.devices.findMany({
-			where: (row, { eq }) => eq(row.organizationId, organizationId),
+			where: (row) =>
+				includeArchived
+					? eq(row.organizationId, organizationId)
+					: and(eq(row.organizationId, organizationId), isNull(row.archivedAt)),
 			columns: {
 				id: true,
 				name: true,
 				slug: true,
 				projectId: true,
 				agentGraphId: true,
+				archivedAt: true,
 				updatedAt: true,
 			},
 			with: {
@@ -277,13 +369,14 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 				description: true,
 				entryNode: true,
 				agentGraphTemplateId: true,
-				agentGraphTemplateVersion: true,
+				agentGraphTemplateVersionId: true,
 			},
 			with: {
-				agentGraphTemplates: {
+				agentGraphTemplateVersions: {
 					columns: {
 						id: true,
-						name: true,
+						version: true,
+						snapshot: true,
 					},
 				},
 				agentGraphNodes: {
@@ -330,77 +423,28 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 		});
 
 		const templateRows = await db.query.agentGraphTemplates.findMany({
-			where: (row) =>
-				or(
-					eq(row.organizationId, organizationId),
-					and(isNull(row.organizationId), eq(row.visibility, "public")),
-				),
+			where: (row) => buildWorkflowTemplateAccessCondition(row, organizationId),
 			columns: {
 				id: true,
-				name: true,
-				description: true,
-				version: true,
 				visibility: true,
-				entryNode: true,
+				organizationId: true,
 			},
 			with: {
-				agentGraphTemplateNodes: {
+				currentVersion: {
 					columns: {
 						id: true,
-						nodeKey: true,
-						nodeType: true,
-						inputKey: true,
-						outputKey: true,
-						modelId: true,
-						config: true,
-					},
-					with: {
-						models: {
-							columns: {
-								provider: true,
-								name: true,
-							},
-						},
+						version: true,
+						snapshot: true,
 					},
 				},
-				agentGraphTemplateEdges: {
+				agentGraphTemplateVersions: {
 					columns: {
 						id: true,
-						fromNode: true,
-						toNode: true,
 					},
 				},
 			},
-			orderBy: (row, { asc, desc }) => [asc(row.name), desc(row.version)],
+			orderBy: (row, { asc }) => [asc(row.createdAt)],
 		});
-
-		const templateNodeIds = templateRows.flatMap((template) =>
-			template.agentGraphTemplateNodes.map((node) => node.id),
-		);
-		const templateNodeToolRows =
-			templateNodeIds.length === 0
-				? []
-				: await db.query.agentGraphTemplateNodeTools.findMany({
-						where: (row) =>
-							inArray(row.agentGraphTemplateNodeId, templateNodeIds),
-						columns: {
-							agentGraphTemplateNodeId: true,
-							toolId: true,
-						},
-					});
-		const templateToolIdsByNodeId = new Map<string, string[]>();
-		for (const link of templateNodeToolRows) {
-			const current = templateToolIdsByNodeId.get(
-				link.agentGraphTemplateNodeId,
-			);
-			if (current) {
-				current.push(link.toolId);
-			} else {
-				templateToolIdsByNodeId.set(link.agentGraphTemplateNodeId, [
-					link.toolId,
-				]);
-			}
-		}
 
 		const deviceCountByProjectId = new Map<string, number>();
 		const apiKeyCountByProjectId = new Map<string, number>();
@@ -439,6 +483,7 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 
 		const mappedProjects = projectRows.map((project) => ({
 			...project,
+			archivedAt: project.archivedAt?.toISOString() ?? null,
 			deviceCount: deviceCountByProjectId.get(project.id) ?? 0,
 			apiKeyCount: apiKeyCountByProjectId.get(project.id) ?? 0,
 		}));
@@ -457,6 +502,7 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 				projectId: device.projectId,
 				agentGraphId: device.agentGraphId,
 				workflowName: device.agentGraphs?.name ?? null,
+				archivedAt: device.archivedAt?.toISOString() ?? null,
 				updatedAt: updatedAt.toISOString(),
 				status,
 				apiKeyCount: device.apikeys.length,
@@ -500,9 +546,15 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 					toolIds: tools.map((tool) => tool.id),
 					tools,
 					toolNames: tools.map((tool) => tool.name),
-					config: normalizeNodeConfig(node.config),
+					config: normalizePersistedWorkflowNodeConfig(node.config),
 				};
 			});
+
+			const templateSnapshot = workflow.agentGraphTemplateVersions
+				? parseWorkflowTemplateSnapshot(
+						workflow.agentGraphTemplateVersions.snapshot,
+					)
+				: null;
 
 			return {
 				id: workflow.id,
@@ -512,13 +564,16 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 				edgeCount: workflow.agentGraphEdges.length,
 				attachedDeviceCount:
 					attachedDeviceCountByWorkflowId.get(workflow.id) ?? 0,
-				template: workflow.agentGraphTemplates
-					? {
-							id: workflow.agentGraphTemplates.id,
-							name: workflow.agentGraphTemplates.name,
-							version: workflow.agentGraphTemplateVersion,
-						}
-					: null,
+				template:
+					workflow.agentGraphTemplateId &&
+					workflow.agentGraphTemplateVersions &&
+					templateSnapshot
+						? {
+								id: workflow.agentGraphTemplateId,
+								name: templateSnapshot.name,
+								version: workflow.agentGraphTemplateVersions.version,
+							}
+						: null,
 				nodeTypeCounts: countNodeTypes(nodes),
 				nodes,
 				edges: workflow.agentGraphEdges.map((edge) => ({
@@ -535,58 +590,34 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 			};
 		});
 
-		const mappedWorkflowTemplates = templateRows.map((template) => {
-			const nodes = template.agentGraphTemplateNodes.map((node, index) => {
-				const position = parseCanvasPosition(node.config, index);
-				const toolIds = templateToolIdsByNodeId.get(node.id) ?? [];
-				const tools = toolIds
-					.map((toolId) => toolOptionById.get(toolId))
-					.filter((tool): tool is WorkflowToolOption => Boolean(tool));
+		const mappedWorkflowTemplates = templateRows
+			.flatMap((template) => {
+				const snapshot = template.currentVersion
+					? parseWorkflowTemplateSnapshot(template.currentVersion.snapshot)
+					: null;
+				if (!snapshot || !template.currentVersion) {
+					return [];
+				}
 
-				return {
-					id: node.id,
-					nodeKey: node.nodeKey,
-					nodeType: node.nodeType,
-					x: position.x,
-					y: position.y,
-					inputKey: node.inputKey,
-					outputKey: node.outputKey,
-					modelId: node.modelId,
-					modelLabel: node.models
-						? `${node.models.provider} / ${node.models.name}`
-						: null,
-					toolIds,
-					tools,
-					toolNames: tools.map((tool) => tool.name),
-					config: normalizeNodeConfig(node.config),
-				};
-			});
-
-			return {
-				id: template.id,
-				name: template.name,
-				description: template.description,
-				version: template.version,
-				visibility: template.visibility,
-				entryNode: template.entryNode,
-				edgeCount: template.agentGraphTemplateEdges.length,
-				startedWorkflowCount:
-					startedWorkflowCountByTemplateId.get(template.id) ?? 0,
-				nodeTypeCounts: countNodeTypes(nodes),
-				nodes,
-				edges: template.agentGraphTemplateEdges.map((edge) => ({
-					id: edge.id,
-					fromNode: edge.fromNode,
-					toNode: edge.toNode,
-				})),
-				nodeSamples: nodes.slice(0, 6).map((node) => ({
-					id: node.id,
-					nodeKey: node.nodeKey,
-					nodeType: node.nodeType,
-					toolNames: node.toolNames,
-				})),
-			};
-		});
+				return [
+					mapTemplateSummaryFromSnapshot({
+						templateId: template.id,
+						versionId: template.currentVersion.id,
+						version: template.currentVersion.version,
+						versionCount: template.agentGraphTemplateVersions.length,
+						snapshot,
+						visibility: normalizeWorkflowTemplateVisibility(
+							template.visibility,
+						),
+						canEdit: template.organizationId === organizationId,
+						startedWorkflowCount:
+							startedWorkflowCountByTemplateId.get(template.id) ?? 0,
+						modelLabelById,
+						toolOptionById,
+					}),
+				];
+			})
+			.sort((left, right) => left.name.localeCompare(right.name));
 
 		return {
 			auth: {
@@ -595,7 +626,13 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 				sessionPreview: context.sessionPreview,
 				userName: context.user?.name ?? null,
 				userEmail: context.user?.email ?? null,
+				activeOrganizationId: context.session.activeOrganizationId,
+				signUpEnabled: authFeatureFlags.signUpEnabled,
+				organizationCreationEnabled:
+					authFeatureFlags.organizationCreationEnabled,
+				debugSessionBootstrapEnabled,
 			},
+			organizations: organizationOptions,
 			organization,
 			projects: mappedProjects,
 			devices: mappedDevices,
@@ -604,5 +641,4 @@ export const getDashboardData = createServerFn({ method: "GET" }).handler(
 			modelCatalog,
 			toolCatalog,
 		};
-	},
-);
+	});

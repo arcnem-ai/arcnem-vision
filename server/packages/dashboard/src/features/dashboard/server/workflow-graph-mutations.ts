@@ -2,13 +2,30 @@ import { schema } from "@arcnem-vision/db";
 import { getDB } from "@arcnem-vision/db/server";
 import { createServerFn } from "@tanstack/react-start";
 import { and, eq, inArray } from "drizzle-orm";
-import type { WorkflowNodeConfig } from "@/features/dashboard/types";
+import type {
+	WorkflowNodeConfig,
+	WorkflowTemplateVisibility,
+} from "@/features/dashboard/types";
 import { requireOrganizationContext } from "./session-context";
 import {
 	normalizeGraphData,
 	normalizeWorkflowFields,
+	parseCanvasPosition,
 } from "./workflow-normalization";
-import { buildWorkflowNameFromTemplate } from "./workflow-template-utils";
+import { buildWorkflowTemplateAccessCondition } from "./workflow-template-access";
+import {
+	createWorkflowTemplateSnapshot,
+	normalizePersistedWorkflowNodeConfig,
+	parseWorkflowTemplateSnapshot,
+} from "./workflow-template-snapshot";
+import {
+	buildWorkflowNameFromTemplate,
+	normalizeWorkflowTemplateVisibility,
+} from "./workflow-template-utils";
+
+type DatabaseTransaction = Parameters<
+	Parameters<ReturnType<typeof getDB>["transaction"]>[0]
+>[0];
 
 type WorkflowNodeInput = {
 	id?: string;
@@ -50,6 +67,26 @@ type CreateWorkflowFromTemplateInput = {
 	templateId: string;
 };
 
+type CreateWorkflowTemplateFromWorkflowInput = {
+	workflowId: string;
+	name: string;
+	description?: string | null;
+	visibility: WorkflowTemplateVisibility;
+};
+
+type UpdateWorkflowTemplateInput = {
+	templateId: string;
+	name: string;
+	description?: string | null;
+	entryNode: string;
+	visibility: WorkflowTemplateVisibility;
+	nodes: WorkflowNodeInput[];
+	edges: Array<{
+		fromNode: string;
+		toNode: string;
+	}>;
+};
+
 function buildNodeConfig(
 	node: Pick<WorkflowNodeInput, "x" | "y" | "config">,
 ): Record<string, unknown> {
@@ -67,6 +104,59 @@ function buildNodeConfig(
 			y: node.y,
 		},
 	};
+}
+
+async function insertWorkflowGraphFromSnapshot(
+	tx: DatabaseTransaction,
+	input: {
+		workflowId: string;
+		snapshot: NonNullable<ReturnType<typeof parseWorkflowTemplateSnapshot>>;
+	},
+) {
+	if (input.snapshot.nodes.length > 0) {
+		const insertedNodes = await tx
+			.insert(schema.agentGraphNodes)
+			.values(
+				input.snapshot.nodes.map((node) => ({
+					nodeKey: node.nodeKey,
+					nodeType: node.nodeType,
+					inputKey: node.inputKey,
+					outputKey: node.outputKey,
+					modelId: node.modelId,
+					config: buildNodeConfig(node),
+					agentGraphId: input.workflowId,
+				})),
+			)
+			.returning({
+				id: schema.agentGraphNodes.id,
+				nodeKey: schema.agentGraphNodes.nodeKey,
+			});
+
+		const nodeIdByKey = new Map(
+			insertedNodes.map((node) => [node.nodeKey, node.id]),
+		);
+		const nodeToolRows = input.snapshot.nodes.flatMap((node) => {
+			const nodeId = nodeIdByKey.get(node.nodeKey);
+			if (!nodeId) return [];
+			return node.toolIds.map((toolId) => ({
+				agentGraphNodeId: nodeId,
+				toolId,
+			}));
+		});
+		if (nodeToolRows.length > 0) {
+			await tx.insert(schema.agentGraphNodeTools).values(nodeToolRows);
+		}
+	}
+
+	if (input.snapshot.edges.length > 0) {
+		await tx.insert(schema.agentGraphEdges).values(
+			input.snapshot.edges.map((edge) => ({
+				fromNode: edge.fromNode,
+				toNode: edge.toNode,
+				agentGraphId: input.workflowId,
+			})),
+		);
+	}
 }
 
 export const createWorkflow = createServerFn({ method: "POST" })
@@ -306,52 +396,39 @@ export const createWorkflowFromTemplate = createServerFn({ method: "POST" })
 
 		return db.transaction(async (tx) => {
 			const template = await tx.query.agentGraphTemplates.findFirst({
-				where: (row, { and, eq, isNull, or }) =>
+				where: (row, { and, eq }) =>
 					and(
 						eq(row.id, data.templateId),
-						or(
-							eq(row.organizationId, organizationId),
-							and(isNull(row.organizationId), eq(row.visibility, "public")),
-						),
+						buildWorkflowTemplateAccessCondition(row, organizationId),
 					),
 				columns: {
 					id: true,
-					name: true,
-					description: true,
-					version: true,
-					entryNode: true,
-					stateSchema: true,
 				},
 				with: {
-					agentGraphTemplateNodes: {
+					currentVersion: {
 						columns: {
 							id: true,
-							nodeKey: true,
-							nodeType: true,
-							inputKey: true,
-							outputKey: true,
-							modelId: true,
-							config: true,
-						},
-						with: {
-							agentGraphTemplateNodeTools: {
-								columns: {
-									toolId: true,
-								},
-							},
-						},
-					},
-					agentGraphTemplateEdges: {
-						columns: {
-							fromNode: true,
-							toNode: true,
+							version: true,
+							snapshot: true,
 						},
 					},
 				},
 			});
 
 			if (!template) {
-				throw new Error("Workflow template not found in your organization.");
+				throw new Error(
+					"Workflow template not found or not shared with your organization.",
+				);
+			}
+			if (!template.currentVersion) {
+				throw new Error("Workflow template has no current version.");
+			}
+
+			const snapshot = parseWorkflowTemplateSnapshot(
+				template.currentVersion.snapshot,
+			);
+			if (!snapshot) {
+				throw new Error("Workflow template version is invalid.");
 			}
 
 			const existingWorkflowNames = await tx.query.agentGraphs.findMany({
@@ -362,7 +439,7 @@ export const createWorkflowFromTemplate = createServerFn({ method: "POST" })
 			});
 
 			const workflowName = buildWorkflowNameFromTemplate(
-				template.name,
+				snapshot.name,
 				existingWorkflowNames.map((workflow) => workflow.name),
 			);
 
@@ -370,12 +447,12 @@ export const createWorkflowFromTemplate = createServerFn({ method: "POST" })
 				.insert(schema.agentGraphs)
 				.values({
 					name: workflowName,
-					description: template.description,
-					entryNode: template.entryNode,
-					stateSchema: template.stateSchema ?? null,
+					description: snapshot.description,
+					entryNode: snapshot.entryNode,
+					stateSchema: snapshot.stateSchema,
 					organizationId,
 					agentGraphTemplateId: template.id,
-					agentGraphTemplateVersion: template.version,
+					agentGraphTemplateVersionId: template.currentVersion.id,
 				})
 				.returning({
 					id: schema.agentGraphs.id,
@@ -386,56 +463,241 @@ export const createWorkflowFromTemplate = createServerFn({ method: "POST" })
 				throw new Error("Failed to create workflow from template.");
 			}
 
-			if (template.agentGraphTemplateNodes.length > 0) {
-				const insertedNodes = await tx
-					.insert(schema.agentGraphNodes)
-					.values(
-						template.agentGraphTemplateNodes.map((node) => ({
-							nodeKey: node.nodeKey,
-							nodeType: node.nodeType,
-							inputKey: node.inputKey,
-							outputKey: node.outputKey,
-							modelId: node.modelId,
-							config: node.config ?? {},
-							agentGraphId: createdWorkflow.id,
-						})),
-					)
-					.returning({
-						id: schema.agentGraphNodes.id,
-						nodeKey: schema.agentGraphNodes.nodeKey,
-					});
-
-				const nodeIdByKey = new Map(
-					insertedNodes.map((node) => [node.nodeKey, node.id]),
-				);
-				const nextNodeToolRows = template.agentGraphTemplateNodes.flatMap(
-					(node) => {
-						const nodeId = nodeIdByKey.get(node.nodeKey);
-						if (!nodeId) {
-							return [];
-						}
-
-						return node.agentGraphTemplateNodeTools.map((toolLink) => ({
-							agentGraphNodeId: nodeId,
-							toolId: toolLink.toolId,
-						}));
-					},
-				);
-				if (nextNodeToolRows.length > 0) {
-					await tx.insert(schema.agentGraphNodeTools).values(nextNodeToolRows);
-				}
-			}
-
-			if (template.agentGraphTemplateEdges.length > 0) {
-				await tx.insert(schema.agentGraphEdges).values(
-					template.agentGraphTemplateEdges.map((edge) => ({
-						fromNode: edge.fromNode,
-						toNode: edge.toNode,
-						agentGraphId: createdWorkflow.id,
-					})),
-				);
-			}
+			await insertWorkflowGraphFromSnapshot(tx, {
+				workflowId: createdWorkflow.id,
+				snapshot,
+			});
 
 			return createdWorkflow;
+		});
+	});
+
+export const createWorkflowTemplateFromWorkflow = createServerFn({
+	method: "POST",
+})
+	.inputValidator((input: CreateWorkflowTemplateFromWorkflowInput) => input)
+	.handler(async ({ data }) => {
+		const db = getDB();
+		const organizationId = await requireOrganizationContext();
+
+		return db.transaction(async (tx) => {
+			const sourceWorkflow = await tx.query.agentGraphs.findFirst({
+				where: (row, { and, eq }) =>
+					and(
+						eq(row.id, data.workflowId),
+						eq(row.organizationId, organizationId),
+					),
+				columns: {
+					id: true,
+					entryNode: true,
+					stateSchema: true,
+					name: true,
+					description: true,
+				},
+				with: {
+					agentGraphNodes: {
+						columns: {
+							nodeKey: true,
+							nodeType: true,
+							inputKey: true,
+							outputKey: true,
+							modelId: true,
+							config: true,
+						},
+						with: {
+							agentGraphNodeTools: {
+								columns: {
+									toolId: true,
+								},
+							},
+						},
+					},
+					agentGraphEdges: {
+						columns: {
+							fromNode: true,
+							toNode: true,
+						},
+					},
+				},
+			});
+
+			if (!sourceWorkflow) {
+				throw new Error("Workflow not found in your organization.");
+			}
+
+			const snapshot = createWorkflowTemplateSnapshot({
+				name: data.name,
+				description: data.description,
+				entryNode: sourceWorkflow.entryNode,
+				stateSchema: sourceWorkflow.stateSchema,
+				nodes: sourceWorkflow.agentGraphNodes.map((node, index) => {
+					const position = parseCanvasPosition(node.config, index);
+					return {
+						nodeKey: node.nodeKey,
+						nodeType: node.nodeType,
+						x: position.x,
+						y: position.y,
+						inputKey: node.inputKey,
+						outputKey: node.outputKey,
+						modelId: node.modelId,
+						toolIds: node.agentGraphNodeTools.map(
+							(toolLink) => toolLink.toolId,
+						),
+						config: normalizePersistedWorkflowNodeConfig(node.config),
+					};
+				}),
+				edges: sourceWorkflow.agentGraphEdges.map((edge) => ({
+					fromNode: edge.fromNode,
+					toNode: edge.toNode,
+				})),
+			});
+			const visibility = normalizeWorkflowTemplateVisibility(data.visibility);
+
+			const [createdTemplate] = await tx
+				.insert(schema.agentGraphTemplates)
+				.values({
+					visibility,
+					organizationId,
+				})
+				.returning({
+					id: schema.agentGraphTemplates.id,
+				});
+
+			if (!createdTemplate) {
+				throw new Error("Failed to create workflow template.");
+			}
+
+			const [createdVersion] = await tx
+				.insert(schema.agentGraphTemplateVersions)
+				.values({
+					agentGraphTemplateId: createdTemplate.id,
+					version: 1,
+					snapshot,
+				})
+				.returning({
+					id: schema.agentGraphTemplateVersions.id,
+					version: schema.agentGraphTemplateVersions.version,
+				});
+
+			if (!createdVersion) {
+				throw new Error("Failed to create workflow template version.");
+			}
+
+			await tx
+				.update(schema.agentGraphTemplates)
+				.set({
+					currentVersionId: createdVersion.id,
+				})
+				.where(eq(schema.agentGraphTemplates.id, createdTemplate.id));
+
+			await tx
+				.update(schema.agentGraphs)
+				.set({
+					agentGraphTemplateId: createdTemplate.id,
+					agentGraphTemplateVersionId: createdVersion.id,
+				})
+				.where(
+					and(
+						eq(schema.agentGraphs.id, sourceWorkflow.id),
+						eq(schema.agentGraphs.organizationId, organizationId),
+					),
+				);
+
+			return {
+				id: createdTemplate.id,
+				name: snapshot.name,
+				version: createdVersion.version,
+			};
+		});
+	});
+
+export const updateWorkflowTemplate = createServerFn({ method: "POST" })
+	.inputValidator((input: UpdateWorkflowTemplateInput) => input)
+	.handler(async ({ data }) => {
+		const db = getDB();
+		const organizationId = await requireOrganizationContext();
+		const visibility = normalizeWorkflowTemplateVisibility(data.visibility);
+
+		return db.transaction(async (tx) => {
+			const template = await tx.query.agentGraphTemplates.findFirst({
+				where: (row, { and, eq }) =>
+					and(
+						eq(row.id, data.templateId),
+						eq(row.organizationId, organizationId),
+					),
+				columns: {
+					id: true,
+				},
+				with: {
+					currentVersion: {
+						columns: {
+							id: true,
+							version: true,
+							snapshot: true,
+						},
+					},
+				},
+			});
+			if (!template) {
+				throw new Error("Template not found in your organization.");
+			}
+			const currentSnapshot = template.currentVersion
+				? parseWorkflowTemplateSnapshot(template.currentVersion.snapshot)
+				: null;
+			if (!currentSnapshot) {
+				throw new Error("Template has no valid current version.");
+			}
+
+			const latestVersion = await tx.query.agentGraphTemplateVersions.findFirst(
+				{
+					where: (row, { eq }) => eq(row.agentGraphTemplateId, data.templateId),
+					columns: {
+						version: true,
+					},
+					orderBy: (row, { desc }) => [desc(row.version)],
+				},
+			);
+			const nextVersion = (latestVersion?.version ?? 0) + 1;
+			const snapshot = createWorkflowTemplateSnapshot({
+				name: data.name,
+				description: data.description,
+				entryNode: data.entryNode,
+				stateSchema: currentSnapshot.stateSchema,
+				nodes: data.nodes,
+				edges: data.edges,
+			});
+
+			const [createdVersion] = await tx
+				.insert(schema.agentGraphTemplateVersions)
+				.values({
+					agentGraphTemplateId: data.templateId,
+					version: nextVersion,
+					snapshot,
+				})
+				.returning({
+					id: schema.agentGraphTemplateVersions.id,
+				});
+
+			if (!createdVersion) {
+				throw new Error("Failed to create template version.");
+			}
+
+			await tx
+				.update(schema.agentGraphTemplates)
+				.set({
+					currentVersionId: createdVersion.id,
+					visibility,
+				})
+				.where(
+					and(
+						eq(schema.agentGraphTemplates.id, data.templateId),
+						eq(schema.agentGraphTemplates.organizationId, organizationId),
+					),
+				);
+
+			return {
+				id: data.templateId,
+				version: nextVersion,
+			};
 		});
 	});

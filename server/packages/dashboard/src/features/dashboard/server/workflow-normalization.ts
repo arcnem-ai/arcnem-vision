@@ -143,6 +143,18 @@ function normalizeConditionTarget(
 	return normalized;
 }
 
+function appendAdjacency(
+	adjacency: Map<string, string[]>,
+	fromNode: string,
+	toNode: string,
+) {
+	const next = adjacency.get(fromNode) ?? [];
+	if (!next.includes(toNode)) {
+		next.push(toNode);
+	}
+	adjacency.set(fromNode, next);
+}
+
 export function normalizeWorkflowFields(input: {
 	name: string;
 	description?: string | null;
@@ -521,6 +533,9 @@ export function normalizeGraphData(input: {
 				.filter((edge) => edge.fromNode === node.nodeKey)
 				.map((edge) => edge.toNode),
 		);
+		if (actualTargets.size === 0) {
+			continue;
+		}
 		if (actualTargets.size !== expectedTargets.size) {
 			throw new Error(
 				`Condition node "${node.nodeKey}" must have edges for both condition targets.`,
@@ -535,15 +550,41 @@ export function normalizeGraphData(input: {
 		}
 	}
 
-	if (!normalizedEdges.some((edge) => edge.toNode === "END")) {
-		throw new Error("Add at least one edge that points to END.");
-	}
-
 	const adjacency = new Map<string, string[]>();
 	for (const edge of normalizedEdges) {
-		const next = adjacency.get(edge.fromNode) ?? [];
-		next.push(edge.toNode);
-		adjacency.set(edge.fromNode, next);
+		appendAdjacency(adjacency, edge.fromNode, edge.toNode);
+	}
+
+	for (const node of normalizedNodes) {
+		switch (node.nodeType) {
+			case "supervisor": {
+				const members = (node.config.members as string[]) ?? [];
+				for (const member of members) {
+					appendAdjacency(adjacency, node.nodeKey, member);
+					appendAdjacency(adjacency, member, node.nodeKey);
+				}
+				const finishTarget =
+					typeof node.config.finish_target === "string"
+						? node.config.finish_target.trim()
+						: "";
+				appendAdjacency(adjacency, node.nodeKey, finishTarget || "END");
+				break;
+			}
+			case "condition":
+				appendAdjacency(
+					adjacency,
+					node.nodeKey,
+					String(node.config.true_target).trim(),
+				);
+				appendAdjacency(
+					adjacency,
+					node.nodeKey,
+					String(node.config.false_target).trim(),
+				);
+				break;
+			default:
+				break;
+		}
 	}
 
 	const visited = new Set<string>();

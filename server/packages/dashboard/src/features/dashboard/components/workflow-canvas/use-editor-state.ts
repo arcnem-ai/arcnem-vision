@@ -8,13 +8,11 @@ import type {
 	WorkflowDraft,
 	WorkflowModelOption,
 	WorkflowNodeConfig,
+	WorkflowTemplateDraft,
+	WorkflowTemplateVisibility,
 	WorkflowToolOption,
 } from "@/features/dashboard/types";
-import {
-	type EditorNode,
-	initialDraftFromWorkflow,
-	makeLocalId,
-} from "./shared";
+import { type EditorNode, initialDraftFromGraph, makeLocalId } from "./shared";
 import { buildUniqueNodeKey, validateCanvasGraph } from "./state-utils";
 
 type CanvasViewport = {
@@ -92,24 +90,36 @@ function syncConditionEdges(
 
 export function useWorkflowCanvasEditorState({
 	isOpen,
-	workflow,
+	mode,
+	graph,
 	modelCatalog,
 	toolCatalog,
 	onCreateWorkflow,
 	onUpdateWorkflow,
+	onUpdateTemplate,
 	onClose,
 }: {
 	isOpen: boolean;
-	workflow: DashboardData["workflows"][number] | null;
+	mode: "workflow-create" | "workflow-edit" | "template-edit";
+	graph:
+		| DashboardData["workflows"][number]
+		| DashboardData["workflowTemplates"][number]
+		| null;
 	modelCatalog: WorkflowModelOption[];
 	toolCatalog: WorkflowToolOption[];
 	onCreateWorkflow: (draft: WorkflowDraft) => Promise<void>;
 	onUpdateWorkflow: (workflowId: string, draft: WorkflowDraft) => Promise<void>;
+	onUpdateTemplate: (
+		templateId: string,
+		draft: WorkflowTemplateDraft,
+	) => Promise<void>;
 	onClose: () => void;
 }) {
 	const [name, setName] = useState("");
 	const [description, setDescription] = useState("");
 	const [entryNode, setEntryNode] = useState("");
+	const [templateVisibility, setTemplateVisibility] =
+		useState<WorkflowTemplateVisibility>("organization");
 	const [nodes, setNodes] = useState<EditorNode[]>([]);
 	const [edges, setEdges] = useState<WorkflowDraft["edges"]>([]);
 	const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -226,11 +236,16 @@ export function useWorkflowCanvasEditorState({
 
 	useEffect(() => {
 		if (!isOpen) return;
-		const initial = initialDraftFromWorkflow(workflow);
+		const initial = initialDraftFromGraph(graph);
 		const hydratedNodes = initial.nodes.map((node) => hydrateNode(node));
 		setName(initial.name);
 		setDescription(initial.description);
 		setEntryNode(initial.entryNode);
+		setTemplateVisibility(
+			mode === "template-edit" && graph && "visibility" in graph
+				? graph.visibility
+				: "organization",
+		);
 		setNodes(hydratedNodes);
 		setEdges(syncConditionEdges(hydratedNodes, initial.edges));
 		setSelectedNodeId(hydratedNodes[0]?.localId ?? null);
@@ -238,7 +253,7 @@ export function useWorkflowCanvasEditorState({
 		setViewport({ scale: 1, offsetX: 40, offsetY: 40 });
 		setEdgeDraft(null);
 		setEdgeHoverNodeKey(null);
-	}, [hydrateNode, isOpen, workflow]);
+	}, [graph, hydrateNode, isOpen, mode]);
 
 	const toWorldCoords = useCallback(
 		(clientX: number, clientY: number) => {
@@ -712,8 +727,13 @@ export function useWorkflowCanvasEditorState({
 		};
 
 		try {
-			if (workflow) {
-				await onUpdateWorkflow(workflow.id, payload);
+			if (mode === "template-edit" && graph) {
+				await onUpdateTemplate(graph.id, {
+					...payload,
+					visibility: templateVisibility,
+				});
+			} else if (mode === "workflow-edit" && graph) {
+				await onUpdateWorkflow(graph.id, payload);
 			} else {
 				await onCreateWorkflow(payload);
 			}
@@ -737,9 +757,11 @@ export function useWorkflowCanvasEditorState({
 		selectedNode,
 		localError,
 		nodeValidationMessage,
+		templateVisibility,
 		setName,
 		setDescription,
 		setEntryNode,
+		setTemplateVisibility,
 		addNode,
 		removeNode,
 		updateSelectedNode,

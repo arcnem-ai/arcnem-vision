@@ -1,4 +1,7 @@
+import { and, eq, gt } from "drizzle-orm";
 import { Hono } from "hono";
+import { setSignedCookie } from "hono/cookie";
+import { getAPIEnvVar } from "@/env/getAPIEnvVar";
 import { isAPIDebugModeEnabled } from "@/env/isAPIDebugModeEnabled";
 import { auth } from "@/lib/auth";
 import type { HonoServerContext } from "@/types/serverContext";
@@ -7,6 +10,76 @@ export const authRouter = new Hono<HonoServerContext>({
 	strict: false,
 });
 const isDebugMode = isAPIDebugModeEnabled();
+const FALLBACK_DEV_SESSION_TOKEN =
+	"seed_dashboard_session_s4M8xR2vJ7nK1qP5wL9cD3fH6tY0uB4";
+
+function getDebugSessionToken() {
+	const configuredToken = process.env.DASHBOARD_SESSION_TOKEN?.trim();
+	if (configuredToken) {
+		return configuredToken;
+	}
+
+	if (isDebugMode) {
+		return FALLBACK_DEV_SESSION_TOKEN;
+	}
+
+	return null;
+}
+
+function getSessionCookieName() {
+	return getAPIEnvVar("BETTER_AUTH_BASE_URL").startsWith("https://")
+		? "__Secure-better-auth.session_token"
+		: "better-auth.session_token";
+}
+
+authRouter.get("/auth/debug/session", async (c) => {
+	if (!isDebugMode) {
+		return c.json({ message: "Debug auth is disabled." }, 404);
+	}
+
+	const sessionToken = getDebugSessionToken();
+	if (!sessionToken) {
+		return c.json(
+			{ message: "No debug dashboard session is configured." },
+			404,
+		);
+	}
+
+	const dbClient = c.get("dbClient");
+	const session = await dbClient.query.sessions.findFirst({
+		where: (row) =>
+			and(eq(row.token, sessionToken), gt(row.expiresAt, new Date())),
+		columns: {
+			token: true,
+			expiresAt: true,
+		},
+	});
+
+	if (!session) {
+		return c.json({ message: "Configured debug session was not found." }, 404);
+	}
+
+	const maxAge = Math.max(
+		1,
+		Math.floor((session.expiresAt.getTime() - Date.now()) / 1000),
+	);
+
+	await setSignedCookie(
+		c,
+		getSessionCookieName(),
+		session.token,
+		getAPIEnvVar("BETTER_AUTH_SECRET"),
+		{
+			httpOnly: true,
+			maxAge,
+			path: "/",
+			sameSite: "lax",
+			secure: getAPIEnvVar("BETTER_AUTH_BASE_URL").startsWith("https://"),
+		},
+	);
+
+	return c.json({ success: true });
+});
 
 authRouter.post("/auth/api-key/verify", async (c) => {
 	const payload: { key?: string } = await c.req

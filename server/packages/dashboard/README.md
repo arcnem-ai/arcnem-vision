@@ -41,7 +41,7 @@ Dev server runs on `http://localhost:3001`.
 ## Workflow editor notes
 
 - The Workflow Library exposes a searchable template picker. Operators can search by workflow name, node role, or tool, then clone a template into a new workflow canvas.
-- Started workflows keep their source template provenance on `agent_graph_template_id` and `agent_graph_template_version`.
+- Started workflows keep their source template provenance on `agent_graph_template_id` and `agent_graph_template_version_id`.
 - Node types: `worker`, `supervisor`, `condition`, `tool`
 - Worker/supervisor nodes require a model
 - Workers can have multiple tools

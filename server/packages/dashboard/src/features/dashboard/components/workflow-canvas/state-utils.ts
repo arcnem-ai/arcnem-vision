@@ -23,6 +23,18 @@ function isConditionTarget(value: string) {
 	return value === "END" || KEY_PATTERN.test(value);
 }
 
+function appendAdjacency(
+	adjacency: Map<string, string[]>,
+	fromNode: string,
+	toNode: string,
+) {
+	const next = adjacency.get(fromNode) ?? [];
+	if (!next.includes(toNode)) {
+		next.push(toNode);
+	}
+	adjacency.set(fromNode, next);
+}
+
 export function validateCanvasGraph({
 	nodes,
 	entryNode,
@@ -261,7 +273,13 @@ export function validateCanvasGraph({
 				.filter((edge) => edge.fromNode === node.nodeKey)
 				.map((edge) => edge.toNode),
 		);
-		if (expectedTargets.size !== 2 || actualTargets.size !== 2) {
+		if (expectedTargets.size !== 2) {
+			return `Condition node ${node.nodeKey} must have exactly two managed edges.`;
+		}
+		if (actualTargets.size === 0) {
+			continue;
+		}
+		if (actualTargets.size !== 2) {
 			return `Condition node ${node.nodeKey} must have exactly two managed edges.`;
 		}
 		for (const target of expectedTargets) {
@@ -271,15 +289,43 @@ export function validateCanvasGraph({
 		}
 	}
 
-	if (!edges.some((edge) => edge.toNode === "END")) {
-		return "Add at least one edge to END so the workflow can finish.";
-	}
-
 	const adjacency = new Map<string, string[]>();
 	for (const edge of edges) {
-		const next = adjacency.get(edge.fromNode) ?? [];
-		next.push(edge.toNode);
-		adjacency.set(edge.fromNode, next);
+		appendAdjacency(adjacency, edge.fromNode, edge.toNode);
+	}
+
+	for (const node of nodes) {
+		const config = isRecord(node.config) ? node.config : {};
+		switch (node.nodeType) {
+			case "supervisor": {
+				const members = asStringArray(config.members);
+				for (const member of members) {
+					appendAdjacency(adjacency, node.nodeKey, member);
+					appendAdjacency(adjacency, member, node.nodeKey);
+				}
+				const finishTarget =
+					typeof config.finish_target === "string"
+						? config.finish_target.trim()
+						: "";
+				appendAdjacency(adjacency, node.nodeKey, finishTarget || "END");
+				break;
+			}
+			case "condition": {
+				const trueTarget =
+					typeof config.true_target === "string"
+						? config.true_target.trim()
+						: "";
+				const falseTarget =
+					typeof config.false_target === "string"
+						? config.false_target.trim()
+						: "";
+				appendAdjacency(adjacency, node.nodeKey, trueTarget);
+				appendAdjacency(adjacency, node.nodeKey, falseTarget);
+				break;
+			}
+			default:
+				break;
+		}
 	}
 
 	const entry = entryNode.trim();

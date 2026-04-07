@@ -8,27 +8,27 @@ import {
 	Workflow,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DashboardAuthCard } from "@/features/dashboard/components/dashboard-auth-card";
+import { DashboardCreateOrganizationCard } from "@/features/dashboard/components/dashboard-create-organization-card";
 import { DashboardHeader } from "@/features/dashboard/components/dashboard-header";
+import { DashboardSessionToolbar } from "@/features/dashboard/components/dashboard-session-toolbar";
 import { ProjectDevicePanel } from "@/features/dashboard/components/project-device-panel";
 import { WorkflowCanvasEditor } from "@/features/dashboard/components/workflow-canvas-editor";
 import { WorkflowLibraryPanel } from "@/features/dashboard/components/workflow-library-panel";
 import {
 	createWorkflow,
 	createWorkflowFromTemplate,
+	createWorkflowTemplateFromWorkflow,
 	updateWorkflow,
+	updateWorkflowTemplate,
 } from "@/features/dashboard/server-fns";
 import type {
 	DashboardData,
 	StatusMessage,
 	WorkflowDraft,
+	WorkflowTemplateDraft,
 } from "@/features/dashboard/types";
 import { DocumentGalleryPanel } from "@/features/documents/components/document-gallery-panel";
 import type { DocumentsResponse } from "@/features/documents/types";
@@ -56,39 +56,54 @@ function EmptyOrgCard({ message }: { message: string }) {
 	);
 }
 
+type CanvasTarget =
+	| { kind: "workflow-create" }
+	| { kind: "workflow"; id: string }
+	| { kind: "template"; id: string }
+	| null;
+
 export function DashboardPage({
 	dashboard,
 	documents,
 	runs,
+	showArchived,
 }: {
 	dashboard: DashboardData;
 	documents: DocumentsResponse;
 	runs: RunsResponse;
+	showArchived: boolean;
 }) {
 	const router = useRouter();
 	const createWorkflowFn = useServerFn(createWorkflow);
 	const createWorkflowFromTemplateFn = useServerFn(createWorkflowFromTemplate);
+	const createWorkflowTemplateFromWorkflowFn = useServerFn(
+		createWorkflowTemplateFromWorkflow,
+	);
 	const updateWorkflowFn = useServerFn(updateWorkflow);
+	const updateWorkflowTemplateFn = useServerFn(updateWorkflowTemplate);
 
 	const [creatingWorkflow, setCreatingWorkflow] = useState(false);
 	const [startingTemplateId, setStartingTemplateId] = useState<string | null>(
 		null,
 	);
+	const [savingTemplateFromWorkflowId, setSavingTemplateFromWorkflowId] =
+		useState<string | null>(null);
 	const [updatingWorkflowId, setUpdatingWorkflowId] = useState<string | null>(
 		null,
 	);
-	const [workflowMessage, setWorkflowMessage] = useState<StatusMessage | null>(
+	const [updatingTemplateId, setUpdatingTemplateId] = useState<string | null>(
 		null,
 	);
-	const [canvasCreateMode, setCanvasCreateMode] = useState(false);
-	const [canvasWorkflowId, setCanvasWorkflowId] = useState<string | null>(null);
-	const [pendingCanvasWorkflowId, setPendingCanvasWorkflowId] = useState<
-		string | null
-	>(null);
+	const [editorMessage, setEditorMessage] = useState<StatusMessage | null>(
+		null,
+	);
+	const [canvasTarget, setCanvasTarget] = useState<CanvasTarget>(null);
+	const [pendingCanvasTarget, setPendingCanvasTarget] =
+		useState<CanvasTarget>(null);
 
 	const createWorkflowDraft = async (draft: WorkflowDraft) => {
 		setCreatingWorkflow(true);
-		setWorkflowMessage(null);
+		setEditorMessage(null);
 		try {
 			await createWorkflowFn({
 				data: {
@@ -99,13 +114,13 @@ export function DashboardPage({
 					edges: draft.edges,
 				},
 			});
-			setWorkflowMessage({
+			setEditorMessage({
 				tone: "success",
 				text: "Workflow created. It is now ready for node and edge edits.",
 			});
 			await router.invalidate();
 		} catch (error) {
-			setWorkflowMessage({
+			setEditorMessage({
 				tone: "error",
 				text:
 					error instanceof Error ? error.message : "Failed to create workflow.",
@@ -121,7 +136,7 @@ export function DashboardPage({
 		draft: WorkflowDraft,
 	) => {
 		setUpdatingWorkflowId(workflowId);
-		setWorkflowMessage(null);
+		setEditorMessage(null);
 		try {
 			await updateWorkflowFn({
 				data: {
@@ -133,13 +148,13 @@ export function DashboardPage({
 					edges: draft.edges,
 				},
 			});
-			setWorkflowMessage({
+			setEditorMessage({
 				tone: "success",
 				text: "Workflow metadata updated.",
 			});
 			await router.invalidate();
 		} catch (error) {
-			setWorkflowMessage({
+			setEditorMessage({
 				tone: "error",
 				text:
 					error instanceof Error ? error.message : "Failed to update workflow.",
@@ -150,58 +165,124 @@ export function DashboardPage({
 		}
 	};
 
+	const createTemplateFromWorkflow = async (
+		workflowId: string,
+		templateDraft: Pick<
+			WorkflowTemplateDraft,
+			"name" | "description" | "visibility"
+		>,
+	) => {
+		setSavingTemplateFromWorkflowId(workflowId);
+		try {
+			const template = await createWorkflowTemplateFromWorkflowFn({
+				data: {
+					workflowId,
+					name: templateDraft.name,
+					description: templateDraft.description,
+					visibility: templateDraft.visibility,
+				},
+			});
+			await router.invalidate();
+			return template;
+		} finally {
+			setSavingTemplateFromWorkflowId(null);
+		}
+	};
+
+	const updateTemplateDraft = async (
+		templateId: string,
+		draft: WorkflowTemplateDraft,
+	) => {
+		setUpdatingTemplateId(templateId);
+		setEditorMessage(null);
+		try {
+			const template = await updateWorkflowTemplateFn({
+				data: {
+					templateId,
+					name: draft.name,
+					description: draft.description,
+					entryNode: draft.entryNode,
+					visibility: draft.visibility,
+					nodes: draft.nodes,
+					edges: draft.edges,
+				},
+			});
+			setEditorMessage({
+				tone: "success",
+				text: `Published template version ${template.version}.`,
+			});
+			await router.invalidate();
+		} catch (error) {
+			setEditorMessage({
+				tone: "error",
+				text:
+					error instanceof Error ? error.message : "Failed to update template.",
+			});
+			throw error;
+		} finally {
+			setUpdatingTemplateId(null);
+		}
+	};
+
 	useEffect(() => {
-		if (!pendingCanvasWorkflowId) {
+		if (
+			!pendingCanvasTarget ||
+			pendingCanvasTarget.kind === "workflow-create"
+		) {
 			return;
 		}
 
-		const workflowExists = dashboard.workflows.some(
-			(workflow) => workflow.id === pendingCanvasWorkflowId,
-		);
-		if (!workflowExists) {
+		const exists =
+			pendingCanvasTarget.kind === "workflow"
+				? dashboard.workflows.some(
+						(workflow) => workflow.id === pendingCanvasTarget.id,
+					)
+				: dashboard.workflowTemplates.some(
+						(template) => template.id === pendingCanvasTarget.id,
+					);
+		if (!exists) {
 			return;
 		}
 
-		setCanvasCreateMode(false);
-		setCanvasWorkflowId(pendingCanvasWorkflowId);
-		setPendingCanvasWorkflowId(null);
-	}, [dashboard.workflows, pendingCanvasWorkflowId]);
+		setCanvasTarget(pendingCanvasTarget);
+		setPendingCanvasTarget(null);
+	}, [dashboard.workflowTemplates, dashboard.workflows, pendingCanvasTarget]);
 
 	const startWorkflowFromTemplate = async (templateId: string) => {
 		setStartingTemplateId(templateId);
-		setWorkflowMessage(null);
 		try {
 			const workflow = await createWorkflowFromTemplateFn({
 				data: {
 					templateId,
 				},
 			});
-			setPendingCanvasWorkflowId(workflow.id);
-			setWorkflowMessage({
-				tone: "success",
-				text: `${workflow.name} created from the selected template.`,
+			setPendingCanvasTarget({
+				kind: "workflow",
+				id: workflow.id,
 			});
 			await router.invalidate();
-		} catch (error) {
-			setWorkflowMessage({
-				tone: "error",
-				text:
-					error instanceof Error
-						? error.message
-						: "Failed to create workflow from template.",
-			});
-			throw error;
 		} finally {
 			setStartingTemplateId(null);
 		}
 	};
 
-	const activeCanvasWorkflow = canvasWorkflowId
-		? (dashboard.workflows.find(
-				(workflow) => workflow.id === canvasWorkflowId,
-			) ?? null)
-		: null;
-	const isCanvasOpen = canvasCreateMode || canvasWorkflowId !== null;
+	const activeCanvasWorkflow =
+		canvasTarget?.kind === "workflow"
+			? (dashboard.workflows.find(
+					(workflow) => workflow.id === canvasTarget.id,
+				) ?? null)
+			: null;
+	const activeCanvasTemplate =
+		canvasTarget?.kind === "template"
+			? (dashboard.workflowTemplates.find(
+					(template) => template.id === canvasTarget.id,
+				) ?? null)
+			: null;
+	const isCanvasOpen = canvasTarget !== null;
+	const hasOrganizations = dashboard.organizations.length > 0;
+	const showWorkspace = dashboard.auth.state === "ready" && hasOrganizations;
+	const showCreateOrganization =
+		dashboard.auth.state === "ready" && !hasOrganizations;
 
 	return (
 		<DashboardRealtimeProvider
@@ -216,129 +297,172 @@ export function DashboardPage({
 					<DashboardHeader />
 
 					{dashboard.auth.state === "missing" ? (
-						<Card className="border-amber-300 bg-amber-50/90 shadow-sm">
-							<CardHeader>
-								<CardTitle className="font-display text-xl">
-									No active session found
-								</CardTitle>
-								<CardDescription>
-									Seed the database to create a local dashboard session, then
-									set cookie{" "}
-									<code className="rounded bg-amber-100 px-1">
-										better-auth.session_token
-									</code>
-									. You can also set{" "}
-									<code className="rounded bg-amber-100 px-1">
-										DASHBOARD_SESSION_TOKEN
-									</code>
-									.
-								</CardDescription>
-							</CardHeader>
-						</Card>
-					) : null}
-
-					<Tabs defaultValue="project-view" className="w-full">
-						<TabsList className="w-full justify-start gap-1 rounded-xl border border-slate-200/60 bg-white/80 p-1 shadow-sm backdrop-blur-sm">
-							<TabsTrigger
-								value="project-view"
-								className="gap-1.5 rounded-lg text-xs sm:text-sm"
-							>
-								<MonitorSmartphone className="size-3.5" />
-								<span className="hidden sm:inline">Projects &</span> Devices
-							</TabsTrigger>
-							<TabsTrigger
-								value="workflow-view"
-								className="gap-1.5 rounded-lg text-xs sm:text-sm"
-							>
-								<Workflow className="size-3.5" />
-								<span className="hidden sm:inline">Workflow</span>
-								<span className="sm:hidden">Flows</span>
-								<span className="hidden sm:inline">Library</span>
-							</TabsTrigger>
-							<TabsTrigger
-								value="documents-view"
-								className="gap-1.5 rounded-lg text-xs sm:text-sm"
-							>
-								<FileImage className="size-3.5" />
-								Docs
-							</TabsTrigger>
-							<TabsTrigger
-								value="runs-view"
-								className="gap-1.5 rounded-lg text-xs sm:text-sm"
-							>
-								<Activity className="size-3.5" />
-								Runs
-							</TabsTrigger>
-						</TabsList>
-
-						<TabsContent value="project-view" className="mt-4">
-							<ProjectDevicePanel dashboard={dashboard} />
-						</TabsContent>
-
-						<TabsContent value="workflow-view" className="mt-4">
-							<WorkflowLibraryPanel
-								workflowTemplates={dashboard.workflowTemplates}
-								workflows={dashboard.workflows}
-								startingTemplateId={startingTemplateId}
-								onOpenCreate={() => {
-									setCanvasCreateMode(true);
-									setCanvasWorkflowId(null);
-									setPendingCanvasWorkflowId(null);
-									setWorkflowMessage(null);
-								}}
-								onOpenEdit={(workflow) => {
-									setCanvasCreateMode(false);
-									setCanvasWorkflowId(workflow.id);
-									setPendingCanvasWorkflowId(null);
-									setWorkflowMessage(null);
-								}}
-								onStartFromTemplate={(template) =>
-									startWorkflowFromTemplate(template.id)
-								}
+						<DashboardAuthCard
+							signUpEnabled={dashboard.auth.signUpEnabled}
+							organizationCreationEnabled={
+								dashboard.auth.organizationCreationEnabled
+							}
+							debugSessionBootstrapEnabled={
+								dashboard.auth.debugSessionBootstrapEnabled
+							}
+						/>
+					) : (
+						<>
+							<DashboardSessionToolbar
+								auth={dashboard.auth}
+								organizations={dashboard.organizations}
+								currentOrganizationId={dashboard.organization?.id ?? null}
 							/>
-						</TabsContent>
 
-						<TabsContent value="documents-view" className="mt-4">
-							{dashboard.organization ? (
-								<DocumentGalleryPanel
-									initialData={documents}
-									organizationId={dashboard.organization.id}
-									organizationName={dashboard.organization.name}
-									projects={dashboard.projects}
-									devices={dashboard.devices}
-									workflows={dashboard.workflows}
+							{showCreateOrganization ? (
+								<DashboardCreateOrganizationCard
+									userEmail={dashboard.auth.userEmail}
+									organizationCreationEnabled={
+										dashboard.auth.organizationCreationEnabled
+									}
 								/>
-							) : (
-								<EmptyOrgCard message="Set up an organization to view documents." />
-							)}
-						</TabsContent>
-						<TabsContent value="runs-view" className="mt-4">
-							{dashboard.organization ? (
-								<RunsPanel
-									initialData={runs}
-									organizationId={dashboard.organization.id}
-								/>
-							) : (
-								<EmptyOrgCard message="Set up an organization to view runs." />
-							)}
-						</TabsContent>
-					</Tabs>
+							) : null}
+
+							{showWorkspace ? (
+								<Tabs defaultValue="project-view" className="w-full">
+									<TabsList className="w-full justify-start gap-1 rounded-xl border border-slate-200/60 bg-white/80 p-1 shadow-sm backdrop-blur-sm">
+										<TabsTrigger
+											value="project-view"
+											className="gap-1.5 rounded-lg text-xs sm:text-sm"
+										>
+											<MonitorSmartphone className="size-3.5" />
+											<span className="hidden sm:inline">Projects &</span>{" "}
+											Devices
+										</TabsTrigger>
+										<TabsTrigger
+											value="workflow-view"
+											className="gap-1.5 rounded-lg text-xs sm:text-sm"
+										>
+											<Workflow className="size-3.5" />
+											<span className="hidden sm:inline">Workflow</span>
+											<span className="sm:hidden">Flows</span>
+											<span className="hidden sm:inline">Library</span>
+										</TabsTrigger>
+										<TabsTrigger
+											value="documents-view"
+											className="gap-1.5 rounded-lg text-xs sm:text-sm"
+										>
+											<FileImage className="size-3.5" />
+											Docs
+										</TabsTrigger>
+										<TabsTrigger
+											value="runs-view"
+											className="gap-1.5 rounded-lg text-xs sm:text-sm"
+										>
+											<Activity className="size-3.5" />
+											Runs
+										</TabsTrigger>
+									</TabsList>
+
+									<TabsContent value="project-view" className="mt-4">
+										<ProjectDevicePanel
+											dashboard={dashboard}
+											showArchived={showArchived}
+										/>
+									</TabsContent>
+
+									<TabsContent value="workflow-view" className="mt-4">
+										<WorkflowLibraryPanel
+											workflowTemplates={dashboard.workflowTemplates}
+											workflows={dashboard.workflows}
+											startingTemplateId={startingTemplateId}
+											savingTemplateFromWorkflowId={
+												savingTemplateFromWorkflowId
+											}
+											onOpenCreate={() => {
+												setCanvasTarget({
+													kind: "workflow-create",
+												});
+												setPendingCanvasTarget(null);
+												setEditorMessage(null);
+											}}
+											onOpenEdit={(workflow) => {
+												setCanvasTarget({
+													kind: "workflow",
+													id: workflow.id,
+												});
+												setPendingCanvasTarget(null);
+												setEditorMessage(null);
+											}}
+											onOpenEditTemplate={(template) => {
+												setCanvasTarget({
+													kind: "template",
+													id: template.id,
+												});
+												setPendingCanvasTarget(null);
+												setEditorMessage(null);
+											}}
+											onCreateTemplateFromWorkflow={(workflow, templateDraft) =>
+												createTemplateFromWorkflow(workflow.id, templateDraft)
+											}
+											onStartFromTemplate={(template) =>
+												startWorkflowFromTemplate(template.id)
+											}
+										/>
+									</TabsContent>
+
+									<TabsContent value="documents-view" className="mt-4">
+										{dashboard.organization ? (
+											<DocumentGalleryPanel
+												initialData={documents}
+												organizationId={dashboard.organization.id}
+												organizationName={dashboard.organization.name}
+												projects={dashboard.projects}
+												devices={dashboard.devices}
+												workflows={dashboard.workflows}
+											/>
+										) : (
+											<EmptyOrgCard message="Set up an organization to view documents." />
+										)}
+									</TabsContent>
+									<TabsContent value="runs-view" className="mt-4">
+										{dashboard.organization ? (
+											<RunsPanel
+												initialData={runs}
+												organizationId={dashboard.organization.id}
+											/>
+										) : (
+											<EmptyOrgCard message="Set up an organization to view runs." />
+										)}
+									</TabsContent>
+								</Tabs>
+							) : null}
+						</>
+					)}
 				</main>
 
 				<WorkflowCanvasEditor
-					isOpen={isCanvasOpen}
-					workflow={canvasCreateMode ? null : activeCanvasWorkflow}
+					isOpen={showWorkspace ? isCanvasOpen : false}
+					mode={
+						canvasTarget?.kind === "template"
+							? "template-edit"
+							: canvasTarget?.kind === "workflow"
+								? "workflow-edit"
+								: "workflow-create"
+					}
+					workflow={
+						canvasTarget?.kind === "workflow" ? activeCanvasWorkflow : null
+					}
+					template={
+						canvasTarget?.kind === "template" ? activeCanvasTemplate : null
+					}
 					modelCatalog={dashboard.modelCatalog}
 					toolCatalog={dashboard.toolCatalog}
-					saveMessage={workflowMessage}
+					saveMessage={editorMessage}
 					creatingWorkflow={creatingWorkflow}
 					updatingWorkflowId={updatingWorkflowId}
+					updatingTemplateId={updatingTemplateId}
 					onClose={() => {
-						setCanvasCreateMode(false);
-						setCanvasWorkflowId(null);
+						setCanvasTarget(null);
 					}}
 					onCreateWorkflow={createWorkflowDraft}
 					onUpdateWorkflow={updateWorkflowDraft}
+					onUpdateTemplate={updateTemplateDraft}
 				/>
 			</div>
 		</DashboardRealtimeProvider>

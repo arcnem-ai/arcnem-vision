@@ -1,5 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getCookie } from "@tanstack/react-start/server";
+import {
+	getDashboardSessionCookieHeader,
+	getSessionContext,
+} from "@/features/dashboard/server/session-context";
 import type {
 	DocumentItem,
 	DocumentOCRResultsResponse,
@@ -9,6 +12,18 @@ import type {
 
 const API_URL = process.env.API_URL ?? "http://localhost:3000";
 
+async function buildHeaders() {
+	const headers: Record<string, string> = {
+		"Content-Type": "application/json",
+	};
+	const cookieHeader = await getDashboardSessionCookieHeader();
+	if (cookieHeader) {
+		headers.Cookie = cookieHeader;
+	}
+
+	return headers;
+}
+
 export const getDocuments = createServerFn({ method: "GET" })
 	.inputValidator(
 		(input: {
@@ -16,27 +31,30 @@ export const getDocuments = createServerFn({ method: "GET" })
 			cursor?: string;
 			limit?: number;
 			query?: string;
+			projectId?: string;
+			deviceId?: string;
+			dashboardUploadsOnly?: boolean;
 		}) => input,
 	)
 	.handler(async ({ data }): Promise<DocumentsResponse> => {
+		const context = await getSessionContext();
+		if (!context.session || !context.organizationId) {
+			return { documents: [], nextCursor: null };
+		}
+
 		const params = new URLSearchParams({
-			organizationId: data.organizationId,
+			organizationId: context.organizationId,
 		});
 		if (data.limit) params.set("limit", String(data.limit));
 		if (data.cursor) params.set("cursor", data.cursor);
 		if (data.query?.trim()) params.set("query", data.query.trim());
-
-		const sessionToken = getCookie("better-auth.session_token");
-		const headers: Record<string, string> = {
-			"Content-Type": "application/json",
-		};
-		if (sessionToken) {
-			headers.Cookie = `better-auth.session_token=${sessionToken}`;
-		}
+		if (data.projectId?.trim()) params.set("projectId", data.projectId.trim());
+		if (data.deviceId?.trim()) params.set("deviceId", data.deviceId.trim());
+		if (data.dashboardUploadsOnly) params.set("dashboardUploadsOnly", "true");
 
 		const response = await fetch(
 			`${API_URL}/api/dashboard/documents?${params}`,
-			{ headers },
+			{ headers: await buildHeaders() },
 		);
 
 		if (!response.ok) {
@@ -51,17 +69,9 @@ export const getDocuments = createServerFn({ method: "GET" })
 export const getDocumentSegmentations = createServerFn({ method: "GET" })
 	.inputValidator((input: { documentId: string }) => input)
 	.handler(async ({ data }): Promise<DocumentSegmentationsResponse> => {
-		const sessionToken = getCookie("better-auth.session_token");
-		const headers: Record<string, string> = {
-			"Content-Type": "application/json",
-		};
-		if (sessionToken) {
-			headers.Cookie = `better-auth.session_token=${sessionToken}`;
-		}
-
 		const response = await fetch(
 			`${API_URL}/api/dashboard/documents/${encodeURIComponent(data.documentId)}/segmentations`,
-			{ headers },
+			{ headers: await buildHeaders() },
 		);
 
 		if (!response.ok) {
@@ -76,17 +86,9 @@ export const getDocumentSegmentations = createServerFn({ method: "GET" })
 export const getDocumentOCRResults = createServerFn({ method: "GET" })
 	.inputValidator((input: { documentId: string }) => input)
 	.handler(async ({ data }): Promise<DocumentOCRResultsResponse> => {
-		const sessionToken = getCookie("better-auth.session_token");
-		const headers: Record<string, string> = {
-			"Content-Type": "application/json",
-		};
-		if (sessionToken) {
-			headers.Cookie = `better-auth.session_token=${sessionToken}`;
-		}
-
 		const response = await fetch(
 			`${API_URL}/api/dashboard/documents/${encodeURIComponent(data.documentId)}/ocr`,
-			{ headers },
+			{ headers: await buildHeaders() },
 		);
 
 		if (!response.ok) {
@@ -101,17 +103,9 @@ export const getDocumentOCRResults = createServerFn({ method: "GET" })
 export const getDocument = createServerFn({ method: "GET" })
 	.inputValidator((input: { documentId: string }) => input)
 	.handler(async ({ data }): Promise<DocumentItem> => {
-		const sessionToken = getCookie("better-auth.session_token");
-		const headers: Record<string, string> = {
-			"Content-Type": "application/json",
-		};
-		if (sessionToken) {
-			headers.Cookie = `better-auth.session_token=${sessionToken}`;
-		}
-
 		const response = await fetch(
 			`${API_URL}/api/dashboard/documents/${encodeURIComponent(data.documentId)}`,
-			{ headers },
+			{ headers: await buildHeaders() },
 		);
 
 		if (!response.ok) {

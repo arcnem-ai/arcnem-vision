@@ -5,11 +5,11 @@ import { requestId } from "hono/request-id";
 import { pinoLogger } from "hono-pino";
 import { serve } from "inngest/hono";
 import { auth } from "@/lib/auth";
+import { isTrustedOrigin } from "@/lib/auth-origins";
 import { ackUploadRouter } from "@/routes/ackUpload";
 import { authRouter } from "@/routes/auth";
 import { getInngestClient } from "./clients/inngest";
 import { getS3Client } from "./clients/s3";
-import { getAPIEnvVar } from "./env/getAPIEnvVar";
 import { isAPIDebugModeEnabled } from "./env/isAPIDebugModeEnabled";
 import { dashboardDocumentsRouter } from "./routes/dashboardDocuments";
 import { documentsRouter } from "./routes/documents";
@@ -27,8 +27,7 @@ app.use(
 		origin: (origin) => {
 			if (!origin) return undefined;
 			if (isDebugMode) return origin;
-			const clientOrigin = getAPIEnvVar("CLIENT_ORIGIN");
-			if (origin === clientOrigin) return origin;
+			if (isTrustedOrigin(origin)) return origin;
 		},
 		allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 		allowHeaders: ["Content-Type", "Authorization", "x-api-key"],

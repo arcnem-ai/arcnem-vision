@@ -18,13 +18,14 @@ export const getAgentGraphRuns = createServerFn({ method: "GET" })
 	.handler(async ({ data }): Promise<RunsResponse> => {
 		const db = getDB();
 		const context = await getSessionContext();
-		if (!context.session || !context.organizationId) {
+		const organizationId = context.organizationId;
+		if (!context.session || !organizationId) {
 			return { runs: [], nextCursor: null };
 		}
 
 		const limit = data.limit ?? PAGE_SIZE;
 
-		const conditions = [eq(agentGraphs.organizationId, data.organizationId)];
+		const conditions = [eq(agentGraphs.organizationId, organizationId)];
 		if (data.cursor) {
 			conditions.push(lt(agentGraphRuns.id, data.cursor));
 		}
@@ -111,16 +112,23 @@ export const getAgentGraphRunSteps = createServerFn({ method: "GET" })
 	.inputValidator((input: { runId: string }) => input)
 	.handler(async ({ data }): Promise<RunStepsResponse> => {
 		const db = getDB();
-		await requireOrganizationContext();
+		const organizationId = await requireOrganizationContext();
 
-		const run = await db.query.agentGraphRuns.findFirst({
-			where: (row, { eq }) => eq(row.id, data.runId),
-			columns: {
-				initialState: true,
-				finalState: true,
-				error: true,
-			},
-		});
+		const [run] = await db
+			.select({
+				initialState: agentGraphRuns.initialState,
+				finalState: agentGraphRuns.finalState,
+				error: agentGraphRuns.error,
+			})
+			.from(agentGraphRuns)
+			.innerJoin(agentGraphs, eq(agentGraphRuns.agentGraphId, agentGraphs.id))
+			.where(
+				and(
+					eq(agentGraphRuns.id, data.runId),
+					eq(agentGraphs.organizationId, organizationId),
+				),
+			)
+			.limit(1);
 
 		if (!run) {
 			return { steps: [], initialState: null, finalState: null, error: null };

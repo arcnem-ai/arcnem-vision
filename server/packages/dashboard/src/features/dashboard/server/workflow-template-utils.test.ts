@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { buildWorkflowNameFromTemplate } from "./workflow-template-utils";
+import {
+	buildWorkflowNameFromTemplate,
+	normalizeWorkflowTemplateVisibility,
+} from "./workflow-template-utils";
 
 describe("buildWorkflowNameFromTemplate", () => {
 	test("returns the template name when it is unused", () => {
@@ -26,5 +29,17 @@ describe("buildWorkflowNameFromTemplate", () => {
 				"Image Quality Review 4",
 			]),
 		).toBe("Image Quality Review 3");
+	});
+
+	test("normalizes unknown visibility values to organization", () => {
+		expect(normalizeWorkflowTemplateVisibility("internal")).toBe(
+			"organization",
+		);
+		expect(normalizeWorkflowTemplateVisibility(null)).toBe("organization");
+	});
+
+	test("keeps public visibility when requested", () => {
+		expect(normalizeWorkflowTemplateVisibility("public")).toBe("public");
+		expect(normalizeWorkflowTemplateVisibility(" PUBLIC ")).toBe("public");
 	});
 });

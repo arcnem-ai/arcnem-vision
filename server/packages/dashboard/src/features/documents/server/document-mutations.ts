@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getCookie } from "@tanstack/react-start/server";
+import { getDashboardSessionCookieHeader } from "@/features/dashboard/server/session-context";
 import type {
 	DocumentUploadAckResponse,
 	DocumentUploadTarget,
@@ -8,14 +8,14 @@ import type {
 
 const API_URL = process.env.API_URL ?? "http://localhost:3000";
 
-function buildHeaders() {
-	const sessionToken = getCookie("better-auth.session_token");
+async function buildHeaders() {
 	const headers: Record<string, string> = {
 		"Content-Type": "application/json",
 	};
+	const cookieHeader = await getDashboardSessionCookieHeader();
 
-	if (sessionToken) {
-		headers.Cookie = `better-auth.session_token=${sessionToken}`;
+	if (cookieHeader) {
+		headers.Cookie = cookieHeader;
 	}
 
 	return headers;
@@ -48,7 +48,7 @@ export const createDocumentUpload = createServerFn({ method: "POST" })
 			`${API_URL}/api/dashboard/documents/uploads/presign`,
 			{
 				method: "POST",
-				headers: buildHeaders(),
+				headers: await buildHeaders(),
 				body: JSON.stringify(data),
 			},
 		);
@@ -63,7 +63,7 @@ export const acknowledgeDocumentUpload = createServerFn({ method: "POST" })
 			`${API_URL}/api/dashboard/documents/uploads/ack`,
 			{
 				method: "POST",
-				headers: buildHeaders(),
+				headers: await buildHeaders(),
 				body: JSON.stringify(data),
 			},
 		);
@@ -78,7 +78,7 @@ export const runDocumentWorkflow = createServerFn({ method: "POST" })
 			`${API_URL}/api/dashboard/documents/${data.documentId}/run`,
 			{
 				method: "POST",
-				headers: buildHeaders(),
+				headers: await buildHeaders(),
 				body: JSON.stringify({ workflowId: data.workflowId }),
 			},
 		);

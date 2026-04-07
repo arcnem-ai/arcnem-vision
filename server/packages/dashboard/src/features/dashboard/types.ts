@@ -6,12 +6,23 @@ export type WorkflowModelOption = {
 	label: string;
 };
 
+export interface WorkflowSchemaObject {
+	[key: string]: WorkflowSchemaValue;
+}
+
+export type WorkflowSchemaValue =
+	| string
+	| number
+	| boolean
+	| WorkflowSchemaObject
+	| WorkflowSchemaValue[];
+
 export type WorkflowToolOption = {
 	id: string;
 	name: string;
 	description: string;
-	inputSchema: Record<string, unknown>;
-	outputSchema: Record<string, unknown>;
+	inputSchema: WorkflowSchemaObject;
+	outputSchema: WorkflowSchemaObject;
 	inputFields: string[];
 	outputFields: string[];
 };
@@ -56,12 +67,16 @@ export type WorkflowNodeSample = {
 	toolNames: string[];
 };
 
+export type WorkflowTemplateVisibility = "organization" | "public";
+
 export type WorkflowTemplateSummary = {
 	id: string;
 	name: string;
 	description: string | null;
 	version: number;
-	visibility: string;
+	versionCount: number;
+	visibility: WorkflowTemplateVisibility;
+	canEdit: boolean;
 	entryNode: string;
 	edgeCount: number;
 	startedWorkflowCount: number;
@@ -90,11 +105,21 @@ export type DeviceAPIKey = {
 export type DashboardData = {
 	auth: {
 		state: "ready" | "missing";
-		source: "cookie" | "fallback";
+		source: "cookie" | "fallback" | "none";
 		sessionPreview: string | null;
 		userName: string | null;
 		userEmail: string | null;
+		activeOrganizationId: string | null;
+		signUpEnabled: boolean;
+		organizationCreationEnabled: boolean;
+		debugSessionBootstrapEnabled: boolean;
 	};
+	organizations: Array<{
+		id: string;
+		name: string;
+		slug: string;
+		role: string;
+	}>;
 	organization: {
 		id: string;
 		name: string;
@@ -104,6 +129,7 @@ export type DashboardData = {
 		id: string;
 		name: string;
 		slug: string;
+		archivedAt: string | null;
 		deviceCount: number;
 		apiKeyCount: number;
 	}>;
@@ -114,6 +140,7 @@ export type DashboardData = {
 		projectId: string;
 		agentGraphId: string;
 		workflowName: string | null;
+		archivedAt: string | null;
 		updatedAt: string;
 		status: "connected" | "idle";
 		apiKeyCount: number;
@@ -174,4 +201,8 @@ export type WorkflowDraft = {
 		fromNode: string;
 		toNode: string;
 	}>;
+};
+
+export type WorkflowTemplateDraft = WorkflowDraft & {
+	visibility: WorkflowTemplateVisibility;
 };

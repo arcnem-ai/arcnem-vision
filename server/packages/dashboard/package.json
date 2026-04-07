@@ -32,6 +32,7 @@
 		"@tanstack/ai-react": "^0.7.8",
 		"@tanstack/react-router": "^1.135.2",
 		"@tanstack/react-start": "^1.135.2",
+		"better-auth": "^1.4.18",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
 		"deepagents": "^1.8.8",

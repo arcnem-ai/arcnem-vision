@@ -60,6 +60,69 @@ describe("validateCanvasGraph", () => {
 		expect(message).toBeNull();
 	});
 
+	test("allows supervisor graphs that rely on implicit finish routing", () => {
+		const message = validateCanvasGraph({
+			entryNode: "quality_review_supervisor",
+			nodes: [
+				{
+					localId: "1",
+					id: "node-1",
+					nodeKey: "quality_review_supervisor",
+					nodeType: "supervisor",
+					x: 0,
+					y: 0,
+					inputKey: null,
+					outputKey: null,
+					modelId: "00000000-0000-4000-8000-000000000001",
+					modelLabel: "openai / gpt-4.1-mini",
+					toolIds: [],
+					tools: [],
+					toolNames: [],
+					config: {
+						members: ["image_quality_good_worker", "image_quality_bad_worker"],
+					},
+				},
+				{
+					localId: "2",
+					id: "node-2",
+					nodeKey: "image_quality_good_worker",
+					nodeType: "worker",
+					x: 240,
+					y: 0,
+					inputKey: null,
+					outputKey: null,
+					modelId: "00000000-0000-4000-8000-000000000001",
+					modelLabel: "openai / gpt-4.1-mini",
+					toolIds: [],
+					tools: [],
+					toolNames: [],
+					config: {},
+				},
+				{
+					localId: "3",
+					id: "node-3",
+					nodeKey: "image_quality_bad_worker",
+					nodeType: "worker",
+					x: 240,
+					y: 100,
+					inputKey: null,
+					outputKey: null,
+					modelId: "00000000-0000-4000-8000-000000000001",
+					modelLabel: "openai / gpt-4.1-mini",
+					toolIds: [],
+					tools: [],
+					toolNames: [],
+					config: {},
+				},
+			],
+			edges: [],
+			modelCatalog: baseModelCatalog,
+			toolCatalog: [],
+		});
+
+		expect(message).toBeNull();
+	});
+
 	test("rejects duplicate supervisor members", () => {
 		const message = validateCanvasGraph({
 			entryNode: "supervisor",

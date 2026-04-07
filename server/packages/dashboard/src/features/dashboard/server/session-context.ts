@@ -1,13 +1,25 @@
 import { getDB } from "@arcnem-vision/db/server";
-import { getCookie } from "@tanstack/react-start/server";
+import { inArray } from "drizzle-orm";
+import {
+	getBetterAuthSession,
+	getDashboardSessionCookieHeader,
+	listBetterAuthOrganizations,
+} from "./better-auth-api";
 
-export const FALLBACK_DEV_SESSION_TOKEN =
-	"seed_dashboard_session_s4M8xR2vJ7nK1qP5wL9cD3fH6tY0uB4";
+export { getDashboardSessionCookieHeader };
+
+export type SessionOrganizationMembership = {
+	organizationId: string;
+	name: string;
+	slug: string;
+	role: string;
+};
 
 export type SessionContext = {
-	source: "cookie" | "fallback";
+	source: "cookie" | "fallback" | "none";
 	sessionPreview: string | null;
 	session: {
+		id: string;
 		userId: string;
 		activeOrganizationId: string | null;
 	} | null;
@@ -16,123 +28,129 @@ export type SessionContext = {
 		email: string;
 	} | null;
 	organizationId: string | null;
+	organizations: SessionOrganizationMembership[];
 };
 
-function buildSessionTokenCandidates(
-	rawCookie: string | undefined,
-	fallbackToken: string,
-) {
-	const candidateTokens = new Set<string>();
-	const pushCandidate = (value: string | undefined) => {
-		if (!value) return;
-		try {
-			const decoded = decodeURIComponent(value);
-			if (decoded) candidateTokens.add(decoded);
-			const splitAt = decoded.lastIndexOf(".");
-			if (splitAt > 0) {
-				candidateTokens.add(decoded.slice(0, splitAt));
-			}
-		} catch {
-			candidateTokens.add(value);
-		}
-	};
+export type AuthenticatedSessionContext = SessionContext & {
+	session: NonNullable<SessionContext["session"]>;
+};
 
-	pushCandidate(rawCookie);
-	if (!rawCookie) {
-		pushCandidate(fallbackToken);
-	}
-
-	return candidateTokens;
-}
+export type AuthenticatedOrganizationContext = AuthenticatedSessionContext & {
+	organizationId: string;
+};
 
 export async function getSessionContext(): Promise<SessionContext> {
 	const db = getDB();
-	const rawCookie = getCookie("better-auth.session_token");
-	const source: "cookie" | "fallback" = rawCookie ? "cookie" : "fallback";
-	const fallbackToken =
-		process.env.DASHBOARD_SESSION_TOKEN ?? FALLBACK_DEV_SESSION_TOKEN;
-	const candidateTokens = buildSessionTokenCandidates(rawCookie, fallbackToken);
+	const authSession = await getBetterAuthSession();
+	const session = authSession.payload?.session ?? null;
+	const user = authSession.payload?.user ?? null;
+	const sessionPreview = session?.token?.slice(0, 10) ?? null;
+	const source: SessionContext["source"] =
+		session?.userAgent === "seed-dashboard-session"
+			? "fallback"
+			: authSession.source;
 
-	let activeSession:
-		| {
-				userId: string;
-				activeOrganizationId: string | null;
-		  }
-		| undefined;
-	let sessionPreview: string | null = null;
-	for (const token of candidateTokens) {
-		sessionPreview = `${token.slice(0, 10)}...`;
-		const session = await db.query.sessions.findFirst({
-			where: (row, { and, eq, gt }) =>
-				and(eq(row.token, token), gt(row.expiresAt, new Date())),
-			columns: {
-				userId: true,
-				activeOrganizationId: true,
-			},
-		});
-		if (session) {
-			activeSession = session;
-			break;
-		}
-	}
-
-	if (!activeSession) {
+	if (!session || !user) {
 		return {
 			source,
-			sessionPreview,
+			sessionPreview: sessionPreview ? `${sessionPreview}...` : null,
 			session: null,
 			user: null,
 			organizationId: null,
+			organizations: [],
 		};
 	}
 
-	const user = await db.query.users.findFirst({
-		where: (row, { eq }) => eq(row.id, activeSession.userId),
-		columns: {
-			name: true,
-			email: true,
-		},
-	});
-
-	const member =
-		activeSession.activeOrganizationId === null
-			? await db.query.members.findFirst({
-					where: (row, { eq }) => eq(row.userId, activeSession.userId),
+	const betterAuthOrganizations = await listBetterAuthOrganizations();
+	const organizationIds = betterAuthOrganizations.map(
+		(organization) => organization.id,
+	);
+	const membershipRows =
+		organizationIds.length > 0
+			? await db.query.members.findMany({
+					where: (row, { and, eq }) =>
+						and(
+							eq(row.userId, user.id),
+							inArray(row.organizationId, organizationIds),
+						),
 					columns: {
 						organizationId: true,
+						role: true,
 					},
 				})
-			: undefined;
+			: [];
+	const roleByOrganizationId = new Map(
+		membershipRows.map(
+			(membership) => [membership.organizationId, membership.role] as const,
+		),
+	);
+
+	const organizations = betterAuthOrganizations.map((organization) => ({
+		organizationId: organization.id,
+		name: organization.name,
+		slug: organization.slug,
+		role: roleByOrganizationId.get(organization.id) ?? "member",
+	}));
+
+	const resolvedOrganizationId =
+		organizations.find(
+			(organization) =>
+				organization.organizationId === session.activeOrganizationId,
+		)?.organizationId ??
+		organizations[0]?.organizationId ??
+		null;
 
 	return {
 		source,
-		sessionPreview,
-		session: activeSession,
-		user: user ?? null,
-		organizationId:
-			activeSession.activeOrganizationId ?? member?.organizationId ?? null,
+		sessionPreview: sessionPreview ? `${sessionPreview}...` : null,
+		session: {
+			id: session.id,
+			userId: session.userId,
+			activeOrganizationId: session.activeOrganizationId,
+		},
+		user: {
+			name: user.name ?? null,
+			email: user.email,
+		},
+		organizationId: resolvedOrganizationId,
+		organizations,
 	};
 }
 
-export async function requireOrganizationContext() {
+export async function requireDashboardSessionContext(): Promise<AuthenticatedSessionContext> {
 	const context = await getSessionContext();
 	if (!context.session) {
 		throw new Error("No active session for dashboard mutation.");
 	}
+
+	return {
+		...context,
+		session: context.session,
+	};
+}
+
+export async function requireOrganizationContext() {
+	const context = await requireDashboardSessionContext();
 	if (!context.organizationId) {
 		throw new Error("No organization context for this session.");
 	}
 	return context.organizationId;
 }
 
-export async function requireDashboardActorContext() {
-	const context = await getSessionContext();
-	if (!context.session) {
-		throw new Error("No active session for dashboard mutation.");
-	}
+export async function requireDashboardOrganizationContext(): Promise<AuthenticatedOrganizationContext> {
+	const context = await requireDashboardSessionContext();
 	if (!context.organizationId) {
 		throw new Error("No organization context for this session.");
 	}
+
+	return {
+		...context,
+		organizationId: context.organizationId,
+	};
+}
+
+export async function requireDashboardActorContext() {
+	const context = await requireDashboardOrganizationContext();
 
 	return {
 		organizationId: context.organizationId,

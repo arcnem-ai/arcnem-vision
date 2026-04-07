@@ -1,7 +1,7 @@
 import { schema } from "@arcnem-vision/db";
 import { getDB } from "@arcnem-vision/db/server";
 import { createServerFn } from "@tanstack/react-start";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { GeneratedDeviceAPIKey } from "@/features/dashboard/types";
 import {
 	createUniqueSlug,
@@ -42,6 +42,16 @@ type UpdateDeviceAPIKeyInput = {
 
 type DeleteDeviceAPIKeyInput = {
 	apiKeyId: string;
+};
+
+type SetProjectArchivedInput = {
+	projectId: string;
+	archived: boolean;
+};
+
+type SetDeviceArchivedInput = {
+	deviceId: string;
+	archived: boolean;
 };
 
 async function assertWorkflowInOrganization(
@@ -104,15 +114,19 @@ export const createDevice = createServerFn({ method: "POST" })
 		const { organizationId } = await requireDashboardActorContext();
 		const name = requireDisplayName(data.name, "Device name");
 		const project = await db.query.projects.findFirst({
-			where: (row, { and, eq }) =>
-				and(eq(row.id, data.projectId), eq(row.organizationId, organizationId)),
+			where: (row) =>
+				and(
+					eq(row.id, data.projectId),
+					eq(row.organizationId, organizationId),
+					isNull(row.archivedAt),
+				),
 			columns: {
 				id: true,
 			},
 		});
 
 		if (!project) {
-			throw new Error("Project not found in your organization.");
+			throw new Error("Active project not found in your organization.");
 		}
 
 		await assertWorkflowInOrganization(organizationId, data.agentGraphId);
@@ -159,15 +173,19 @@ export const updateDevice = createServerFn({ method: "POST" })
 		const name = requireDisplayName(data.name, "Device name");
 
 		const device = await db.query.devices.findFirst({
-			where: (row, { and, eq }) =>
-				and(eq(row.id, data.deviceId), eq(row.organizationId, organizationId)),
+			where: (row) =>
+				and(
+					eq(row.id, data.deviceId),
+					eq(row.organizationId, organizationId),
+					isNull(row.archivedAt),
+				),
 			columns: {
 				id: true,
 			},
 		});
 
 		if (!device) {
-			throw new Error("Device not found in your organization.");
+			throw new Error("Active device not found in your organization.");
 		}
 
 		await assertWorkflowInOrganization(organizationId, data.agentGraphId);
@@ -201,8 +219,12 @@ export const createDeviceAPIKey = createServerFn({ method: "POST" })
 		const name = requireDisplayName(data.name, "API key name");
 
 		const device = await db.query.devices.findFirst({
-			where: (row, { and, eq }) =>
-				and(eq(row.id, data.deviceId), eq(row.organizationId, organizationId)),
+			where: (row) =>
+				and(
+					eq(row.id, data.deviceId),
+					eq(row.organizationId, organizationId),
+					isNull(row.archivedAt),
+				),
 			columns: {
 				id: true,
 				projectId: true,
@@ -210,7 +232,7 @@ export const createDeviceAPIKey = createServerFn({ method: "POST" })
 		});
 
 		if (!device) {
-			throw new Error("Device not found in your organization.");
+			throw new Error("Active device not found in your organization.");
 		}
 
 		const rawKey = generatePlainAPIKey();
@@ -271,11 +293,32 @@ export const updateDeviceAPIKey = createServerFn({ method: "POST" })
 				and(eq(row.id, data.apiKeyId), eq(row.organizationId, organizationId)),
 			columns: {
 				id: true,
+				deviceId: true,
 			},
 		});
 
 		if (!apiKey) {
 			throw new Error("API key not found in your organization.");
+		}
+
+		const device = await db.query.devices.findFirst({
+			where: (row, { and, eq }) =>
+				and(
+					eq(row.id, apiKey.deviceId),
+					eq(row.organizationId, organizationId),
+				),
+			columns: {
+				id: true,
+				archivedAt: true,
+			},
+		});
+
+		if (!device) {
+			throw new Error("Device not found in your organization.");
+		}
+
+		if (device.archivedAt) {
+			throw new Error("Restore the device before editing its API keys.");
 		}
 
 		const [updatedKey] = await db
@@ -305,21 +348,179 @@ export const deleteDeviceAPIKey = createServerFn({ method: "POST" })
 		const db = getDB();
 		const { organizationId } = await requireDashboardActorContext();
 
+		const apiKey = await db.query.apikeys.findFirst({
+			where: (row, { and, eq }) =>
+				and(eq(row.id, data.apiKeyId), eq(row.organizationId, organizationId)),
+			columns: {
+				id: true,
+				deviceId: true,
+			},
+		});
+
+		if (!apiKey) {
+			throw new Error("API key not found in your organization.");
+		}
+
+		const device = await db.query.devices.findFirst({
+			where: (row, { and, eq }) =>
+				and(
+					eq(row.id, apiKey.deviceId),
+					eq(row.organizationId, organizationId),
+				),
+			columns: {
+				id: true,
+				archivedAt: true,
+			},
+		});
+
+		if (!device) {
+			throw new Error("Device not found in your organization.");
+		}
+
+		if (device.archivedAt) {
+			throw new Error("Restore the device before deleting its API keys.");
+		}
+
 		const [deletedKey] = await db
 			.delete(schema.apikeys)
-			.where(
-				and(
-					eq(schema.apikeys.id, data.apiKeyId),
-					eq(schema.apikeys.organizationId, organizationId),
-				),
-			)
+			.where(eq(schema.apikeys.id, data.apiKeyId))
 			.returning({
 				id: schema.apikeys.id,
 			});
 
 		if (!deletedKey) {
-			throw new Error("API key not found in your organization.");
+			throw new Error("Failed to delete API key.");
 		}
 
 		return deletedKey;
+	});
+
+export const setProjectArchived = createServerFn({ method: "POST" })
+	.inputValidator((input: SetProjectArchivedInput) => input)
+	.handler(async ({ data }) => {
+		const db = getDB();
+		const { organizationId } = await requireDashboardActorContext();
+		const project = await db.query.projects.findFirst({
+			where: (row, { and, eq }) =>
+				and(eq(row.id, data.projectId), eq(row.organizationId, organizationId)),
+			columns: {
+				id: true,
+				name: true,
+				archivedAt: true,
+			},
+		});
+
+		if (!project) {
+			throw new Error("Project not found in your organization.");
+		}
+
+		const timestamp = data.archived ? (project.archivedAt ?? new Date()) : null;
+
+		const updatedProject = await db.transaction(async (tx) => {
+			const [nextProject] = await tx
+				.update(schema.projects)
+				.set({
+					archivedAt: timestamp,
+					updatedAt: new Date(),
+				})
+				.where(eq(schema.projects.id, data.projectId))
+				.returning({
+					id: schema.projects.id,
+					name: schema.projects.name,
+					archivedAt: schema.projects.archivedAt,
+				});
+
+			if (!nextProject) {
+				throw new Error("Failed to update project archive state.");
+			}
+
+			await tx
+				.update(schema.devices)
+				.set({
+					archivedAt: timestamp,
+					updatedAt: new Date(),
+				})
+				.where(
+					and(
+						eq(schema.devices.projectId, data.projectId),
+						eq(schema.devices.organizationId, organizationId),
+					),
+				);
+
+			return nextProject;
+		});
+
+		return {
+			id: updatedProject.id,
+			name: updatedProject.name,
+			archivedAt: updatedProject.archivedAt?.toISOString() ?? null,
+		};
+	});
+
+export const setDeviceArchived = createServerFn({ method: "POST" })
+	.inputValidator((input: SetDeviceArchivedInput) => input)
+	.handler(async ({ data }) => {
+		const db = getDB();
+		const { organizationId } = await requireDashboardActorContext();
+		const device = await db.query.devices.findFirst({
+			where: (row, { and, eq }) =>
+				and(eq(row.id, data.deviceId), eq(row.organizationId, organizationId)),
+			columns: {
+				id: true,
+				name: true,
+				projectId: true,
+				archivedAt: true,
+			},
+		});
+
+		if (!device) {
+			throw new Error("Device not found in your organization.");
+		}
+
+		if (!data.archived) {
+			const project = await db.query.projects.findFirst({
+				where: (row, { and, eq }) =>
+					and(
+						eq(row.id, device.projectId),
+						eq(row.organizationId, organizationId),
+					),
+				columns: {
+					id: true,
+					archivedAt: true,
+				},
+			});
+
+			if (!project) {
+				throw new Error("Project not found in your organization.");
+			}
+
+			if (project.archivedAt) {
+				throw new Error("Restore the project before restoring this device.");
+			}
+		}
+
+		const timestamp = data.archived ? (device.archivedAt ?? new Date()) : null;
+
+		const [updatedDevice] = await db
+			.update(schema.devices)
+			.set({
+				archivedAt: timestamp,
+				updatedAt: new Date(),
+			})
+			.where(eq(schema.devices.id, data.deviceId))
+			.returning({
+				id: schema.devices.id,
+				name: schema.devices.name,
+				archivedAt: schema.devices.archivedAt,
+			});
+
+		if (!updatedDevice) {
+			throw new Error("Failed to update device archive state.");
+		}
+
+		return {
+			id: updatedDevice.id,
+			name: updatedDevice.name,
+			archivedAt: updatedDevice.archivedAt?.toISOString() ?? null,
+		};
 	});
