@@ -8,7 +8,7 @@ import type {
 	DocumentWorkflowRunResponse,
 } from "@/features/documents/types";
 
-const API_URL = getDashboardEnvVar(DASHBOARD_ENV_VAR.VITE_API_URL);
+const API_URL = getDashboardEnvVar(DASHBOARD_ENV_VAR.API_URL);
 
 async function buildHeaders() {
 	const headers: Record<string, string> = {

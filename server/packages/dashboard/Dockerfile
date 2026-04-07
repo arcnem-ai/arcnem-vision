@@ -27,10 +27,10 @@ COPY packages/dashboard ./packages/dashboard
 
 WORKDIR /app/packages/dashboard
 
-ARG VITE_API_URL
+ARG API_URL
 
-RUN test -n "$VITE_API_URL"
-RUN VITE_API_URL="$VITE_API_URL" bun run build
+RUN test -n "$API_URL"
+RUN API_URL="$API_URL" bun run build
 
 FROM oven/bun:1.3.11-alpine AS runner
 

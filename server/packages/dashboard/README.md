@@ -30,7 +30,7 @@ Dev server runs on `http://localhost:3001`.
 
 `server/packages/dashboard/.env.example`:
 
-- `VITE_API_URL`: the single API base URL used by both the browser and server-side dashboard requests
+- `API_URL`: the server-side API base URL used by dashboard loaders, mutations, and the `/api/auth` proxy
 - `DATABASE_URL`: local Postgres connection string
 - `OPENAI_API_KEY`: required for Docs-tab collection chat
 - `OPENAI_MODEL`: optional model override for Docs-tab collection chat (defaults to `gpt-4.1-mini`)

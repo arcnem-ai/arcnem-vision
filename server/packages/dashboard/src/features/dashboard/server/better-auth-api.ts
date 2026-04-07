@@ -2,7 +2,7 @@ import { getRequestHeader } from "@tanstack/react-start/server";
 import { DASHBOARD_ENV_VAR } from "@/env/dashboardEnvVar";
 import { getDashboardEnvVar } from "@/env/getDashboardEnvVar";
 
-const API_URL = getDashboardEnvVar(DASHBOARD_ENV_VAR.VITE_API_URL);
+const API_URL = getDashboardEnvVar(DASHBOARD_ENV_VAR.API_URL);
 const SESSION_COOKIE_NAME = "better-auth.session_token";
 const SECURE_SESSION_COOKIE_NAME = "__Secure-better-auth.session_token";
 

@@ -1,14 +1,29 @@
 import { emailOTPClient, organizationClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
-export const authAPIBaseURL = import.meta.env.VITE_API_URL?.trim();
+export const dashboardAuthBasePath = "/api/auth";
 
-if (!authAPIBaseURL) {
-	throw new Error("VITE_API_URL is not defined");
+export function buildDashboardAuthPath(path = "") {
+	if (!path) {
+		return dashboardAuthBasePath;
+	}
+
+	return `${dashboardAuthBasePath}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+function getDashboardOrigin() {
+	if (typeof window !== "undefined") {
+		return window.location.origin;
+	}
+
+	// Better Auth validates the base URL during SSR module evaluation even though
+	// the client instance is only used from browser event handlers.
+	return "http://localhost";
 }
 
 export const authClient = createAuthClient({
-	baseURL: authAPIBaseURL,
+	baseURL: getDashboardOrigin(),
+	basePath: dashboardAuthBasePath,
 	plugins: [emailOTPClient(), organizationClient()],
 });
 

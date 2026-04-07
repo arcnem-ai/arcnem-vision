@@ -70,6 +70,8 @@ import Bun from "bun";
 const SERVER_PORT = Number(process.env.PORT ?? 3001);
 const CLIENT_DIRECTORY = "./dist/client";
 const SERVER_ENTRY_POINT = "./dist/server/server.js";
+const AUTH_PROXY_BASE_PATH = "/api/auth";
+const API_BASE_URL = process.env.API_URL?.trim();
 
 // Logging utilities for professional output
 const log = {
@@ -176,6 +178,34 @@ interface PreloadResult {
 	routes: Record<string, (req: Request) => Response | Promise<Response>>;
 	loaded: AssetMetadata[];
 	skipped: AssetMetadata[];
+}
+
+async function proxyAuthRequest(req: Request): Promise<Response> {
+	if (!API_BASE_URL) {
+		return new Response("API_URL is not configured on the dashboard.", {
+			status: 500,
+		});
+	}
+
+	const requestURL = new URL(req.url);
+	const targetURL = new URL(
+		`${requestURL.pathname}${requestURL.search}`,
+		API_BASE_URL,
+	);
+	const headers = new Headers(req.headers);
+	headers.delete("host");
+
+	const body =
+		req.method === "GET" || req.method === "HEAD"
+			? undefined
+			: await req.arrayBuffer();
+
+	return await fetch(targetURL, {
+		method: req.method,
+		headers,
+		body,
+		redirect: "manual",
+	});
 }
 
 /**
@@ -528,6 +558,7 @@ async function initializeServer() {
 		routes: {
 			// Serve static assets (preloaded or on-demand)
 			...routes,
+			[`${AUTH_PROXY_BASE_PATH}/*`]: (req: Request) => proxyAuthRequest(req),
 
 			// Fallback to TanStack Start handler for all other routes
 			"/*": (req: Request) => {

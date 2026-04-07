@@ -9,7 +9,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { authAPIBaseURL, authClient, signIn } from "@/lib/auth-client";
+import { authClient, buildDashboardAuthPath, signIn } from "@/lib/auth-client";
 
 function errorMessage(error: unknown, fallback: string) {
 	if (
@@ -55,7 +55,7 @@ export function DashboardAuthCard({
 		setError(null);
 		setMessage("Loading local debug session…");
 
-		void fetch(`${authAPIBaseURL}/api/auth/debug/session`, {
+		void fetch(buildDashboardAuthPath("/debug/session"), {
 			credentials: "include",
 		})
 			.then(async (response) => {
