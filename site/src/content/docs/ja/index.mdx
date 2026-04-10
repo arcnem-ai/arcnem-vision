@@ -3,7 +3,7 @@ title: Arcnem Vision
 description: 機械に「見る」を教え、エージェントに「どうするか」を任せる。
 template: splash
 hero:
-  tagline: 写真をアップロードすると、LangGraphでつながったAIエージェント群が、OCR抽出、説明文生成、ベクトル化、そして条件分岐や専門ワーカーへの振り分けまで引き受けます。設定はデータベースから差し替え可能。必要なAPIキーは2つだけで、残りはローカルで動きます。
+  tagline: Arcnem Visionは、画像を受け取り、設定可能なAIワークフローを走らせ、結果と実行履歴まで運用画面で扱える画像解析基盤です。デバイス/APIキー経由の自動取り込みにも、ダッシュボードからの単発投入にも対応し、ワークフロー定義はデータベースから差し替えられます。
   image:
     file: ../../../assets/logo.svg
   actions:
@@ -21,29 +21,26 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 ## 特徴
 
 <CardGrid stagger>
-  <Card title="データベース駆動のエージェントグラフ" icon="setting">
-    AIワークフローをコードではなく行として定義。worker、tool、supervisor、condition を組み合わせた処理パイプラインを再デプロイなしで差し替え可能。
+  <Card title="2つの取り込み経路" icon="random">
+    デバイス/APIキー経由の自動処理と、ダッシュボードからの単発アップロードの両方に対応。同じ基盤の上で継続運用とスポット検証を使い分けられます。
   </Card>
-  <Card title="GenUIチャットインターフェース" icon="puzzle">
-    AIはテキストで返答するだけではない。カード、ギャラリー、インタラクティブコンポーネントなど、実際のFlutterウィジェットをJSONからランタイムで生成。
+  <Card title="データベース駆動のワークフロー" icon="setting">
+    ワークフローはコードではなくデータとして管理。worker、tool、supervisor、condition を組み合わせた処理グラフを、再デプロイなしで差し替えられます。
   </Card>
-  <Card title="オンデバイスGemma" icon="laptop">
-    インテント解析はネットワークに到達する前にスマートフォン上でローカル実行。デフォルトでプライバシー重視。
+  <Card title="MCPを軸にした解析レイヤー" icon="open-book">
+    OCR、説明文生成、画像埋め込み、説明文埋め込み、セグメンテーション、類似検索、根拠付き取得を MCP ツールとして公開。ワークフローからもダッシュボードからも活用できます。
   </Card>
-  <Card title="CLIPベクトル検索" icon="magnifier">
-    画像とその説明文を同一の768次元空間に埋め込み。画像で検索、テキストで検索、雰囲気で検索。
+  <Card title="結果を捨てずに蓄積する" icon="document">
+    元画像だけでなく、説明文、OCR結果、埋め込み、セグメンテーション、派生画像まで保存。あとから検索、確認、再利用できる解析コーパスが育ちます。
   </Card>
-  <Card title="ドキュメント横断チャット" icon="comment-alt">
-    Docsタブでは、意味検索に加えて、OCR、説明文、関連セグメントを根拠にした組織単位のチャットを開けます。回答には出典カードも付きます。
+  <Card title="ダッシュボードが運用の中枢" icon="pencil">
+    プロジェクト、デバイス、APIキー、ワークフロー、アップロード、検索、チャット、実行状況の確認までを1つの画面に集約。Flutterを開かなくても、コア体験はここで完結します。
   </Card>
-  <Card title="ビジュアルワークフロービルダー" icon="pencil">
-    Reactダッシュボードでプロジェクト作成、デバイス登録、APIキー発行、分岐を含むワークフロー編集、テンプレートからの新規グラフ起動まで一か所で進められます。
+  <Card title="状態遷移まで追える実行トレース" icon="bars">
+    初期状態、各ステップの差分、最終状態、所要時間、エラーを実行ごとに保存。運用担当者が「どこで何が起きたか」を後から追跡できます。
   </Card>
-  <Card title="リアルタイム運用ビュー" icon="bars">
-    アップロード、OCR結果保存、説明文生成、セグメンテーション、実行ステップの進行に合わせてDocumentsとRunsが更新。
-  </Card>
-  <Card title="MCPツールがファーストクラス" icon="open-book">
-    説明文生成、OCR、CLIPエンベディング、類似検索、セグメンテーションモデルをMCP経由で公開。エージェントも人も利用可能。
+  <Card title="検索と根拠付きチャット" icon="comment-alt">
+    Docsタブでは意味検索に加えて、OCR、説明文、関連セグメントを根拠にしたコレクションチャットを利用できます。回答には出典カードも付きます。
   </Card>
 </CardGrid>
 
@@ -51,9 +48,9 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 | レイヤー | 技術 | 役割 |
 |---|---|---|
-| **クライアント** | Flutter, Dart, flutter_gemma, GenUI, fpdart | カメラキャプチャ、オンデバイスLLM、AI生成UI、関数型エラーハンドリング |
-| **API** | Bun, Hono, better-auth, Inngest, Pino | RESTルート、署名付きアップロード、ジョブスケジューリング、構造化ログ |
-| **ダッシュボード** | React 19, TanStack Router, Tailwind, shadcn/ui | ワークフロービルダー、プロジェクト/デバイス/APIキー管理、ライブ運用UI |
-| **エージェント** | Go, Gin, LangGraph, LangChain, inngestgo | グラフベースのエージェントオーケストレーション、ReActワーカー、ステップレベルトレーシング |
-| **MCP** | Go, MCP go-sdk, replicate-go, GORM | CLIPエンベディング、説明文生成、OCR、セグメンテーション、類似検索 |
-| **ストレージ** | Postgres 18 + pgvector, S3互換, Redis | ベクターインデックス、オブジェクトストレージ、セッションキャッシュ |
+| **API** | Bun, Hono, better-auth, Inngest, Pino | 署名付きアップロード、認証、実行トリガー、構造化ログ |
+| **ダッシュボード** | React 19, TanStack Router, Tailwind, shadcn/ui | ワークフロービルダー、プロジェクト/デバイス/APIキー管理、検索、チャット、運用UI |
+| **エージェント** | Go, Gin, LangGraph, LangChain, inngestgo | グラフ読み込み、エージェント実行、ステップ単位の実行追跡 |
+| **MCP** | Go, MCP go-sdk, replicate-go, GORM | OCR、説明文生成、埋め込み、セグメンテーション、類似検索、取得系ツール |
+| **ストレージ** | Postgres 18 + pgvector, S3互換, Redis | ドキュメント保存、派生データ、ベクター検索、セッション、リアルタイム配信 |
+| **クライアント** | Flutter, Dart, flutter_gemma, GenUI, fpdart | 撮影、プレビュー、GenUI実験用のデモクライアント |

@@ -1,36 +1,116 @@
 ---
 title: API Examples
-description: Upload flow using presigned S3 URLs and the agent processing pipeline.
+description: Device ingestion, dashboard uploads, workflow queueing, and realtime feed examples.
 ---
 
-## Upload Flow
+Arcnem Vision exposes two primary operational APIs:
+
+- a **device/API-key ingestion path** for automated uploads
+- a **dashboard/session path** for operator-driven uploads, browsing, and workflow queueing
+
+## Device Ingestion
+
+This is the automated path used by devices or external integrations.
+
+### 1. Get a presigned upload URL
 
 ```bash
-# 1. Get a presigned upload URL
 curl -X POST http://localhost:3000/api/uploads/presign \
   -H "Content-Type: application/json" \
   -H "x-api-key: ${API_KEY}" \
   -d '{"contentType":"image/png","size":12345}'
+```
 
-# 2. Upload directly to S3 with the returned uploadUrl
+### 2. Upload directly to storage
+
+```bash
 curl -X PUT "${UPLOAD_URL}" --data-binary @photo.png
+```
 
-# 3. Acknowledge — triggers the full agent pipeline
+### 3. Acknowledge the upload
+
+```bash
 curl -X POST http://localhost:3000/api/uploads/ack \
   -H "Content-Type: application/json" \
   -H "x-api-key: ${API_KEY}" \
   -d '{"objectKey":"uploads/.../photo.png"}'
 ```
 
-After step 3, Inngest fires `document/process.upload`. The assigned workflow takes it from there — OCR, description generation, embedding, routing, segmentation, whatever that graph defines.
+After step 3, the API verifies the object, creates the document, and emits `document/process.upload`. The agents service loads the device's assigned workflow and executes it.
+
+## Dashboard Uploads
+
+Dashboard uploads are session-authenticated and intended for operator-driven review.
+
+### Presign an ad-hoc upload
+
+```http
+POST /api/dashboard/documents/uploads/presign
+```
+
+Body:
+
+```json
+{
+  "projectId": "<projectId>",
+  "contentType": "image/png",
+  "size": 12345
+}
+```
+
+### Acknowledge the ad-hoc upload
+
+```http
+POST /api/dashboard/documents/uploads/ack
+```
+
+Body:
+
+```json
+{
+  "objectKey": "uploads/.../dashboard/.../image.png"
+}
+```
+
+This creates the document and publishes a dashboard document event. Unlike the device path, it does **not** auto-run a workflow. Operators choose which saved workflow to queue next.
+
+## Queue Any Workflow Against A Saved Document
+
+```http
+POST /api/dashboard/documents/:id/run
+```
+
+Body:
+
+```json
+{
+  "workflowId": "<agentGraphId>"
+}
+```
+
+Response:
+
+```json
+{
+  "status": "queued",
+  "documentId": "<documentId>",
+  "workflowId": "<agentGraphId>",
+  "workflowName": "OCR Review Supervisor"
+}
+```
+
+This lets operators compare workflows, rerun analysis, or process dashboard-uploaded documents without changing a device's default assignment.
 
 ## Auth Model
 
-Authentication uses better-auth with the API key plugin. API keys are scoped to org/project/device, stored as SHA-256 hashes. The Flutter client authenticates via API key verification. Redis is used as secondary session storage. The dashboard uses session-based auth.
+- **Device ingestion** uses API keys scoped to organization, project, and device.
+- API keys are stored as SHA-256 hashes.
+- **Dashboard operations** use better-auth session cookies.
+- Local debug mode can bootstrap a seeded session when `API_DEBUG=true`.
 
-## Dashboard Documents Endpoints
+## Dashboard Document APIs
 
-Dashboard document browsing and search use:
+### Browse or search documents
 
 ```http
 GET /api/dashboard/documents?organizationId=<orgId>&query=<text>&limit=<n>&cursor=<id>
@@ -39,52 +119,51 @@ GET /api/dashboard/documents?organizationId=<orgId>&query=<text>&limit=<n>&curso
 Notes:
 
 - `organizationId` is required.
-- `query` is optional; when present, the API tries semantic ranking first (embedding distance) and falls back to lexical matching.
-- Dashboard auth is session-based (`better-auth.session_token` cookie or `DASHBOARD_SESSION_TOKEN` in local debug mode).
-- Response shape:
-  - `documents`: list of cards (`id`, `objectKey`, `contentType`, `sizeBytes`, `createdAt`, `description`, `thumbnailUrl`, `distance`)
-  - `nextCursor`: pagination cursor (`null` for query-based search responses)
+- `query` is optional.
+- Semantic ranking is attempted first when embeddings are available.
+- The API falls back to lexical matching when no semantic seed exists.
 
-Dashboard uploads use:
+Response fields include:
 
-```http
-POST /api/dashboard/documents/uploads/presign
-POST /api/dashboard/documents/uploads/ack
-```
+- `id`
+- `objectKey`
+- `contentType`
+- `sizeBytes`
+- `createdAt`
+- `description`
+- `thumbnailUrl`
+- `distance`
 
-- `presign` issues a direct S3 upload target for a selected project.
-- `ack` verifies the upload, creates the document, and publishes a dashboard document event.
-
-Related OCR outputs for a source document use:
+### Read OCR outputs for a document
 
 ```http
 GET /api/dashboard/documents/:id/ocr
 ```
 
-- Response shape:
-  - `ocrResults`: extracted text records with `ocrResultId`, `ocrCreatedAt`, `modelLabel`, `text`, `avgConfidence`, and `result`
+Each OCR result includes:
 
-Related segmented outputs for a source document use:
+- `ocrResultId`
+- `ocrCreatedAt`
+- `modelLabel`
+- `text`
+- `avgConfidence`
+- `result`
+
+### Read segmentation outputs for a document
 
 ```http
 GET /api/dashboard/documents/:id/segmentations
 ```
 
-- Response shape:
-  - `segmentedResults`: derived image cards with `segmentationId`, `segmentationCreatedAt`, `modelLabel`, `prompt`, and nested `document`
+Each segmentation result includes:
 
-Queueing any saved workflow against a selected dashboard document uses:
+- `segmentationId`
+- `segmentationCreatedAt`
+- `modelLabel`
+- `prompt`
+- nested derived `document` data when a segmented image was stored
 
-```http
-POST /api/dashboard/documents/:id/run
-```
-
-- Body: `{ "workflowId": "<agentGraphId>" }`
-- Response shape:
-  - `status`: always `queued`
-  - `documentId`, `workflowId`, `workflowName`
-
-Dashboard document chat uses:
+## Grounded Collection Chat
 
 ```http
 POST /api/documents/chat
@@ -92,11 +171,13 @@ POST /api/documents/chat
 
 Notes:
 
-- Dashboard auth is session-based and must resolve to the active organization.
-- Request body follows the TanStack AI chat shape: `messages` plus optional `conversationId` and `scope`.
-- `scope` must stay inside the authenticated organization. The current UI sends organization scope, while the endpoint also accepts optional `projectIds`, `deviceIds`, and `documentIds`.
+- Dashboard auth is session-based and scoped to the active organization.
+- The request body follows the TanStack AI chat shape.
+- The current UI uses organization scope, while the endpoint also accepts optional `projectIds`, `deviceIds`, and `documentIds`.
 - Responses stream over Server-Sent Events.
-- Grounded source cards are delivered as `assistant_sources` custom events with `documentId`, `projectName`, optional `deviceName`, `label`, `excerpt`, and `matchReason`.
+- Source cards are emitted as `assistant_sources` events and include document metadata plus matched excerpts.
+
+The chat layer is grounded in stored document descriptions, OCR text, and related segmentation context.
 
 ## Dashboard Realtime Feed
 
@@ -104,13 +185,21 @@ Notes:
 GET /api/realtime/dashboard
 ```
 
-- Uses Server-Sent Events.
-- Document events: `document-created`, `ocr-created`, `description-upserted`, `segmentation-created`
-- Run events: `run-created`, `run-step-changed`, `run-finished`
+This Server-Sent Events feed publishes:
+
+- document creation
+- OCR creation
+- description upserts
+- segmentation creation
+- run creation
+- run step changes
+- run completion
+
+It powers the live Docs and Runs tabs in the dashboard.
 
 ## Health Checks
 
-```
+```text
 GET http://localhost:3000/health   # API
 GET http://localhost:3020/health   # Agents
 GET http://localhost:3021/health   # MCP

@@ -18,108 +18,103 @@
 
 ---
 
-Arcnem Vision is an open-source platform that turns images into understanding. Upload a photo from the Flutter app or directly from the dashboard, and a swarm of AI agents — orchestrated by LangGraph, connected through MCP, and configured entirely from a database — will extract OCR text, generate embeddings, write descriptions, branch through deterministic condition nodes or supervisor loops, run segmentation models, and make everything searchable by meaning, not just metadata.
+Arcnem Vision is an open-source image ingestion and orchestration platform. Devices can upload images with org/project/device-scoped API keys, operators can upload images from the dashboard, and every document can be routed through a customizable agent graph stored in Postgres and executed by Go services.
 
-Four languages. Five services. One pipeline from camera shutter to semantic search.
+That core service is the product: a control plane for defining workflows, attaching them to devices, running ad-hoc analyses from the dashboard, persisting OCR/descriptions/embeddings/segmentations, and inspecting every run with step-level state transitions. The Flutter app is included as a demo client for capture and GenUI experiments, but it is not the center of the system.
 
-> **Two API keys. That's it.** Grab an [OpenAI API key](https://platform.openai.com/api-keys) and a [Replicate API token](https://replicate.com/account/api-tokens). Everything else — Postgres, Redis, S3, Inngest — runs locally via `docker compose`.
+## Core Service
 
-**What makes it interesting:**
+- **Two ingestion paths**: device/API-key uploads for automated pipelines, plus dashboard uploads for ad-hoc operator review.
+- **Configurable workflows**: graphs live in the database and can be created, edited, templated, cloned, and assigned without redeploying code.
+- **Multiple analysis modes**: OCR, descriptions, image embeddings, description embeddings, prompt-based segmentation, semantic segmentation, similarity search, and grounded collection chat.
+- **Mixed orchestration styles**: combine LLM workers, MCP tool nodes, supervisor routing, and deterministic condition nodes in the same graph.
+- **Persistent run history**: track `agent_graph_runs` and `agent_graph_run_steps` with initial state, final state, per-step deltas, timing, and errors.
+- **Operator-first dashboard**: manage projects, devices, API keys, workflow templates, uploads, search, chat, and live run inspection from one UI.
 
-- **Database-driven agent graphs** — Define AI workflows as rows, not code. Mix worker, tool, supervisor, and condition nodes per organization without redeploying anything.
-- **GenUI chat interface** — The AI doesn't just reply with text. It generates real Flutter widgets at runtime — cards, galleries, interactive components — composed from JSON.
-- **On-device Gemma** — Intent parsing happens locally on the phone before anything hits the network. Private by default.
-- **CLIP vector search** — Images and their descriptions are embedded in the same 768-dimensional space. Search by image, by text, or by vibes.
-- **Dashboard control room** — Manage projects, devices, API keys, workflow assignments, and one-off dashboard uploads from the same UI.
-- **Grounded document collection chat** — Ask the Docs tab about the current collection and get answers grounded in OCR, descriptions, and segmentation context with source cards.
-- **Visual workflow builder** — Drag-and-drop agent graphs with workers, tools, supervisors, condition nodes, edges, and reusable templates you can search and start from in the dashboard.
-- **OCR-aware document review** — OCR runs as a first-class MCP tool, stores extracted text plus confidence metadata, and can feed either rule-based routing or specialist review loops.
-- **Realtime operator feedback** — The Docs and Runs tabs update as uploads land, OCR results persist, descriptions finish, segmentations appear, and graph steps advance.
-- **MCP tools as a first-class primitive** — CLIP embeddings, descriptions, OCR, similarity search, and segmentation models all sit behind MCP. Agents call them. You can too.
+## What You Can Customize
+
+- **Worker nodes**: choose a model, prompt, input mode, and optional MCP tools.
+- **Tool nodes**: call one MCP tool with configurable input/output mappings and literal constants.
+- **Supervisor nodes**: route between specialist workers, cap iterations, and choose explicit finish targets.
+- **Condition nodes**: branch on extracted state with `contains` or `equals` rules.
+- **State reducers**: configure append vs overwrite behavior per state key.
+- **Template library**: save reusable workflow versions, then start editable copies from them in the dashboard.
+
+## Analysis Modes
+
+The seeded workflows show the kinds of pipelines this service is built for:
+
+- **Document Processing Pipeline**: describe an image, save the description, embed the image and text, then find similar items.
+- **Image Quality Review**: use a supervisor to route an upload to a good-image or bad-image specialist.
+- **Document Segmentation Showcase**: derive a prompt from the image, run prompt-based segmentation, then summarize the segmented output.
+- **Semantic Document Segmentation Showcase**: run semantic segmentation directly and describe the result.
+- **OCR Keyword Condition Router**: extract OCR, branch deterministically on keywords, and save a summary.
+- **OCR Review Supervisor**: extract OCR with confidence, route to domain specialists, and save a reviewed summary.
+
+Behind those workflows, the MCP layer currently exposes document description, document embedding, OCR, segmentation, description embedding, similarity search, scoped search, scoped browse, and grounded document-context reads.
 
 ## Tech Stack
 
-| Layer         | Tech                                           | What it does                                                               |
-| ------------- | ---------------------------------------------- | -------------------------------------------------------------------------- |
-| **Client**    | Flutter, Dart, flutter_gemma, GenUI, fpdart    | Camera capture, on-device LLM, AI-generated UI, functional error handling  |
-| **API**       | Bun, Hono, better-auth, Inngest, Pino          | REST routes, presigned uploads, durable job scheduling, structured logging |
-| **Dashboard** | React 19, TanStack Router, Tailwind, shadcn/ui | Workflow builder, project/device/API key management, live operations UI    |
-| **Agents**    | Go, Gin, LangGraph, LangChain, inngestgo       | Graph-based agent orchestration, ReAct workers, step-level tracing         |
-| **MCP**       | Go, MCP go-sdk, replicate-go, GORM             | CLIP embeddings, description generation, OCR, segmentation, similarity search |
-| **Storage**   | Postgres 18 + pgvector, S3-compatible, Redis   | Vector indexes, object storage, session cache                              |
+| Layer | Tech | What it does |
+| --- | --- | --- |
+| **API** | Bun, Hono, better-auth, Inngest, Pino | Presigned upload flow, auth, orchestration triggers, realtime publishing |
+| **Dashboard** | React 19, TanStack Router, Tailwind, shadcn/ui | Projects/devices/API keys, workflow builder, docs view, chat, run inspection |
+| **Agents** | Go, Gin, LangGraph, LangChain, inngestgo | Loads graph snapshots from DB, executes worker/tool/supervisor/condition nodes |
+| **MCP** | Go, MCP go-sdk, replicate-go, GORM | OCR, descriptions, embeddings, segmentation, retrieval, grounded reads |
+| **Storage** | Postgres 18 + pgvector, S3-compatible storage, Redis | Documents, derived artifacts, vector indexes, sessions, realtime fan-out |
+| **Client** | Flutter, Dart, flutter_gemma, GenUI | Optional demo client for capture, preview, and UI experiments |
 
 ## Architecture
 
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
-│   Flutter    │────▶│   Hono API   │────▶│     Inngest     │
-│   Client     │     │   (Bun)      │     │   Event Queue   │
-│              │     │              │     │                 │
-│ GenUI + Gemma│     │ Presigned S3 │     └────────┬────────┘
-└─────────────┘     │ better-auth  │              │
-                    └──────────────┘              ▼
-┌─────────────┐                        ┌──────────────────┐
-│    React     │                        │   Go Agents      │
-│  Dashboard   │                        │                  │
-│              │     ┌──────────┐       │ LangGraph loads  │
-│  Workflow    │────▶│ Postgres │◀──────│ graph from DB,   │
-│  Builder     │     │ pgvector │       │ executes nodes   │
-└─────────────┘     └──────────┘       └────────┬─────────┘
-                         ▲                      │
-                         │               ┌──────▼─────────┐
-                    ┌────┴───┐           │   MCP Server    │
-                    │   S3   │           │                 │
-                    │Storage │           │ OCR, CLIP,      │
-                    └────────┘           │ Descriptions,   │
-                                         │ Search, Segment │
-                                         └─────────────────┘
+```text
+┌──────────────────────┐          ┌──────────────────────────┐
+│ Device / Integration │──x-api-key upload flow────────────▶│
+└──────────────────────┘          │        Hono API          │
+                                  │   presign / ack / auth   │
+┌──────────────────────┐          │                          │
+│ Dashboard Operators  │──session-based uploads / queue────▶│
+└──────────┬───────────┘          └─────────────┬────────────┘
+           │                                    │
+           │ search, chat, runs, config         │ enqueue
+           ▼                                    ▼
+     ┌──────────────┐                    ┌──────────────┐
+     │  Dashboard   │◀──realtime SSE────▶│    Inngest    │
+     │  Control UI  │                    └──────┬───────┘
+     └──────┬───────┘                           │
+            │                                    ▼
+            │                            ┌──────────────┐
+            └──────────────▶ Postgres ◀──│  Go Agents    │
+                           + pgvector    │  LangGraph    │
+                                         └──────┬───────┘
+                                                │
+                                                ▼
+                                         ┌──────────────┐
+                                         │  MCP Server   │
+                                         │ OCR / desc /  │
+                                         │ embed / seg / │
+                                         │ retrieval     │
+                                         └──────────────┘
 ```
 
-**The pipeline:** Client captures image → API issues presigned S3 URL → Client uploads directly → API acknowledges and fires Inngest event → Go agent service loads the document's agent graph from Postgres → LangGraph builds and executes the workflow → Worker nodes call LLMs, tool/condition/supervisor nodes route the work → MCP generates OCR, descriptions, embeddings, and segmentations → Everything lands in Postgres with HNSW cosine indexes plus persisted OCR results → Searchable by meaning.
+**Device flow**: a device or external integration calls `/api/uploads/presign`, uploads to S3, then calls `/api/uploads/ack`. The API verifies the object, creates the document, and emits `document/process.upload`. The agents service then loads the document's assigned workflow from the database and runs it.
+
+**Dashboard flow**: an operator uploads an image to a project from the Docs tab. The dashboard path creates the document without binding it to a device, and the operator can then queue any saved workflow against that document from the UI.
+
+**Execution flow**: the agents service builds the graph from DB rows, runs LangGraph nodes, calls MCP tools as needed, and persists run records, step deltas, errors, OCR results, descriptions, embeddings, and segmentations back into Postgres.
 
 ## Screenshots
 
-| Flutter Client | Dashboard — Projects & Devices |
+| Projects & Devices | Workflow Library |
 |---|---|
-| ![Flutter Client](site/public/flutter-client.png) | ![Dashboard Projects](site/public/dashboard-projects.png) |
+| ![Dashboard Projects](site/public/dashboard-projects.png) | ![Workflow Library](site/public/dashboard-workflows.png) |
 
-| Workflow Library | Docs Search & Chat |
+| Docs Search & Chat | Run Details |
 |---|---|
-| ![Workflow Library](site/public/dashboard-workflows.png) | ![Docs Search and Chat](site/public/dashboard-docs-chat.png) |
+| ![Docs Search and Chat](site/public/dashboard-docs-chat.png) | ![Agent Run Details](site/public/dashboard-run-detail.png) |
 
-| Selected Document & Segmentation | Agent Run Details |
+| Selected Document & Derived Outputs | Optional Demo Client |
 |---|---|
-| ![Selected Document and Segmentation](site/public/dashboard-docs-segmentation-detail.png) | ![Agent Run Details](site/public/dashboard-run-detail.png) |
-
-**Agent graphs are data, not code.** Templates define reusable workflows with nodes, edges, and tools. The dashboard's Workflow Library lets operators browse templates, search by workflow name, node role, or tool, and start a new graph from a template straight into the canvas. Started graphs stay editable as independent copies while retaining their source template version for provenance. Four node types:
-
-- **Worker** — ReAct agent with access to MCP tools
-- **Tool** — Single MCP tool invocation with input/output mapping
-- **Supervisor** — Multi-agent orchestration across workers
-- **Condition** — Deterministic branching on state with `contains` / `equals` checks and explicit true/false targets
-
-Every execution is traced step-by-step in `agent_graph_runs` and `agent_graph_run_steps` — state deltas, timing, errors, the full picture. OCR payloads are persisted separately in `document_ocr_results` so operators can inspect extracted text and confidence without digging through raw run state. The dashboard's Docs tab sits on top of that same material, combining semantic search with a grounded collection chat that cites matching documents.
-
-## Repository Layout
-
-```
-arcnem-vision/
-├── client/                 Flutter app — GenUI, Gemma, camera, gallery
-│   ├── lib/screens/        Auth, camera, dashboard, loading
-│   ├── lib/services/       Upload, document, GenUI, intent parsing
-│   └── lib/catalog/        Custom widget catalog for AI-generated UI
-├── server/                 Bun workspace
-│   ├── packages/api/       Hono routes, middleware, auth, S3, Inngest
-│   ├── packages/db/        Drizzle schema (23 tables), migrations, seed
-│   ├── packages/dashboard/ React admin — workflow builder, doc viewer
-│   └── packages/shared/    Env helpers
-├── models/                 Go workspace
-│   ├── agents/             Inngest handlers, LangGraph execution engine
-│   ├── mcp/                MCP server — 7 tools (descriptions, OCR, embeddings, segmentation, search)
-│   ├── db/                 GORM gen introspection (schema → Go models)
-│   └── shared/             Common env loading
-└── docs/                   Deep dives — embeddings, LangChain, LangGraph, GenUI
-```
+| ![Selected Document and Segmentation](site/public/dashboard-docs-segmentation-detail.png) | ![Flutter Client](site/public/flutter-client.png) |
 
 ## Quickstart
 
@@ -141,86 +136,106 @@ cp models/mcp/.env.example          models/mcp/.env
 cp client/.env.example              client/.env
 ```
 
-Add your two API keys — the only external services required:
+Add your two API keys:
 
 - **[OpenAI API key](https://platform.openai.com/api-keys)** → `OPENAI_API_KEY` in `models/agents/.env`
-- **Same OpenAI key (recommended)** → `OPENAI_API_KEY` in `server/packages/dashboard/.env` if you want the Docs tab's collection chat enabled locally
+- **Same OpenAI key (recommended)** → `OPENAI_API_KEY` in `server/packages/dashboard/.env` for collection chat
 - **[Replicate API token](https://replicate.com/account/api-tokens)** → `REPLICATE_API_TOKEN` in `models/mcp/.env`
 
-Everything else is already configured for local development. Database, S3, and Redis all run in Docker via `docker-compose.yaml` — the `.env.example` defaults point to them out of the box.
+Everything else is wired for local development. Postgres, Redis, and MinIO come from `docker-compose.yaml`.
 
-### 2. Start everything
+### 2. Start the stack
 
 ```bash
 tilt up
 ```
 
-That's it. Tilt installs all dependencies, starts Postgres/Redis/MinIO, runs migrations, and launches every service — API, dashboard, agents, MCP, Inngest, Flutter client, and the docs site. Open the Tilt UI at `http://localhost:10350` to watch logs and manage resources.
+Tilt starts the whole repository, including the dashboard, API, agents, MCP server, Inngest, docs site, and the Flutter demo client. If you're evaluating the core service, your first stop should be the dashboard on `http://localhost:3001`.
 
 ### 3. Seed the database
 
-In the Tilt UI, click the **seed-database** resource and hit the trigger button. The seed now creates a demo organization with projects, devices, API keys, newer sample images, OCR keyword-routing and OCR supervisor showcase workflows, segmentation showcase workflows, and matching reusable workflow templates. Open **Workflow Library** -> **Browse Templates** to start a new graph from any seeded template immediately. It also prints a usable API key — set `DEBUG_SEED_API_KEY=...` in `client/.env` for auto-auth in the Flutter app during development.
+In the Tilt UI, trigger **seed-database**.
 
-### Health checks
+The seed creates:
 
-```
-GET http://localhost:3000/health   # API
-GET http://localhost:3020/health   # Agents
-GET http://localhost:3021/health   # MCP
-```
+- a demo organization, project, devices, and API keys
+- reusable workflow templates and editable workflows
+- sample documents for the document, OCR, quality-review, and segmentation paths
+- example OCR results, descriptions, embeddings, segmentations, and run history
+- a local debug dashboard session
 
-### S3 config details
+Because `API_DEBUG=true` is enabled in the committed `.env.example` files, the dashboard can auto-bootstrap into the seeded local session after seeding.
 
-Default local dev uses MinIO from `docker-compose.yaml`. The `.env.example` files ship with working defaults:
+### 4. Explore the core service
 
-- `S3_ACCESS_KEY_ID=minioadmin`
-- `S3_SECRET_ACCESS_KEY=minioadmin`
-- `S3_BUCKET=arcnem-vision`
-- `S3_ENDPOINT=http://localhost:9000`
-- `S3_REGION=us-east-1`
-- `S3_USE_PATH_STYLE=true` (agents only)
+1. Open `http://localhost:3001`.
+2. In **Projects & Devices**, inspect seeded devices and their attached workflows.
+3. In **Workflow Library**, browse templates and open the canvas to see how graphs are composed.
+4. In **Docs**, inspect seeded documents or upload a new one from the dashboard.
+5. In **Runs**, expand a run to inspect initial state, per-step deltas, final state, and errors.
 
-For hosted storage, substitute your AWS S3, Cloudflare R2, Railway Object Storage, or Backblaze B2 credentials.
+### 5. Test automated device ingestion
 
-## API Example
+Use a device API key to exercise the automated path:
 
 ```bash
-# 1. Get a presigned upload URL
+# 1. Ask the API for a presigned upload URL
 curl -X POST http://localhost:3000/api/uploads/presign \
   -H "Content-Type: application/json" \
   -H "x-api-key: ${API_KEY}" \
   -d '{"contentType":"image/png","size":12345}'
 
-# 2. Upload directly to S3 with the returned uploadUrl
+# 2. Upload directly to storage
 curl -X PUT "${UPLOAD_URL}" --data-binary @photo.png
 
-# 3. Acknowledge — triggers the full agent pipeline
+# 3. Acknowledge the upload
 curl -X POST http://localhost:3000/api/uploads/ack \
   -H "Content-Type: application/json" \
   -H "x-api-key: ${API_KEY}" \
   -d '{"objectKey":"uploads/.../photo.png"}'
 ```
 
-After step 3, Inngest fires `document/process.upload`. The agent graph takes it from there — OCR, description generation, embedding, routing, vector indexing, whatever the assigned workflow defines.
+For device-bound uploads, step 3 verifies the object, creates the document, and enqueues `document/process.upload` for the device's assigned workflow.
 
 ## Requirements
 
 - Docker + Docker Compose
-- Bun (server)
-- Go 1.25+ (agents, MCP)
+- Bun
+- Go 1.25+
 - CompileDaemon (`go install github.com/githubnemo/CompileDaemon@latest`)
-- Flutter SDK (client)
+- Flutter SDK
 - Tilt
+
+## Repository Layout
+
+```text
+arcnem-vision/
+├── server/                 Bun workspace
+│   ├── packages/api/       Upload/auth routes, dashboard APIs, Inngest triggers
+│   ├── packages/db/        Drizzle schema, migrations, seed data, templates
+│   ├── packages/dashboard/ React control plane for operators
+│   └── packages/shared/    Shared env helpers
+├── models/                 Go workspace
+│   ├── agents/             Workflow loader, LangGraph execution, run tracker
+│   ├── mcp/                OCR, embeddings, descriptions, segmentation, retrieval
+│   ├── db/                 GORM model generation
+│   └── shared/             Shared env, S3, realtime utilities
+├── client/                 Optional Flutter demo client
+└── docs/                   Deep dives on embeddings, LangChain, LangGraph, GenUI
+```
 
 ## Documentation
 
-| Doc                                        | What's in it                                                                       |
-| ------------------------------------------ | ---------------------------------------------------------------------------------- |
-| [site/](site/)                             | Local docs site (Starlight) for onboarding and reference pages                     |
-| [docs/embeddings.md](docs/embeddings.md)   | Current embedding implementation and operational constraints                       |
-| [docs/langgraphgo.md](docs/langgraphgo.md) | Graph orchestration patterns, condition nodes, supervisor routing, checkpointing |
-| [docs/langchaingo.md](docs/langchaingo.md) | LLM providers, chains, agents, tools, MCP bridging                                 |
-| [docs/genui.md](docs/genui.md)             | Flutter GenUI SDK, DataModel binding, A2UI protocol, custom widgets                |
+| Doc | What's in it |
+| --- | --- |
+| [site/](site/) | Docs site for onboarding, architecture, guides, and API examples |
+| [site/src/content/docs/architecture.md](site/src/content/docs/architecture.md) | Service architecture, ingestion paths, workflow model, persistence |
+| [site/src/content/docs/guides/dashboard-workflow-editor.md](site/src/content/docs/guides/dashboard-workflow-editor.md) | Dashboard operations, workflow canvas, docs tab, runs tab |
+| [site/src/content/docs/reference/api.md](site/src/content/docs/reference/api.md) | Device ingestion, dashboard uploads, run queueing, realtime feed |
+| [docs/embeddings.md](docs/embeddings.md) | Embedding implementation details |
+| [docs/langgraphgo.md](docs/langgraphgo.md) | LangGraph orchestration patterns and graph execution notes |
+| [docs/langchaingo.md](docs/langchaingo.md) | LangChain and tool-integration notes |
+| [docs/genui.md](docs/genui.md) | Flutter GenUI experiments and widget protocol details |
 
 ## Contributing
 

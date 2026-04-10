@@ -5,7 +5,7 @@
 <h1 align="center">Arcnem Vision</h1>
 
 <p align="center">
-  <strong>機械に「見る」を教え、エージェントに「どうするか」を任せる。</strong>
+  <strong>機械に「見る」を教え、エージェントに「次の判断」を任せる。</strong>
 </p>
 
 <p align="center">
@@ -18,108 +18,103 @@
 
 ---
 
-Arcnem Visionは、画像を「理解」に変えるオープンソースプラットフォームです。Flutterアプリからでも、ダッシュボードからでも写真をアップロードでき、LangGraphでオーケストレーションされ、MCPで接続され、データベースから設定されたAIエージェント群が、OCR抽出、エンベディング生成、説明文作成、条件ノードやスーパーバイザーによる分岐、セグメンテーション実行、そしてメタデータではなく意味による検索まで担います。
+Arcnem Visionは、画像を受け取り、設定可能なAIワークフローで処理し、その結果と実行履歴を運用画面で扱えるオープンソースの画像解析基盤です。デバイスはAPIキー経由で画像を送信でき、運用担当者はダッシュボードから単発アップロードして任意のワークフローを流せます。どちらの経路でも、最終的にはPostgres上に保存されたエージェントグラフが読み込まれ、Goのサービスが実行を担います。
 
-4つの言語。5つのサービス。カメラのシャッターからセマンティック検索まで、1本のパイプライン。
+このリポジトリで本当に重要なのはサーバー側の仕組みです。Flutterアプリは撮影やGenUIの実験に便利なデモクライアントですが、主役ではありません。価値の中心にあるのは、ワークフロー定義、デバイスへの割り当て、OCR・説明文・埋め込み・セグメンテーションの保存、そして各ステップの状態変化まで追える運用基盤です。
 
-> **必要なAPIキーはたった2つ。** [OpenAI APIキー](https://platform.openai.com/api-keys)と[Replicate APIトークン](https://replicate.com/account/api-tokens)を取得するだけ。Postgres、Redis、S3、Inngestなど、その他すべては`docker compose`でローカル実行。
+## コアとなる機能
 
-**ここが面白い：**
+- **取り込み経路は2つ**: デバイス/APIキー経由の自動処理と、ダッシュボードからの単発アップロードに対応
+- **ワークフローはデータとして管理**: グラフはデータベースに保存され、作成・編集・テンプレート化・複製・割り当てを再デプロイなしで行える
+- **解析方法を組み合わせられる**: OCR、説明文生成、画像埋め込み、説明文埋め込み、プロンプト駆動セグメンテーション、セマンティックセグメンテーション、類似検索、根拠付きコレクションチャット
+- **オーケストレーションを混在できる**: LLMワーカー、MCPツールノード、supervisor、conditionを同じグラフに混ぜて構成できる
+- **実行履歴を細かく追える**: `agent_graph_runs` と `agent_graph_run_steps` に初期状態、最終状態、各ステップの差分、所要時間、エラーを保存
+- **運用の中心はダッシュボード**: プロジェクト、デバイス、APIキー、ワークフロー、アップロード、検索、チャット、実行状況を1つの画面で扱える
 
-- **データベース駆動のエージェントグラフ** — AIワークフローをコードではなく行として定義。worker / tool / supervisor / condition を組み合わせた処理パイプラインを、再デプロイなしで組織ごとに切り替え可能。
-- **GenUIチャットインターフェース** — AIはテキストで返答するだけではない。カード、ギャラリー、インタラクティブコンポーネントなど、実際のFlutterウィジェットをJSONからランタイムで生成。
-- **オンデバイスGemma** — インテント解析はネットワークに到達する前にスマートフォン上でローカル実行。デフォルトでプライバシー重視。
-- **CLIPベクトル検索** — 画像とその説明文を同一の768次元空間に埋め込み。画像で検索、テキストで検索、雰囲気で検索。
-- **ダッシュボード運用画面** — プロジェクト、デバイス、APIキー、ワークフロー割り当て、単発のダッシュボードアップロードを同じUIで管理。
-- **ドキュメント横断チャット** — Docsタブ上の資料群をまとめて質問でき、OCR、説明文、関連セグメントを根拠にした回答と出典カードをその場で確認できます。
-- **ビジュアルワークフロービルダー** — worker、tool、supervisor、condition node、edge を組み合わせ、再利用可能なテンプレートを検索しながら新しいエージェントグラフをダッシュボードから立ち上げられます。
-- **OCR前提のドキュメント運用** — OCRはMCPツールとして扱われ、抽出テキストと信頼度を保存。その結果を条件分岐にも、専門ワーカーへの振り分けにも使えます。
-- **リアルタイムの運用フィードバック** — DocsタブとRunsタブが、アップロード、OCR結果保存、説明文生成、セグメンテーション、実行ステップの進行に合わせて更新。
-- **MCPツールがファーストクラス** — CLIPエンベディング、説明文生成、OCR、類似検索、セグメンテーションモデルをMCPの背後に集約。エージェントも人も利用可能。
+## どこを自由に変えられるか
+
+- **workerノード**: モデル、プロンプト、入力モード、利用ツールを選べる
+- **toolノード**: 1つのMCPツールを入出力マッピング付きで呼び出せる
+- **supervisorノード**: 担当ワーカー、反復回数の上限、終了先を設定できる
+- **conditionノード**: `contains` / `equals` で状態を判定し、分岐先を明示できる
+- **state reducer**: キーごとに追記するか上書きするかを制御できる
+- **テンプレートライブラリ**: 再利用可能な版付きワークフローを保存し、ダッシュボードから編集可能なコピーを起動できる
+
+## 想定している解析パターン
+
+シードには、次のようなワークフローが入っています。
+
+- **`Document Processing Pipeline`**: 画像を説明し、その説明を保存し、画像と説明文の両方を埋め込み、類似項目を探す
+- **`Image Quality Review`**: supervisorが画像品質を見て、良好担当か不良担当に振り分ける
+- **`Document Segmentation Showcase`**: 画像から短いセグメンテーション用プロンプトを作り、セグメント結果を要約する
+- **`Semantic Document Segmentation Showcase`**: セマンティックセグメンテーションを直接実行し、その結果を説明する
+- **`OCR Keyword Condition Router`**: OCR抽出後、キーワードで決定論的に分岐して要約を保存する
+- **`OCR Review Supervisor`**: 信頼度付きOCRを取り、専門ワーカーに振り分けてレビュー結果を保存する
+
+これらを支えるMCP層では、説明文生成、画像埋め込み、OCR、セグメンテーション、説明文埋め込み、類似検索、範囲を絞った検索・一覧取得、文脈付きドキュメント取得を提供しています。
 
 ## 技術スタック
 
-| レイヤー           | 技術                                           | 役割                                                                                      |
-| ------------------ | ---------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| **クライアント**   | Flutter, Dart, flutter_gemma, GenUI, fpdart    | カメラキャプチャ、オンデバイスLLM、AI生成UI、関数型エラーハンドリング                     |
-| **API**            | Bun, Hono, better-auth, Inngest, Pino          | RESTルート、署名付きアップロード、ジョブスケジューリング、構造化ログ                      |
-| **ダッシュボード** | React 19, TanStack Router, Tailwind, shadcn/ui | ワークフロービルダー、プロジェクト/デバイス/APIキー管理、ライブ運用UI                       |
-| **エージェント**   | Go, Gin, LangGraph, LangChain, inngestgo       | グラフベースのエージェントオーケストレーション、ReActワーカー、ステップレベルトレーシング |
-| **MCP**            | Go, MCP go-sdk, replicate-go, GORM             | CLIPエンベディング、説明文生成、OCR、セグメンテーション、類似検索                         |
-| **ストレージ**     | Postgres 18 + pgvector, S3互換, Redis          | ベクターインデックス、オブジェクトストレージ、セッションキャッシュ                        |
+| レイヤー | 技術 | 役割 |
+| --- | --- | --- |
+| **API** | Bun, Hono, better-auth, Inngest, Pino | 署名付きアップロード、認証、実行トリガー、リアルタイム通知 |
+| **ダッシュボード** | React 19, TanStack Router, Tailwind, shadcn/ui | プロジェクト/デバイス/APIキー管理、ワークフロー編集、ドキュメント閲覧、検索、チャット、実行確認 |
+| **エージェント** | Go, Gin, LangGraph, LangChain, inngestgo | DBからグラフを読み込み、worker/tool/supervisor/conditionを実行 |
+| **MCP** | Go, MCP go-sdk, replicate-go, GORM | OCR、説明文生成、埋め込み、セグメンテーション、取得系ツール |
+| **ストレージ** | Postgres 18 + pgvector, S3互換ストレージ, Redis | ドキュメント、派生データ、ベクター検索、セッション、リアルタイム配信 |
+| **クライアント** | Flutter, Dart, flutter_gemma, GenUI | 撮影、プレビュー、GenUI実験用のデモクライアント |
 
 ## アーキテクチャ
 
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
-│   Flutter    │────▶│   Hono API   │────▶│     Inngest     │
-│   Client     │     │   (Bun)      │     │   Event Queue   │
-│              │     │              │     │                 │
-│ GenUI + Gemma│     │ Presigned S3 │     └────────┬────────┘
-└─────────────┘     │ better-auth  │              │
-                    └──────────────┘              ▼
-┌─────────────┐                        ┌──────────────────┐
-│    React     │                        │   Go Agents      │
-│  Dashboard   │                        │                  │
-│              │     ┌──────────┐       │ LangGraph loads  │
-│  Workflow    │────▶│ Postgres │◀──────│ graph from DB,   │
-│  Builder     │     │ pgvector │       │ executes nodes   │
-└─────────────┘     └──────────┘       └────────┬─────────┘
-                         ▲                      │
-                         │               ┌──────▼─────────┐
-                    ┌────┴───┐           │   MCP Server    │
-                    │   S3   │           │                 │
-                    │Storage │           │ OCR, CLIP,      │
-                    └────────┘           │ Descriptions,   │
-                                         │ Search, Segment │
-                                         └─────────────────┘
+```text
+┌──────────────────────┐          ┌──────────────────────────┐
+│ Device / Integration │──x-api-key upload flow────────────▶│
+└──────────────────────┘          │        Hono API          │
+                                  │   presign / ack / auth   │
+┌──────────────────────┐          │                          │
+│ Dashboard Operators  │──session-based uploads / queue────▶│
+└──────────┬───────────┘          └─────────────┬────────────┘
+           │                                    │
+           │ search, chat, runs, config         │ enqueue
+           ▼                                    ▼
+     ┌──────────────┐                    ┌──────────────┐
+     │  Dashboard   │◀──realtime SSE────▶│    Inngest    │
+     │  Control UI  │                    └──────┬───────┘
+     └──────┬───────┘                           │
+            │                                    ▼
+            │                            ┌──────────────┐
+            └──────────────▶ Postgres ◀──│  Go Agents    │
+                           + pgvector    │  LangGraph    │
+                                         └──────┬───────┘
+                                                │
+                                                ▼
+                                         ┌──────────────┐
+                                         │  MCP Server   │
+                                         │ OCR / desc /  │
+                                         │ embed / seg / │
+                                         │ retrieval     │
+                                         └──────────────┘
 ```
 
-**パイプライン：** クライアントが画像をキャプチャ → APIが署名付きS3 URLを発行 → クライアントが直接アップロード → APIが確認してInngestイベントを発火 → GoエージェントサービスがPostgresからドキュメントのエージェントグラフを読み込み → LangGraphがワークフローを構築・実行 → worker がLLMを呼び出し、tool / condition / supervisor node が処理をつなぐ → MCPがOCR、説明文、エンベディング、セグメンテーションを実行 → 結果がPostgresとベクターインデックス、OCR結果テーブルに保存 → 意味で検索可能に。
+**デバイス経路**: デバイスや外部連携先が `/api/uploads/presign` を呼び、S3へ直接アップロードし、最後に `/api/uploads/ack` を呼びます。APIはオブジェクトを検証してドキュメントを作成し、`document/process.upload` を発火します。その後、エージェントサービスがデバイスに割り当てられたワークフローを読み込んで実行します。
+
+**ダッシュボード経路**: 運用担当者はDocsタブから画像をプロジェクトにアップロードできます。この経路では、まずデバイスに紐付かないドキュメントを作り、その後で保存済みワークフローを任意に投入します。
+
+**実行経路**: エージェントサービスがDBのグラフ定義からLangGraphを組み立て、必要に応じてMCPツールを呼び出し、OCR、説明文、埋め込み、セグメンテーション、実行ログをPostgresに保存します。
 
 ## スクリーンショット
 
-| Flutterクライアント | ダッシュボード — プロジェクト＆デバイス |
+| プロジェクトとデバイス | ワークフローライブラリ |
 |---|---|
-| ![Flutterクライアント](site/public/flutter-client.png) | ![ダッシュボード プロジェクト](site/public/dashboard-projects.png) |
+| ![ダッシュボード プロジェクト](site/public/dashboard-projects.png) | ![ワークフローライブラリ](site/public/dashboard-workflows.png) |
 
-| ワークフローライブラリ | Docs検索とコレクションチャット |
+| Docs検索とコレクションチャット | 実行の詳細 |
 |---|---|
-| ![ワークフローライブラリ](site/public/dashboard-workflows.png) | ![Docs検索とコレクションチャット](site/public/dashboard-docs-chat.png) |
+| ![Docs検索とコレクションチャット](site/public/dashboard-docs-chat.png) | ![エージェント実行詳細](site/public/dashboard-run-detail.png) |
 
-| 選択中のドキュメントとセグメンテーション | エージェント実行詳細 |
+| 選択中のドキュメントと派生結果 | デモクライアント |
 |---|---|
-| ![選択中のドキュメントとセグメンテーション](site/public/dashboard-docs-segmentation-detail.png) | ![エージェント実行詳細](site/public/dashboard-run-detail.png) |
-
-**エージェントグラフはコードではなくデータ。** テンプレートがノード、エッジ、ツールを持つ再利用可能なワークフローを定義し、ダッシュボードの Workflow Library からはワークフロー名、ノードの役割、ツール名で絞り込みながら新しいグラフをその場で起動できます。起動後のグラフはテンプレート本体とは独立して編集でき、どのテンプレートの何版から始めたかも残ります。ノードタイプは4種類：
-
-- **Worker** — MCPツールにアクセスできるReActエージェント
-- **Tool** — 入出力マッピング付きの単一MCPツール呼び出し
-- **Supervisor** — ワーカー間のマルチエージェントオーケストレーション
-- **Condition** — stateを`contains` / `equals`で判定し、true / false で次ノードを切り替える決定論的な分岐
-
-すべての実行が`agent_graph_runs`と`agent_graph_run_steps`でステップごとにトレースされます。さらにOCRの生テキストと信頼度は`document_ocr_results`に別保存されるため、Runsを開かなくてもDocs画面から確認できます。Docsタブでは同じデータを使って意味検索とコレクションチャットを並行して扱え、回答にぶら下がる出典カードから元資料も追えます。
-
-## リポジトリ構成
-
-```
-arcnem-vision/
-├── client/                 Flutterアプリ — GenUI、Gemma、カメラ、ギャラリー
-│   ├── lib/screens/        認証、カメラ、ダッシュボード、ローディング
-│   ├── lib/services/       アップロード、ドキュメント、GenUI、インテント解析
-│   └── lib/catalog/        AI生成UIのためのカスタムウィジェットカタログ
-├── server/                 Bunワークスペース
-│   ├── packages/api/       Honoルート、ミドルウェア、認証、S3、Inngest
-│   ├── packages/db/        Drizzleスキーマ（23テーブル）、マイグレーション、シード
-│   ├── packages/dashboard/ React管理画面 — ワークフロービルダー、ドキュメントビューア
-│   └── packages/shared/    Envヘルパー
-├── models/                 Goワークスペース
-│   ├── agents/             Inngestハンドラー、LangGraph実行エンジン
-│   ├── mcp/                MCPサーバー — 7ツール（説明文、OCR、埋め込み、セグメンテーション、検索）
-│   ├── db/                 GORM genイントロスペクション（スキーマ → Goモデル）
-│   └── shared/             共通env読み込み
-└── docs/                   ディープダイブ — エンベディング、LangChain、LangGraph、GenUI
-```
+| ![選択中のドキュメントとセグメンテーション](site/public/dashboard-docs-segmentation-detail.png) | ![Flutterクライアント](site/public/flutter-client.png) |
 
 ## クイックスタート
 
@@ -130,7 +125,7 @@ git clone https://github.com/arcnem-ai/arcnem-vision.git
 cd arcnem-vision
 ```
 
-すべての`.env.example`を`.env`にコピー：
+すべての `.env.example` を `.env` にコピーします。
 
 ```bash
 cp server/packages/api/.env.example server/packages/api/.env
@@ -141,48 +136,47 @@ cp models/mcp/.env.example          models/mcp/.env
 cp client/.env.example              client/.env
 ```
 
-外部サービスで必要なのはAPIキー2つだけ：
+必要な外部APIキーは2つです。
 
-- **[OpenAI APIキー](https://platform.openai.com/api-keys)** → `models/agents/.env`に`OPENAI_API_KEY`
-- **同じOpenAIキーを再利用する場合** → Docsタブのコレクションチャットも動かしたいなら、`server/packages/dashboard/.env` にも `OPENAI_API_KEY` を入れておくとそのまま試せます
-- **[Replicate APIトークン](https://replicate.com/account/api-tokens)** → `models/mcp/.env`に`REPLICATE_API_TOKEN`
+- **[OpenAI APIキー](https://platform.openai.com/api-keys)** → `models/agents/.env` の `OPENAI_API_KEY`
+- **同じOpenAIキーをダッシュボードでも使う場合** → `server/packages/dashboard/.env` の `OPENAI_API_KEY`
+- **[Replicate APIトークン](https://replicate.com/account/api-tokens)** → `models/mcp/.env` の `REPLICATE_API_TOKEN`
 
-それ以外はすべてローカル開発用に設定済み。データベース、S3、Redisは`docker-compose.yaml`のDockerで起動され、`.env.example`のデフォルト値がそのまま使えます。
+それ以外はローカル開発向けに初期設定済みです。Postgres、Redis、MinIO は `docker-compose.yaml` 側で起動します。
 
-### 2. すべてを起動
+### 2. スタックを起動
 
 ```bash
 tilt up
 ```
 
-これだけです。Tiltがすべての依存関係をインストールし、Postgres/Redis/MinIOを起動し、マイグレーションを実行し、すべてのサービス（API、ダッシュボード、エージェント、MCP、Inngest、Flutterクライアント、ドキュメントサイト）を起動します。Tilt UI（`http://localhost:10350`）でログの確認やリソースの管理ができます。
+Tiltは、API、ダッシュボード、エージェント、MCP、Inngest、ドキュメントサイト、Flutterデモクライアントまでまとめて立ち上げます。コア機能を確認したい場合は、まず `http://localhost:3001` のダッシュボードを見るのがおすすめです。
 
-### 3. データベースのシード
+### 3. データベースをシード
 
-Tilt UIで**seed-database**リソースをクリックし、トリガーボタンを押します。シードでは、デモ用の組織、プロジェクト、デバイス、APIキー、新しいサンプル画像、OCRの条件分岐ワークフロー、OCRレビュー用スーパーバイザーワークフロー、セグメンテーションのショーケース用ワークフロー、さらにそれらを元にした再利用可能なワークフローテンプレートまでまとめて作成されます。ダッシュボードの **Workflow Library** で **Browse Templates** を開けば、そのテンプレートからすぐに新しいグラフを起動できます。さらに、使用可能なAPIキーも出力されます。開発中のFlutterアプリで自動認証するには、`client/.env`に`DEBUG_SEED_API_KEY=...`を設定してください。
+Tilt UI で **seed-database** を実行します。
 
-### ヘルスチェック
+シードでは次のものが用意されます。
 
-```
-GET http://localhost:3000/health   # API
-GET http://localhost:3020/health   # Agents
-GET http://localhost:3021/health   # MCP
-```
+- デモ用の組織、プロジェクト、デバイス、APIキー
+- 編集可能なワークフローと再利用用テンプレート
+- 説明文生成、OCR、品質判定、セグメンテーション向けのサンプル画像
+- OCR結果、説明文、埋め込み、セグメンテーション、実行履歴のサンプル
+- ローカル開発用のダッシュボードセッション
 
-### S3設定の詳細
+コミット済みの `.env.example` では `API_DEBUG=true` が有効なので、シード後はダッシュボードがローカル用セッションに自動で入れる状態になります。
 
-ローカル開発のデフォルトは`docker-compose.yaml`のMinIOを使用。`.env.example`ファイルに動作するデフォルト値が設定済み：
+### 4. コア機能を順に見る
 
-- `S3_ACCESS_KEY_ID=minioadmin`
-- `S3_SECRET_ACCESS_KEY=minioadmin`
-- `S3_BUCKET=arcnem-vision`
-- `S3_ENDPOINT=http://localhost:9000`
-- `S3_REGION=us-east-1`
-- `S3_USE_PATH_STYLE=true`（agentsのみ）
+1. `http://localhost:3001` を開く
+2. **Projects & Devices** でシード済みデバイスと割り当て済みワークフローを確認する
+3. **Workflow Library** でテンプレートやグラフ構成を見る
+4. **Docs** でシード済みドキュメントを見るか、ダッシュボードから新しい画像をアップロードする
+5. **Runs** で初期状態、各ステップ差分、最終状態、エラーを確認する
 
-ホスト型ストレージの場合は、AWS S3 / Cloudflare R2 / Railway Object Storage / Backblaze B2の認証情報に置き換えてください。
+### 5. デバイス経路の自動処理を試す
 
-## APIの例
+デバイスAPIキーを使うと、自動処理の流れを確認できます。
 
 ```bash
 # 1. 署名付きアップロードURLを取得
@@ -191,36 +185,57 @@ curl -X POST http://localhost:3000/api/uploads/presign \
   -H "x-api-key: ${API_KEY}" \
   -d '{"contentType":"image/png","size":12345}'
 
-# 2. 返されたuploadUrlでS3に直接アップロード
+# 2. ストレージへ直接アップロード
 curl -X PUT "${UPLOAD_URL}" --data-binary @photo.png
 
-# 3. 確認 — エージェントパイプライン全体がトリガーされる
+# 3. アップロードを確定
 curl -X POST http://localhost:3000/api/uploads/ack \
   -H "Content-Type: application/json" \
   -H "x-api-key: ${API_KEY}" \
   -d '{"objectKey":"uploads/.../photo.png"}'
 ```
 
-ステップ3の後、Inngestが`document/process.upload`を発火。以降は割り当てられたワークフロー次第で、OCR、説明文生成、埋め込み、分岐、ベクターインデックス作成まで進みます。
+デバイスに紐づいたアップロードでは、3番目の `ack` でドキュメントが作成され、そのデバイスに設定されたワークフローが `document/process.upload` 経由で実行されます。
 
 ## 必要条件
 
 - Docker + Docker Compose
-- Bun（サーバー）
-- Go 1.25+（エージェント、MCP）
+- Bun
+- Go 1.25+
 - CompileDaemon（`go install github.com/githubnemo/CompileDaemon@latest`）
-- Flutter SDK（クライアント）
+- Flutter SDK
 - Tilt
+
+## リポジトリ構成
+
+```text
+arcnem-vision/
+├── server/                 Bunワークスペース
+│   ├── packages/api/       アップロード/認証ルート、ダッシュボードAPI、Inngest連携
+│   ├── packages/db/        Drizzleスキーマ、マイグレーション、シード、テンプレート
+│   ├── packages/dashboard/ 運用用Reactダッシュボード
+│   └── packages/shared/    共通Envヘルパー
+├── models/                 Goワークスペース
+│   ├── agents/             ワークフロー読み込み、LangGraph実行、run tracker
+│   ├── mcp/                OCR・埋め込み・説明文・セグメンテーション・取得系ツール
+│   ├── db/                 GORMモデル生成
+│   └── shared/             S3やリアルタイム配信の共通処理
+├── client/                 Flutterデモクライアント
+└── docs/                   埋め込み、LangChain、LangGraph、GenUIの補足資料
+```
 
 ## ドキュメント
 
-| ドキュメント                               | 内容                                                                                   |
-| ------------------------------------------ | -------------------------------------------------------------------------------------- |
-| [site/](site/)                             | オンボーディングと参照用のローカルドキュメントサイト（Starlight）                      |
-| [docs/embeddings.md](docs/embeddings.md)   | 現在のエンベディング実装と運用上の制約                                                 |
-| [docs/langgraphgo.md](docs/langgraphgo.md) | グラフオーケストレーションパターン、condition node、supervisor routing、チェックポイント |
-| [docs/langchaingo.md](docs/langchaingo.md) | LLMプロバイダー、チェーン、エージェント、ツール、MCPブリッジ                           |
-| [docs/genui.md](docs/genui.md)             | Flutter GenUI SDK、DataModelバインディング、A2UIプロトコル、カスタムウィジェット       |
+| ドキュメント | 内容 |
+| --- | --- |
+| [site/](site/) | オンボーディング、アーキテクチャ、ガイド、API例をまとめたドキュメントサイト |
+| [site/src/content/docs/ja/architecture.md](site/src/content/docs/ja/architecture.md) | 取り込み経路、ワークフロー、保存データ、実行追跡の全体像 |
+| [site/src/content/docs/ja/guides/dashboard-workflow-editor.md](site/src/content/docs/ja/guides/dashboard-workflow-editor.md) | ダッシュボード運用、ワークフロー編集、Docsタブ、Runsタブ |
+| [site/src/content/docs/ja/reference/api.md](site/src/content/docs/ja/reference/api.md) | デバイス経路、ダッシュボードアップロード、ワークフロー投入、リアルタイムAPI |
+| [docs/embeddings.md](docs/embeddings.md) | 埋め込み実装の詳細 |
+| [docs/langgraphgo.md](docs/langgraphgo.md) | LangGraphでのオーケストレーション設計 |
+| [docs/langchaingo.md](docs/langchaingo.md) | LangChainとツール連携の補足 |
+| [docs/genui.md](docs/genui.md) | Flutter GenUIまわりの実験メモ |
 
 ## コントリビューション
 

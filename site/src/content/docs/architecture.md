@@ -1,80 +1,191 @@
 ---
 title: Architecture
-description: How the services, data pipeline, and agent graph system fit together.
+description: How ingestion, workflow execution, MCP-backed analysis, and run tracking fit together.
 ---
+
+Arcnem Vision is built around a server-side workflow engine for image analysis. Images enter through device API keys or the dashboard, workflows are loaded from database state, agents call MCP tools to analyze the image, and the dashboard exposes the resulting documents, artifacts, and run traces.
 
 ## System Diagram
 
+```text
+┌──────────────────────┐          ┌──────────────────────────┐
+│ Device / Integration │──x-api-key upload flow────────────▶│
+└──────────────────────┘          │        Hono API          │
+                                  │   presign / ack / auth   │
+┌──────────────────────┐          │                          │
+│ Dashboard Operators  │──session-based uploads / queue────▶│
+└──────────┬───────────┘          └─────────────┬────────────┘
+           │                                    │
+           │ search, chat, runs, config         │ enqueue
+           ▼                                    ▼
+     ┌──────────────┐                    ┌──────────────┐
+     │  Dashboard   │◀──realtime SSE────▶│    Inngest    │
+     │  Control UI  │                    └──────┬───────┘
+     └──────┬───────┘                           │
+            │                                    ▼
+            │                            ┌──────────────┐
+            └──────────────▶ Postgres ◀──│  Go Agents    │
+                           + pgvector    │  LangGraph    │
+                                         └──────┬───────┘
+                                                │
+                                                ▼
+                                         ┌──────────────┐
+                                         │  MCP Server   │
+                                         │ OCR / desc /  │
+                                         │ embed / seg / │
+                                         │ retrieval     │
+                                         └──────────────┘
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
-│   Flutter    │────▶│   Hono API   │────▶│     Inngest     │
-│   Client     │     │   (Bun)      │     │   Event Queue   │
-│              │     │              │     │                 │
-│ GenUI + Gemma│     │ Presigned S3 │     └────────┬────────┘
-└─────────────┘     │ better-auth  │              │
-                    └──────────────┘              ▼
-┌─────────────┐                        ┌──────────────────┐
-│    React     │                        │   Go Agents      │
-│  Dashboard   │                        │                  │
-│              │     ┌──────────┐       │ LangGraph loads  │
-│  Workflow    │────▶│ Postgres │◀──────│ graph from DB,   │
-│  Builder     │     │ pgvector │       │ executes nodes   │
-└─────────────┘     └──────────┘       └────────┬─────────┘
-                         ▲                      │
-                         │               ┌──────▼─────────┐
-                    ┌────┴───┐           │   MCP Server    │
-                    │   S3   │           │                 │
-                    │Storage │           │ OCR, CLIP,      │
-                    └────────┘           │ Descriptions,   │
-                                         │ Search, Segment │
-                                         └─────────────────┘
-```
 
-## The Pipeline
+## Two Ingestion Paths
 
-Client captures image → API issues presigned S3 URL → Client uploads directly → API acknowledges and fires Inngest event → Go agent service loads the document's agent graph from Postgres → LangGraph builds and executes the workflow → Worker nodes call LLMs, tool/condition/supervisor nodes route the work → MCP generates OCR, descriptions, embeddings, and segmentations → Everything lands in Postgres with HNSW cosine indexes plus persisted OCR results → Searchable by meaning.
+### Device / API-key ingestion
 
-## Agent Graph System
+Device API keys are scoped to an organization, project, and device. A device or external integration:
 
-![Workflow Library showing both pipeline and supervisor workflows](/dashboard-workflows.png)
+1. calls `/api/uploads/presign`
+2. uploads directly to S3-compatible storage
+3. calls `/api/uploads/ack`
 
-Agent graphs are data, not code. Templates define reusable workflows with nodes, edges, and tools. In the dashboard, operators can browse templates, search by workflow name, node role, or tool, and start a new organization workflow from any template. Started graphs remain editable copies and retain the source template version for provenance. Four node types:
+That acknowledgement verifies the uploaded object, creates the document record, and emits `document/process.upload`. The agents service then loads the device's assigned workflow and executes it.
 
-- **Worker** — ReAct agent with access to MCP tools
-- **Tool** — Single MCP tool invocation with input/output mapping
-- **Supervisor** — Multi-agent orchestration across workers
-- **Condition** — Deterministic branching on state using `contains` / `equals` checks and explicit true/false targets
+### Dashboard ingestion
 
-Every execution is traced step-by-step in `agent_graph_runs` and `agent_graph_run_steps` — state deltas, timing, errors, the full picture. OCR payloads are persisted in `document_ocr_results`, so operators can inspect extracted text and confidence directly in the dashboard. The Docs tab builds on that same data with semantic search plus a grounded collection chat that cites matching documents.
+The dashboard provides a separate operator path:
+
+1. upload an image into a selected project
+2. create a document record without attaching it to a device
+3. queue any saved workflow against that document
+
+This is useful for one-off review, experimentation, reruns, and comparing workflows against the same image.
+
+## Workflows Are Database State
+
+The workflow engine is defined in Postgres:
+
+- `agent_graphs`: saved workflows
+- `agent_graph_templates` and `agent_graph_template_versions`: reusable, versioned templates
+- `agent_graph_nodes`: node definitions
+- `agent_graph_node_tools`: tool assignments
+- `agent_graph_edges`: explicit graph edges
+
+The dashboard edits those records directly through the workflow canvas. The agents service loads a graph snapshot at runtime and builds a LangGraph state machine from it.
+
+Four node types are supported:
+
+- **worker**: LLM-driven specialist with model settings, prompts, and optional MCP tools
+- **tool**: single MCP tool call with input/output mappings
+- **supervisor**: LLM router that coordinates a set of worker members
+- **condition**: deterministic branch using `contains` or `equals`
+
+State reducers can also be defined in the graph schema so keys append or overwrite predictably during execution.
+
+## MCP-Backed Analysis
+
+The MCP service is the analysis layer behind both workflows and dashboard chat. The current server registers tools for:
+
+- creating document descriptions
+- creating image embeddings
+- creating OCR results
+- creating segmentations
+- creating description embeddings
+- finding similar documents
+- finding similar descriptions
+- searching documents in scope
+- browsing documents in scope
+- reading grounded document context
+
+Those tools power the seeded showcase workflows:
+
+- `Document Processing Pipeline`
+- `Image Quality Review`
+- `Document Segmentation Showcase`
+- `Semantic Document Segmentation Showcase`
+- `OCR Keyword Condition Router`
+- `OCR Review Supervisor`
+
+## Persistence Model
+
+The system persists both source documents and derived artifacts:
+
+- `documents`: uploaded and derived image files
+- `document_descriptions`: saved textual descriptions
+- `document_embeddings`: image embeddings
+- `document_description_embeddings`: text embeddings
+- `document_ocr_results`: OCR text plus metadata and raw result payloads
+- `document_segmentations`: segmentation metadata plus links to derived segmented documents
+
+This matters because the platform is not just "run a model and throw away the result." It builds a persistent corpus that can be searched, inspected, and reused in later workflows.
+
+## Run Tracking And State Visibility
+
+Every execution is tracked in:
+
+- `agent_graph_runs`
+- `agent_graph_run_steps`
+
+The run tracker records:
+
+- initial state
+- final state
+- per-step state deltas
+- start and finish times
+- errors
+
+The dashboard subscribes to realtime events over Server-Sent Events so operators see document creation, OCR creation, description updates, segmentation creation, run creation, run step changes, and run completion as they happen.
+
+## Retrieval And Grounded Chat
+
+The dashboard's Docs tab sits on top of the persisted corpus:
+
+- semantic search uses stored embeddings
+- lexical fallback is available when no semantic seed exists
+- grounded collection chat reads document descriptions, OCR text, and related segmentation context
+
+Because the chat layer reads from stored artifacts rather than ephemeral agent state, it works as an operator-facing retrieval surface for the whole collection.
+
+## Dashboard As Control Plane
+
+The dashboard is the main operating surface for the platform:
+
+- create projects and devices
+- issue or rotate API keys
+- assign workflows to devices
+- build workflows and templates
+- upload ad-hoc documents
+- inspect OCR and segmentation outputs
+- search and chat across the collection
+- inspect live and historical runs
+
+## Optional Client
+
+The Flutter app is a useful demo client for camera capture, preview, and GenUI experiments. It is not required for the core platform story. The core value is in the server-side workflow engine, dashboard control plane, and persistent analysis pipeline.
 
 ## Repository Layout
 
-```
+```text
 arcnem-vision/
-├── client/                 Flutter app — GenUI, Gemma, camera, gallery
-│   ├── lib/screens/        Auth, camera, dashboard, loading
-│   ├── lib/services/       Upload, document, GenUI, intent parsing
-│   └── lib/catalog/        Custom widget catalog for AI-generated UI
 ├── server/                 Bun workspace
-│   ├── packages/api/       Hono routes, middleware, auth, S3, Inngest
-│   ├── packages/db/        Drizzle schema (23 tables), migrations, seed
-│   ├── packages/dashboard/ React admin — workflow builder, doc viewer
-│   └── packages/shared/    Env helpers
+│   ├── packages/api/       Upload/auth routes, dashboard APIs, Inngest triggers
+│   ├── packages/db/        Drizzle schema, migrations, templates, seed data
+│   ├── packages/dashboard/ React operator UI
+│   └── packages/shared/    Shared env helpers
 ├── models/                 Go workspace
-│   ├── agents/             Inngest handlers, LangGraph execution engine
-│   ├── mcp/                MCP server — 7 tools (descriptions, OCR, embeddings, segmentation, search)
-│   ├── db/                 GORM gen introspection (schema → Go models)
-│   └── shared/             Common env loading
-└── docs/                   Deep dives — embeddings, LangChain, LangGraph, GenUI
+│   ├── agents/             Graph loader, execution, run tracker
+│   ├── mcp/                MCP tool server
+│   ├── db/                 GORM model generation
+│   └── shared/             Shared runtime utilities
+├── client/                 Optional Flutter demo client
+└── docs/                   Deep-dive notes
 ```
 
 ## Service Ports
 
-| Service   | Host Port | Container Port |
-|-----------|-----------|----------------|
-| Postgres  | 5480      | 5432           |
-| Redis     | 6381      | 6379           |
-| API       | 3000      | —              |
-| Dashboard | 3001      | —              |
-| Agents    | 3020      | —              |
-| MCP       | 3021      | —              |
+| Service | Host Port | Container Port |
+| --- | --- | --- |
+| Postgres | 5480 | 5432 |
+| Redis | 6381 | 6379 |
+| API | 3000 | — |
+| Dashboard | 3001 | — |
+| Agents | 3020 | — |
+| MCP | 3021 | — |

@@ -3,7 +3,7 @@ title: Arcnem Vision
 description: Teach machines to see. Let agents decide what to do about it.
 template: splash
 hero:
-  tagline: Upload a photo, and a swarm of AI agents — orchestrated by LangGraph, connected through MCP, and configured from a database — will extract OCR text, write descriptions, generate embeddings, and route documents through deterministic or agentic workflows. Just two API keys to get started — everything else runs locally.
+  tagline: Arcnem Vision is an image-ingestion and analysis platform built around a server-side workflow engine. Images arrive through device API keys or the dashboard, workflows are loaded from database state, MCP tools perform the analysis, and the dashboard exposes the resulting documents, artifacts, and run traces.
   image:
     file: ../../assets/logo.svg
   actions:
@@ -21,29 +21,26 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 ## Features
 
 <CardGrid stagger>
-  <Card title="Database-driven agent graphs" icon="setting">
-    Define AI workflows as rows, not code. Mix worker, tool, supervisor, and condition nodes per organization without redeploying anything.
+  <Card title="Two ingestion paths" icon="random">
+    Support automated device/API-key uploads and operator-driven dashboard uploads on the same platform.
   </Card>
-  <Card title="GenUI chat interface" icon="puzzle">
-    The AI generates real Flutter widgets at runtime — cards, galleries, interactive components — composed from JSON.
+  <Card title="Database-driven workflows" icon="setting">
+    Define workflows as data, not code. Mix worker, tool, supervisor, and condition nodes without redeploying.
   </Card>
-  <Card title="On-device Gemma" icon="laptop">
-    Intent parsing happens locally on the phone before anything hits the network. Private by default.
+  <Card title="MCP-backed analysis" icon="open-book">
+    OCR, descriptions, embeddings, segmentation, similarity search, and retrieval are exposed as MCP tools for workflows and operators.
   </Card>
-  <Card title="CLIP vector search" icon="magnifier">
-    Images and descriptions embedded in the same 768-dimensional space. Search by image, by text, or by vibes.
+  <Card title="Persistent analysis corpus" icon="document">
+    Store source images plus descriptions, OCR, embeddings, segmentations, and derived images for later search and reuse.
   </Card>
-  <Card title="Grounded document collection chat" icon="comment-alt">
-    The Docs tab pairs semantic search with an org-scoped chat drawer grounded in OCR, descriptions, and segmentation context, complete with source cards.
+  <Card title="Dashboard control plane" icon="pencil">
+    Manage projects, devices, API keys, workflows, uploads, search, chat, and runs from one operating surface.
   </Card>
-  <Card title="Visual workflow builder" icon="pencil">
-    A React dashboard where you create projects, register devices, issue API keys, drag-and-drop workflows, and launch new graphs from searchable reusable templates.
+  <Card title="Run trace visibility" icon="bars">
+    Inspect initial state, per-step deltas, final state, timing, and errors for every workflow execution.
   </Card>
-  <Card title="Realtime operator views" icon="bars">
-    Documents and runs refresh as uploads land, OCR results persist, descriptions finish, segmentations appear, and graph steps advance.
-  </Card>
-  <Card title="MCP tools as a first-class primitive" icon="open-book">
-    Descriptions, OCR, CLIP embeddings, similarity search, and segmentation models are exposed through MCP. Agents call them. You can too.
+  <Card title="Grounded retrieval and chat" icon="comment-alt">
+    Search by meaning and ask questions against the persisted corpus with source-backed answers.
   </Card>
 </CardGrid>
 
@@ -51,9 +48,9 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 | Layer | Tech | What it does |
 |---|---|---|
-| **Client** | Flutter, Dart, flutter_gemma, GenUI, fpdart | Camera capture, on-device LLM, AI-generated UI, functional error handling |
-| **API** | Bun, Hono, better-auth, Inngest, Pino | REST routes, presigned uploads, durable job scheduling, structured logging |
-| **Dashboard** | React 19, TanStack Router, Tailwind, shadcn/ui | Workflow builder, project/device/API key management, live operations UI |
-| **Agents** | Go, Gin, LangGraph, LangChain, inngestgo | Graph-based agent orchestration, ReAct workers, step-level tracing |
-| **MCP** | Go, MCP go-sdk, replicate-go, GORM | CLIP embeddings, description generation, OCR, segmentation, similarity search |
-| **Storage** | Postgres 18 + pgvector, S3-compatible, Redis | Vector indexes, object storage, session cache |
+| **API** | Bun, Hono, better-auth, Inngest, Pino | Presigned uploads, auth, workflow triggers, structured logging |
+| **Dashboard** | React 19, TanStack Router, Tailwind, shadcn/ui | Workflow builder, project/device/API key management, search, chat, operator UI |
+| **Agents** | Go, Gin, LangGraph, LangChain, inngestgo | Graph loading, workflow execution, step-level run tracking |
+| **MCP** | Go, MCP go-sdk, replicate-go, GORM | OCR, descriptions, embeddings, segmentation, similarity search, retrieval tools |
+| **Storage** | Postgres 18 + pgvector, S3-compatible, Redis | Documents, derived artifacts, vector search, sessions, realtime fanout |
+| **Client** | Flutter, Dart, flutter_gemma, GenUI, fpdart | Optional demo client for capture, preview, and GenUI experiments |

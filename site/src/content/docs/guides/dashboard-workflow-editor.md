@@ -1,9 +1,9 @@
 ---
 title: Dashboard Operations
-description: Manage projects, devices, API keys, uploads, chat, workflows, and live runs from the dashboard.
+description: Use the dashboard as the control plane for projects, devices, workflows, uploads, retrieval, and live runs.
 ---
 
-The dashboard (`server/packages/dashboard`) is the operator control room for Arcnem Vision. It covers configuration, ad-hoc uploads, and live run inspection without redeploying code.
+The dashboard (`server/packages/dashboard`) is the control plane for Arcnem Vision. If you never open the Flutter app, you still get the core platform experience here: create devices and API keys, attach workflows, upload images, inspect OCR and segmentation artifacts, search the corpus, and review step-by-step runs without redeploying code.
 
 ![Dashboard — projects, devices, and API keys](/dashboard-projects.png)
 
@@ -25,6 +25,7 @@ Notes:
 - The generated secret is shown once; afterward the dashboard keeps only the public identifier.
 - Existing keys can be renamed, disabled, or deleted without changing the device record.
 - Workflow assignment is per device, so one project can mix standard ingestion, OCR review, quality review, and segmentation devices.
+- Device uploads use the API-key ingestion path and auto-run the device's assigned workflow after `/uploads/ack`.
 
 ## Building workflows
 
@@ -100,6 +101,7 @@ Segmentation flows are ordinary workflows. The difference is the tool they call:
 - Source cards show which document grounded the answer, including project and device badges when available.
 - **New chat** clears the current ephemeral session without changing the document library.
 - **Add From Dashboard** uploads a one-off image into a project without binding it to a device.
+- Dashboard uploads are intentionally separate from device automation: they create a document first, then let you queue whichever saved workflow you want.
 - Click any document to choose a different workflow and queue it without changing the source device's saved assignment.
 
 ![Docs tab with collection chat open and grounded sources](/dashboard-docs-chat.png)

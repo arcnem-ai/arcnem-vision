@@ -1,20 +1,22 @@
 ---
 title: Getting Started
-description: Clone, configure, and run Arcnem Vision locally.
+description: Run the core services locally and exercise image workflows from the dashboard or device API keys.
 ---
 
-:::tip[Two API keys — that's all you need]
-Arcnem Vision only requires an [OpenAI API key](https://platform.openai.com/api-keys) and a [Replicate API token](https://replicate.com/account/api-tokens) to get started. Everything else — Postgres, Redis, S3 (MinIO), Inngest — runs locally via Docker Compose. The `.env.example` defaults point to them out of the box.
+:::tip[Start with the core service]
+Arcnem Vision ships a Flutter demo client, but the fastest way to understand the product is through the dashboard and upload API. The core loop is: ingest an image, run a workflow, inspect the results, and review the run trace.
 :::
 
 ## Prerequisites
 
 - Docker + Docker Compose
-- Bun (server)
+- Bun
 - Go 1.25+ (agents, MCP)
-- CompileDaemon (Go hot reload — `go install github.com/githubnemo/CompileDaemon@latest`)
-- Flutter SDK (client)
+- CompileDaemon (`go install github.com/githubnemo/CompileDaemon@latest`)
+- Flutter SDK
 - Tilt
+
+`tilt up` launches the Flutter demo client too, so the Flutter SDK is still part of the default local stack. If you are evaluating the platform, focus on the dashboard and server-side services first.
 
 ## 1. Clone and configure
 
@@ -34,13 +36,13 @@ cp models/mcp/.env.example          models/mcp/.env
 cp client/.env.example              client/.env
 ```
 
-Add your two API keys — the only external services required:
+Add your two API keys:
 
 - **[OpenAI API key](https://platform.openai.com/api-keys)** → `OPENAI_API_KEY` in `models/agents/.env`
-- **Same OpenAI key (recommended)** → `OPENAI_API_KEY` in `server/packages/dashboard/.env` if you want the Docs tab collection chat enabled locally
+- **Same OpenAI key (recommended)** → `OPENAI_API_KEY` in `server/packages/dashboard/.env` for collection chat
 - **[Replicate API token](https://replicate.com/account/api-tokens)** → `REPLICATE_API_TOKEN` in `models/mcp/.env`
 
-Everything else is already configured for local development. Database, S3, and Redis all run in Docker via `docker-compose.yaml` — the `.env.example` defaults point to them out of the box.
+Everything else is already configured for local development. Postgres, Redis, and MinIO come from `docker-compose.yaml`.
 
 ## 2. Start everything
 
@@ -48,15 +50,59 @@ Everything else is already configured for local development. Database, S3, and R
 tilt up
 ```
 
-That's it. Tilt installs all dependencies, starts Postgres/Redis/MinIO, runs migrations, and launches every service — API, dashboard, agents, MCP, Inngest, Flutter client, and the docs site. Open the Tilt UI at `http://localhost:10350` to watch logs and manage resources.
+Tilt installs dependencies, starts infrastructure, runs migrations, and launches the API, dashboard, agents, MCP server, Inngest, docs site, and the Flutter demo client. Open the Tilt UI at `http://localhost:10350` for logs and manual resources like seed and introspection.
 
 ## 3. Seed the database
 
-In the Tilt UI, click the **seed-database** resource and hit the trigger button. The seed now creates a demo organization with projects, devices, API keys, newer sample images, OCR keyword-routing and OCR supervisor showcase workflows, segmentation showcase workflows, and matching reusable workflow templates. Open **Workflow Library** -> **Browse Templates** to start a new graph from any seeded template right away. It also prints a usable API key — set `DEBUG_SEED_API_KEY=...` in `client/.env` for auto-auth in the Flutter app during development.
+In the Tilt UI, trigger **seed-database**.
+
+The seed creates:
+
+- a demo organization, project, devices, and device API keys
+- editable workflows and reusable workflow templates
+- sample images for the description, OCR, quality-review, and segmentation paths
+- stored OCR results, descriptions, embeddings, segmentations, and example run history
+- a local debug dashboard session
+
+Because the committed `.env.example` files enable `API_DEBUG=true`, the dashboard can bootstrap into the seeded local session after seeding.
+
+## 4. Walk the core product
+
+1. Open the dashboard at `http://localhost:3001`.
+2. In **Projects & Devices**, inspect seeded devices and their attached workflows.
+3. In **Workflow Library**, browse templates and open a graph in the canvas.
+4. In **Docs**, inspect seeded documents or upload a new one from the dashboard.
+5. In **Runs**, open a run and inspect its initial state, per-step deltas, final state, timing, and errors.
+
+## 5. Exercise the two ingestion paths
+
+### Device / API-key path
+
+Use a device API key to run the automated flow:
+
+```bash
+curl -X POST http://localhost:3000/api/uploads/presign \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: ${API_KEY}" \
+  -d '{"contentType":"image/png","size":12345}'
+```
+
+Then upload to the returned S3 URL and call `/api/uploads/ack`. That acknowledgement verifies the object, creates the document, and queues `document/process.upload` for the device's assigned workflow.
+
+### Dashboard path
+
+In the **Docs** tab:
+
+1. Click **Add From Dashboard**.
+2. Upload an image into a project.
+3. Open the saved document.
+4. Queue any saved workflow against it.
+
+This path is useful for ad-hoc analysis, reruns, and operator-driven evaluation because the document is not tied to a device workflow by default.
 
 ## Health checks
 
-```
+```text
 GET http://localhost:3000/health   # API
 GET http://localhost:3020/health   # Agents
 GET http://localhost:3021/health   # MCP
