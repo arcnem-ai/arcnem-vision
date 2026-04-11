@@ -3,7 +3,7 @@ import type { ApiKey } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
 import { createMiddleware } from "hono/factory";
 import { isAPIDebugModeEnabled } from "@/env/isAPIDebugModeEnabled";
-import { auth } from "@/lib/auth";
+import { verifyAPIKey } from "@/lib/api-keys";
 import type { HonoServerContext } from "@/types/serverContext";
 
 const { apikeys } = schema;
@@ -41,16 +41,11 @@ export const requireAPIKey = createMiddleware<HonoServerContext>(
 			return;
 		}
 
-		const verifiedKey = await auth.api.verifyApiKey({
-			body: { key: apiKey },
-			headers: c.req.raw.headers,
-		});
-
-		if (!verifiedKey.valid || !verifiedKey.key) {
+		const verifiedKey = await verifyAPIKey(c.get("dbClient"), apiKey);
+		if (!verifiedKey) {
 			return c.json({ message: "Unauthorized" }, 401);
 		}
-
-		c.set("apiKey", verifiedKey.key);
+		c.set("apiKey", verifiedKey as Omit<ApiKey, "key">);
 
 		await next();
 	},

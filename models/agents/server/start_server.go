@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/arcnem-ai/arcnem-vision/models/agents/clients"
@@ -11,11 +12,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func init() {
-	env.LoadEnv()
-}
+func StartServer() error {
+	if err := env.LoadEnv(); err != nil {
+		return fmt.Errorf("load env: %w", err)
+	}
 
-func StartServer() {
 	router := gin.Default()
 
 	router.GET("/health", func(c *gin.Context) {
@@ -26,12 +27,21 @@ func StartServer() {
 
 	ctx := context.Background()
 
-	inngestClient := clients.NewInngestClient()
-	dbClient := client.NewPGClient()
-	s3Client := clients.NewS3Client(ctx)
+	inngestClient, err := clients.NewInngestClient()
+	if err != nil {
+		return err
+	}
+	dbClient, err := client.NewPGClient()
+	if err != nil {
+		return err
+	}
+	s3Client, err := clients.NewS3Client(ctx)
+	if err != nil {
+		return err
+	}
 	mcpClient, err := clients.NewMCPClient()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	jobs.RegisterJobs(inngestClient, dbClient, s3Client, mcpClient)
@@ -40,5 +50,5 @@ func StartServer() {
 	router.GET("/api/inngest", gin.WrapH(inngestClient.Serve()))
 	router.PUT("/api/inngest", gin.WrapH(inngestClient.Serve()))
 
-	router.Run()
+	return router.Run()
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -10,12 +11,15 @@ import (
 	"gorm.io/gorm"
 )
 
-func init() {
-	env.LoadEnv()
-}
-
 func main() {
+	if err := env.LoadEnv(); err != nil {
+		log.Fatal(fmt.Errorf("load env: %w", err))
+	}
+
 	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		log.Fatal("DATABASE_URL not set")
+	}
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("failed to connect database: %v", err)

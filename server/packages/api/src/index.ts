@@ -11,6 +11,7 @@ import { authRouter } from "@/routes/auth";
 import { getInngestClient } from "./clients/inngest";
 import { getS3Client } from "./clients/s3";
 import { isAPIDebugModeEnabled } from "./env/isAPIDebugModeEnabled";
+import { dashboardRouter } from "./routes/dashboard";
 import { dashboardDocumentsRouter } from "./routes/dashboardDocuments";
 import { documentsRouter } from "./routes/documents";
 import { uploadRouter } from "./routes/upload";
@@ -98,6 +99,7 @@ const routes = [
 	ackUploadRouter,
 	documentsRouter,
 	dashboardDocumentsRouter,
+	dashboardRouter,
 ];
 
 routes.forEach((route) => {

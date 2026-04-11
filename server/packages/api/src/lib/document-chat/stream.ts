@@ -1,16 +1,12 @@
+import type { ChatScope } from "@arcnem-vision/shared";
 import type { BaseMessageLike } from "@langchain/core/messages";
-import { type StreamChunk, toServerSentEventsResponse } from "@tanstack/ai";
-import { DashboardMcpClient } from "@/features/documents-chat/server/dashboard-mcp-client";
-import {
-	createCitationSink,
-	getDocumentChatAgent,
-} from "@/features/documents-chat/server/document-chat-agent";
+import type { StreamChunk } from "@tanstack/ai";
+import { createCitationSink, getDocumentChatAgent } from "./agent";
 import {
 	chunkAssistantText,
 	dedupeCitations,
 	extractLastAssistantText,
-} from "@/features/documents-chat/server/document-chat-helpers";
-import type { ChatScope } from "@/features/documents-chat/types";
+} from "./helpers";
 
 type DocumentChatStreamOptions = {
 	messages: BaseMessageLike[];
@@ -18,11 +14,82 @@ type DocumentChatStreamOptions = {
 	organizationId: string;
 	userId: string;
 	scope: ChatScope;
-	signal: AbortSignal;
 };
 
+const HEARTBEAT_INTERVAL_MS = 5_000;
+
 export function createDocumentChatResponse(options: DocumentChatStreamOptions) {
-	return toServerSentEventsResponse(streamDocumentChatResponse(options));
+	const encoder = new TextEncoder();
+	let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+	let closed = false;
+	const stopHeartbeat = () => {
+		if (heartbeatTimer) {
+			clearInterval(heartbeatTimer);
+			heartbeatTimer = null;
+		}
+	};
+	const stream = new ReadableStream<Uint8Array>({
+		start(controller) {
+			heartbeatTimer = setInterval(() => {
+				if (!closed) {
+					controller.enqueue(encoder.encode(": ping\n\n"));
+				}
+			}, HEARTBEAT_INTERVAL_MS);
+
+			const writeChunk = (chunk: StreamChunk) => {
+				if (!closed) {
+					controller.enqueue(
+						encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`),
+					);
+				}
+			};
+
+			void (async () => {
+				try {
+					for await (const chunk of streamDocumentChatResponse(options)) {
+						writeChunk(chunk);
+					}
+				} catch (error) {
+					writeChunk({
+						type: "RUN_ERROR",
+						runId: options.conversationId,
+						error: {
+							message:
+								error instanceof Error
+									? error.message
+									: "Document chat failed unexpectedly.",
+						},
+						timestamp: Date.now(),
+					});
+				} finally {
+					closed = true;
+					stopHeartbeat();
+					try {
+						controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+					} catch {
+						// stream already cancelled
+					}
+					try {
+						controller.close();
+					} catch {
+						// stream already closed
+					}
+				}
+			})();
+		},
+		cancel() {
+			closed = true;
+			stopHeartbeat();
+		},
+	});
+
+	return new Response(stream, {
+		headers: {
+			"Cache-Control": "no-cache",
+			Connection: "keep-alive",
+			"Content-Type": "text/event-stream",
+		},
+	});
 }
 
 async function* streamDocumentChatResponse(
@@ -30,9 +97,6 @@ async function* streamDocumentChatResponse(
 ): AsyncGenerator<StreamChunk> {
 	const runId = options.conversationId;
 	const messageId = `assistant-${crypto.randomUUID()}`;
-	const agent = getDocumentChatAgent();
-	const mcpClient = new DashboardMcpClient();
-	const citationSink = createCitationSink();
 	const timestamp = () => Date.now();
 
 	yield {
@@ -43,6 +107,8 @@ async function* streamDocumentChatResponse(
 	};
 
 	try {
+		const agent = getDocumentChatAgent();
+		const citationSink = createCitationSink();
 		const result = await agent.invoke(
 			{ messages: options.messages },
 			{
@@ -50,10 +116,8 @@ async function* streamDocumentChatResponse(
 					organizationId: options.organizationId,
 					userId: options.userId,
 					scope: options.scope,
-					mcpClient,
 					citationSink,
 				},
-				signal: options.signal,
 				configurable: {
 					thread_id: options.conversationId,
 					run_id: runId,
@@ -117,7 +181,5 @@ async function* streamDocumentChatResponse(
 			},
 			timestamp: timestamp(),
 		};
-	} finally {
-		await mcpClient.close();
 	}
 }

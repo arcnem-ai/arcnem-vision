@@ -30,12 +30,9 @@ Dev server runs on `http://localhost:3001`.
 
 `server/packages/dashboard/.env.example`:
 
-- `API_URL`: the server-side API base URL used by dashboard loaders, mutations, and the `/api/auth` proxy
-- `DATABASE_URL`: local Postgres connection string
-- `OPENAI_API_KEY`: required for Docs-tab collection chat
-- `OPENAI_MODEL`: optional model override for Docs-tab collection chat (defaults to `gpt-4.1-mini`)
-- `MCP_SERVER_URL`: MCP endpoint used to ground Docs-tab chat answers
-- `REDIS_URL`: Redis connection string for realtime dashboard updates
+- `API_URL`: the server-side API base URL used by dashboard loaders, mutations, and the auth/chat/realtime proxies
+
+Dashboard chat, realtime, and auth all proxy through the API server now. Keep `server/packages/api/.env` configured for `OPENAI_API_KEY`, `OPENAI_MODEL`, `MCP_SERVER_URL`, `REDIS_URL`, and `API_DEBUG`.
 
 ## Workflow editor notes
 
@@ -51,9 +48,9 @@ Dev server runs on `http://localhost:3001`.
 ## Document operations notes
 
 - Documents search is wired to `query` on `/api/dashboard/documents`
-- If a matching description is found, the API returns nearest semantic matches using embedding distance
-- If no semantic seed is found, the API falls back to lexical `ILIKE` matching
-- Docs collection chat posts to `/api/documents/chat`
+- Search blends lexical ranking with semantic description matches when `DOCUMENT_SEARCH_MODE=hybrid` and embeddings are available
+- Search filters are pushed into the API/MCP scope so project, device, and dashboard-upload filters rank within the requested slice
+- Docs collection chat posts to the local `/api/documents/chat` proxy, which forwards to `/api/dashboard/documents/chat`
 - The current chat launcher is organization-scoped and grounds answers in descriptions, OCR text, and related segmentation context
 - Chat responses stream over Server-Sent Events and can attach source cards with project/device badges plus matched excerpts
 - Dashboard uploads use `/api/dashboard/documents/uploads/presign` and `/api/dashboard/documents/uploads/ack`
@@ -62,7 +59,7 @@ Dev server runs on `http://localhost:3001`.
 
 ## Realtime notes
 
-- The dashboard subscribes to `/api/realtime/dashboard` with Server-Sent Events
+- The dashboard subscribes to the local `/api/realtime/dashboard` proxy, which forwards to `/api/dashboard/realtime`
 - Documents refresh on document creation, description updates, and segmentation creation
 - Runs refresh on run creation, step changes, and run completion
 

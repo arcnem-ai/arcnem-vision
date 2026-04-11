@@ -118,10 +118,10 @@ GET /api/dashboard/documents?organizationId=<orgId>&query=<text>&limit=<n>&curso
 
 Notes:
 
-- `organizationId` is required.
+- `organizationId` is required in local debug mode or when there is no active organization in the session.
 - `query` is optional.
-- Semantic ranking is attempted first when embeddings are available.
-- The API falls back to lexical matching when no semantic seed exists.
+- Search always includes lexical ranking.
+- When `DOCUMENT_SEARCH_MODE=hybrid`, the API also blends in semantic description matches when embeddings are available.
 
 Response fields include:
 
@@ -166,7 +166,7 @@ Each segmentation result includes:
 ## Grounded Collection Chat
 
 ```http
-POST /api/documents/chat
+POST /api/dashboard/documents/chat
 ```
 
 Notes:
@@ -176,13 +176,14 @@ Notes:
 - The current UI uses organization scope, while the endpoint also accepts optional `projectIds`, `deviceIds`, and `documentIds`.
 - Responses stream over Server-Sent Events.
 - Source cards are emitted as `assistant_sources` events and include document metadata plus matched excerpts.
+- The dashboard bundle proxies this endpoint locally at `/api/documents/chat`.
 
 The chat layer is grounded in stored document descriptions, OCR text, and related segmentation context.
 
 ## Dashboard Realtime Feed
 
 ```http
-GET /api/realtime/dashboard
+GET /api/dashboard/realtime
 ```
 
 This Server-Sent Events feed publishes:
@@ -195,7 +196,7 @@ This Server-Sent Events feed publishes:
 - run step changes
 - run completion
 
-It powers the live Docs and Runs tabs in the dashboard.
+The dashboard bundle proxies this feed locally at `/api/realtime/dashboard` to power the live Docs and Runs tabs.
 
 ## Health Checks
 

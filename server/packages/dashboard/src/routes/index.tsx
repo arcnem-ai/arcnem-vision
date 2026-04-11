@@ -31,13 +31,10 @@ export const Route = createFileRoute("/")({
 			ReturnType<typeof getAgentGraphRuns>
 		>;
 		if (dashboard.organization) {
-			const orgId = dashboard.organization.id;
 			const [docsResult, runsResult] = await Promise.allSettled([
-				getDocuments({
-					data: { organizationId: orgId },
-				}),
+				getDocuments({ data: {} }),
 				getAgentGraphRuns({
-					data: { organizationId: orgId },
+					data: { organizationId: dashboard.organization.id },
 				}),
 			]);
 			if (docsResult.status === "fulfilled") {

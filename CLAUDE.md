@@ -13,11 +13,11 @@ Arcnem Vision is a multi-service computer vision platform with a Flutter client,
 - `server/` — Bun workspace with four packages:
   - `packages/api/` — Hono HTTP server with better-auth (email+password, API keys, organizations). Routes mounted at `/api`. Inngest handler at `/api/inngest`. Middleware: CORS, request ID, pino logging, session extraction, S3/Inngest/DB client injection.
   - `packages/db/` — Drizzle ORM schema and migrations against pgvector/pg18. Schema split into `authSchema.ts` (users, orgs, projects, devices, apikeys), `projectSchema.ts` (documents, embeddings, descriptions, models, presigned uploads), and `agentGraphSchemas.ts` (tools, templates, graphs, nodes, edges, runs, steps). Relationships defined in `relationships.ts`.
-  - `packages/dashboard/` — React admin UI with TanStack Router, Tailwind CSS, and shadcn/ui. Workflow/graph editor and document viewer. Uses Vite + React 19.
+  - `packages/dashboard/` — React admin UI with TanStack Router, Tailwind CSS, and shadcn/ui. Keep business logic in `packages/api/`; the dashboard should mainly proxy auth/chat/realtime and render API-owned state. Uses Vite + React 19.
   - `packages/shared/` — Shared env var helpers (`createEnvVarGetter` pattern).
 - `models/` — Go workspace (`go.work`) with modules:
   - `agents/` — Gin server exposing Inngest job handlers. `process-document-upload` loads a document's agent graph from DB, builds a LangGraph workflow (worker/tool/supervisor nodes), and executes it with step-level tracing. Uses LangChain Go for LLM calls, MCP client SDK for tool invocation, GORM for DB, S3 for object storage.
-  - `mcp/` — MCP server with 5 registered tools: `create_document_embedding` (image → CLIP via Replicate), `create_description_embedding` (text → CLIP), `create_document_description` (save LLM description), `find_similar_documents` (pgvector cosine search), `find_similar_descriptions` (pgvector cosine search). Uses Replicate API for OpenAI/CLIP embeddings (768 dimensions).
+  - `mcp/` — MCP server with 10 registered tools: `create_document_embedding`, `create_description_embedding`, `create_document_description`, `create_document_ocr`, `create_document_segmentation`, `find_similar_documents`, `find_similar_descriptions`, `search_documents_in_scope`, `browse_documents_in_scope`, and `read_document_context`. Uses Replicate API for CLIP embeddings (768 dimensions) and provides the retrieval layer behind dashboard chat.
   - `db/` — GORM gen introspection tool that generates Go models from the Drizzle-managed Postgres schema. Generated code in `gen/models/` and `gen/queries/`.
   - `cli/` — Bubble Tea TUI (stub).
   - `shared/` — Common env loading via godotenv.
@@ -109,7 +109,7 @@ Postgres uses `pgvector/pgvector:pg18` image with logical replication enabled.
 ## Environment
 
 Each service has its own `.env` (copy from `.env.example`):
-- `server/packages/api/.env` — S3, Inngest, better-auth secrets, Redis
+- `server/packages/api/.env` — S3, Inngest, better-auth secrets, Redis, plus `OPENAI_API_KEY` / `OPENAI_MODEL` / `MCP_SERVER_URL` for dashboard chat
 - `server/packages/db/.env` — DATABASE_URL
 - `client/.env` — API_URL, CLIENT_ORIGIN, DEBUG_SEED_API_KEY
 - `models/agents/.env` — DATABASE_URL, S3, OPENAI_API_KEY, MCP_SERVER_URL, Inngest

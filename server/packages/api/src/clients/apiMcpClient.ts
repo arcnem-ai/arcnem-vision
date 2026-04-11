@@ -71,6 +71,15 @@ export class ApiMcpClient {
 			);
 		}
 	}
+
+	async close() {
+		if (!this.connected) {
+			return;
+		}
+
+		await this.transport.close();
+		this.connected = false;
+	}
 }
 
 let cachedApiMcpClient: ApiMcpClient | undefined;

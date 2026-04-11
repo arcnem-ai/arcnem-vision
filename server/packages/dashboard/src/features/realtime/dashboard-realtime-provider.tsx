@@ -32,7 +32,9 @@ const DashboardRealtimeContext = createContext<DashboardRealtimeContextValue>({
 export function DashboardRealtimeProvider({
 	children,
 	organizationId,
-}: PropsWithChildren<{ organizationId: string | null }>) {
+}: PropsWithChildren<{
+	organizationId: string | null;
+}>) {
 	const [connectionState, setConnectionState] =
 		useState<DashboardRealtimeConnectionState>(
 			organizationId ? "connecting" : "disabled",
@@ -54,7 +56,7 @@ export function DashboardRealtimeProvider({
 		}
 
 		setConnectionState("connecting");
-		const eventSource = new EventSource("/api/realtime/dashboard");
+		const eventSource = new EventSource("/api/dashboard/realtime");
 
 		eventSource.onopen = () => {
 			setConnectionState("open");

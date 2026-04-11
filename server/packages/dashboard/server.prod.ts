@@ -71,6 +71,7 @@ const SERVER_PORT = Number(process.env.PORT ?? 3001);
 const CLIENT_DIRECTORY = "./dist/client";
 const SERVER_ENTRY_POINT = "./dist/server/server.js";
 const AUTH_PROXY_BASE_PATH = "/api/auth";
+const DASHBOARD_API_PROXY_BASE_PATH = "/api/dashboard";
 const API_BASE_URL = process.env.API_URL?.trim();
 
 // Logging utilities for professional output
@@ -180,7 +181,10 @@ interface PreloadResult {
 	skipped: AssetMetadata[];
 }
 
-async function proxyAuthRequest(req: Request): Promise<Response> {
+async function proxyAPIRequest(
+	req: Request,
+	options?: { stripOrigin?: boolean },
+): Promise<Response> {
 	if (!API_BASE_URL) {
 		return new Response("API_URL is not configured on the dashboard.", {
 			status: 500,
@@ -194,6 +198,9 @@ async function proxyAuthRequest(req: Request): Promise<Response> {
 	);
 	const headers = new Headers(req.headers);
 	headers.delete("host");
+	if (options?.stripOrigin) {
+		headers.delete("origin");
+	}
 
 	const body =
 		req.method === "GET" || req.method === "HEAD"
@@ -206,6 +213,14 @@ async function proxyAuthRequest(req: Request): Promise<Response> {
 		body,
 		redirect: "manual",
 	});
+}
+
+async function proxyAuthRequest(req: Request): Promise<Response> {
+	return proxyAPIRequest(req);
+}
+
+async function proxyDashboardAPIRequest(req: Request): Promise<Response> {
+	return proxyAPIRequest(req, { stripOrigin: true });
 }
 
 /**
@@ -492,7 +507,7 @@ async function initializeStaticRoutes(
 								: "preloaded";
 					const route =
 						file.route.length > 30
-							? file.route.substring(0, 27) + "..."
+							? `${file.route.substring(0, 27)}...`
 							: file.route;
 					console.log(
 						`${status.padEnd(12)} │ ${route.padEnd(30)} │ ${file.type.padEnd(28)} │ ${reason.padEnd(10)}`,
@@ -559,6 +574,8 @@ async function initializeServer() {
 			// Serve static assets (preloaded or on-demand)
 			...routes,
 			[`${AUTH_PROXY_BASE_PATH}/*`]: (req: Request) => proxyAuthRequest(req),
+			[`${DASHBOARD_API_PROXY_BASE_PATH}/*`]: (req: Request) =>
+				proxyDashboardAPIRequest(req),
 
 			// Fallback to TanStack Start handler for all other routes
 			"/*": (req: Request) => {

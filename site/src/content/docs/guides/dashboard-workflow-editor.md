@@ -96,7 +96,7 @@ Segmentation flows are ordinary workflows. The difference is the tool they call:
 
 ![Docs tab with newer seeded images](/dashboard-docs.png)
 
-- Search by meaning uses semantic ranking first and falls back to lexical matching if there is no embedding seed.
+- Search by meaning uses lexical ranking and can blend in semantic description matches when hybrid search is enabled.
 - **Ask The Collection** opens an org-scoped drawer that answers using document descriptions, OCR text, and related segmentation context.
 - Source cards show which document grounded the answer, including project and device badges when available.
 - **New chat** clears the current ephemeral session without changing the document library.

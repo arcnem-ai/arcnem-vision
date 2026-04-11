@@ -36,10 +36,14 @@ func ProcessDocumentUpload(ctx context.Context, input inngestgo.Input[inputs.Pro
 		)
 	})
 	if err != nil {
-		return nil, inngestgo.NoRetryError(fmt.Errorf("Failed to load document and agent graph %v", err))
+		return nil, inngestgo.NoRetryError(
+			fmt.Errorf("failed to load document and agent graph: %w", err),
+		)
 	}
 	if result == nil {
-		return nil, inngestgo.NoRetryError(fmt.Errorf("DocumentAndAgentGraph was nil %v", err))
+		return nil, inngestgo.NoRetryError(
+			fmt.Errorf("document and agent graph payload was nil"),
+		)
 	}
 	if result.Document == nil {
 		return nil, inngestgo.NoRetryError(fmt.Errorf("document payload was nil"))
@@ -68,7 +72,9 @@ func ProcessDocumentUpload(ctx context.Context, input inngestgo.Input[inputs.Pro
 		)
 	})
 	if err != nil {
-		return nil, inngestgo.NoRetryError(fmt.Errorf("Failed to produce temp url for document %v", err))
+		return nil, inngestgo.NoRetryError(
+			fmt.Errorf("failed to produce temp url for document: %w", err),
+		)
 	}
 
 	graphResult, err := step.Run(ctx, "run-graph", func(ctx context.Context) (map[string]any, error) {
@@ -102,7 +108,9 @@ func ProcessDocumentUpload(ctx context.Context, input inngestgo.Input[inputs.Pro
 		return builtGraph.Invoke(ctx, initialState)
 	})
 	if err != nil {
-		return nil, inngestgo.NoRetryError(fmt.Errorf("Graph run failed %v", err))
+		return nil, inngestgo.NoRetryError(
+			fmt.Errorf("graph run failed: %w", err),
+		)
 	}
 
 	return graphResult, nil

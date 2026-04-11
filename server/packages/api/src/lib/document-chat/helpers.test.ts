@@ -1,12 +1,29 @@
 import { describe, expect, test } from "bun:test";
+import {
+	collectionSearcherResponseSchema,
+	documentChatRequestSchema,
+} from "@arcnem-vision/shared";
 import { toJsonSchema } from "@langchain/core/utils/json_schema";
-import { searchDocumentsToolInputSchema } from "@/features/documents-chat/server/document-chat-agent";
 import {
 	chunkAssistantText,
 	dedupeCitations,
 	extractLastAssistantText,
-} from "@/features/documents-chat/server/document-chat-helpers";
-import { collectionSearcherResponseSchema } from "@/features/documents-chat/types";
+	toAgentMessages,
+} from "./helpers";
+import { searchDocumentsToolInputSchema } from "./schemas";
+
+function readMessageContent(message: unknown) {
+	if (
+		message &&
+		typeof message === "object" &&
+		"content" in message &&
+		typeof message.content === "string"
+	) {
+		return message.content;
+	}
+
+	return null;
+}
 
 describe("extractLastAssistantText", () => {
 	test("returns the newest assistant message text from mixed message shapes", () => {
@@ -76,6 +93,51 @@ describe("dedupeCitations", () => {
 		expect(citations).toHaveLength(2);
 		expect(citations[0]?.excerpt).toContain("Longer and more useful");
 		expect(citations[1]?.documentId).toBe("doc-2");
+	});
+});
+
+describe("document chat payloads", () => {
+	test("accepts TanStack UI messages with parts", () => {
+		const parsed = documentChatRequestSchema.safeParse({
+			messages: [
+				{
+					id: "user-1",
+					role: "user",
+					parts: [{ type: "text", content: "What is in this document?" }],
+				},
+			],
+			data: {
+				scope: {
+					kind: "organization",
+					organizationId: "org-1",
+				},
+			},
+		});
+
+		expect(parsed.success).toBe(true);
+	});
+
+	test("converts TanStack UI messages into agent messages", () => {
+		const messages = toAgentMessages([
+			{
+				id: "user-1",
+				role: "user",
+				parts: [{ type: "text", content: "Find the serial number." }],
+			},
+			{
+				id: "assistant-1",
+				role: "assistant",
+				parts: [
+					{ type: "text", content: "Looking through the documents now." },
+				],
+			},
+		]);
+
+		expect(messages).toHaveLength(2);
+		expect(readMessageContent(messages[0])).toBe("Find the serial number.");
+		expect(readMessageContent(messages[1])).toBe(
+			"Looking through the documents now.",
+		);
 	});
 });
 

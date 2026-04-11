@@ -3,6 +3,7 @@ package clients
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -15,10 +16,10 @@ import (
 
 const replicateErrorPreviewLimit = 800
 
-func NewReplicateClient() *replicate.Client {
+func NewReplicateClient() (*replicate.Client, error) {
 	replicateAPIKey := os.Getenv("REPLICATE_API_TOKEN")
 	if replicateAPIKey == "" {
-		log.Fatalf("REPLICATE_API_TOKEN not set")
+		return nil, fmt.Errorf("REPLICATE_API_TOKEN not set")
 	}
 
 	httpClient := &http.Client{
@@ -30,10 +31,10 @@ func NewReplicateClient() *replicate.Client {
 		replicate.WithHTTPClient(httpClient),
 	)
 	if err != nil {
-		log.Fatalf("Failed to create replicate client %v", err)
+		return nil, fmt.Errorf("failed to create replicate client: %w", err)
 	}
 
-	return client
+	return client, nil
 }
 
 type replicateDiagnosticTransport struct {

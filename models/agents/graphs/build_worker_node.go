@@ -44,7 +44,10 @@ func BuildWorkerNode(snapshotNode *SnapshotNode, modelClient any, mcpClient *cli
 		Fn: func(ctx context.Context, state map[string]any) (map[string]any, error) {
 			var input string
 			if inputKey != nil {
-				input, _ = state[*inputKey].(string)
+				input, err = loadStateString(state, *inputKey)
+				if err != nil {
+					return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
+				}
 			}
 			log.Printf(
 				"graph worker start node=%s max_iterations=%d input_len=%d input_preview=%q",
@@ -76,11 +79,17 @@ func BuildWorkerNode(snapshotNode *SnapshotNode, modelClient any, mcpClient *cli
 				return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
 			}
 
-			output := extractLastAIMessage(result)
-			messageCount := 0
-			if messages, ok := result["messages"].([]llms.MessageContent); ok {
-				messageCount = len(messages)
+			messages, err := loadResultMessages(result)
+			if err != nil {
+				return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
 			}
+
+			output, err := extractLastAIMessage(messages)
+			if err != nil {
+				return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
+			}
+
+			messageCount := len(messages)
 			if isMaxIterationsMessage(output) {
 				log.Printf(
 					"graph worker iteration_limit node=%s max_iterations=%d input_preview=%q output_preview=%q",
@@ -140,7 +149,10 @@ func BuildSupervisorMemberWorkerNode(snapshotNode *SnapshotNode, modelClient any
 		Name:        nodeKey,
 		Description: fmt.Sprintf("Supervisor member worker: %s", nodeKey),
 		Fn: func(ctx context.Context, state map[string]any) (map[string]any, error) {
-			inputMessages, _ := state["messages"].([]llms.MessageContent)
+			inputMessages, err := loadStateMessages(state, "messages")
+			if err != nil {
+				return nil, fmt.Errorf("member worker %q: %w", nodeKey, err)
+			}
 
 			log.Printf(
 				"graph supervisor_member_start node=%s max_iterations=%d message_count=%d",
@@ -158,7 +170,10 @@ func BuildSupervisorMemberWorkerNode(snapshotNode *SnapshotNode, modelClient any
 				return nil, fmt.Errorf("member worker %q: %w", nodeKey, err)
 			}
 
-			outputMessages, _ := result["messages"].([]llms.MessageContent)
+			outputMessages, err := loadResultMessages(result)
+			if err != nil {
+				return nil, fmt.Errorf("member worker %q: %w", nodeKey, err)
+			}
 			if len(outputMessages) == 0 {
 				log.Printf(
 					"graph supervisor_member_end node=%s message_count=0",
@@ -182,7 +197,10 @@ func BuildSupervisorMemberWorkerNode(snapshotNode *SnapshotNode, modelClient any
 			}
 
 			// Check for max iterations in the last message.
-			lastOutput := extractLastAIMessage(result)
+			lastOutput, err := extractLastAIMessage(outputMessages)
+			if err != nil {
+				return nil, fmt.Errorf("member worker %q: %w", nodeKey, err)
+			}
 			if isMaxIterationsMessage(lastOutput) {
 				log.Printf(
 					"graph supervisor_member_iteration_limit node=%s max_iterations=%d",

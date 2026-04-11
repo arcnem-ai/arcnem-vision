@@ -1,7 +1,13 @@
 package main
 
-import "github.com/arcnem-ai/arcnem-vision/models/mcp/server"
+import (
+	"log"
+
+	"github.com/arcnem-ai/arcnem-vision/models/mcp/server"
+)
 
 func main() {
-	server.StartServer()
+	if err := server.StartServer(); err != nil {
+		log.Fatal(err)
+	}
 }

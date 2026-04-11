@@ -121,7 +121,7 @@ describe("normalizeGraphData", () => {
 				],
 				edges: [{ fromNode: "node_b", toNode: "END" }],
 			}),
-		).toThrow(/path to END/i);
+		).toThrow(/unreachable/i);
 	});
 
 	test("accepts a valid condition graph", () => {

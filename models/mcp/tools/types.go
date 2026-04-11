@@ -81,10 +81,11 @@ type SimilarMatch struct {
 }
 
 type ChatDocumentScope struct {
-	OrganizationID string   `json:"organization_id"`
-	ProjectIDs     []string `json:"project_ids,omitempty"`
-	DeviceIDs      []string `json:"device_ids,omitempty"`
-	DocumentIDs    []string `json:"document_ids,omitempty"`
+	OrganizationID       string   `json:"organization_id"`
+	ProjectIDs           []string `json:"project_ids,omitempty"`
+	DeviceIDs            []string `json:"device_ids,omitempty"`
+	DocumentIDs          []string `json:"document_ids,omitempty"`
+	DashboardUploadsOnly bool     `json:"dashboard_uploads_only,omitempty"`
 }
 
 type SearchDocumentsInScopeInput struct {

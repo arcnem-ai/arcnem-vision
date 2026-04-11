@@ -946,7 +946,6 @@ export function DocumentGalleryPanel({
 		const deviceId = getDeviceIdFromSourceFilterValue(sourceFilterValue);
 
 		return {
-			organizationId,
 			...(cursor ? { cursor } : {}),
 			...(limit ? { limit } : {}),
 			...(nextQuery?.trim() ? { query: nextQuery.trim() } : {}),

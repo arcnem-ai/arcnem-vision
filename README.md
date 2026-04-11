@@ -136,10 +136,10 @@ cp models/mcp/.env.example          models/mcp/.env
 cp client/.env.example              client/.env
 ```
 
-Add your two API keys:
+Add your provider keys:
 
 - **[OpenAI API key](https://platform.openai.com/api-keys)** → `OPENAI_API_KEY` in `models/agents/.env`
-- **Same OpenAI key (recommended)** → `OPENAI_API_KEY` in `server/packages/dashboard/.env` for collection chat
+- **Same OpenAI key (recommended)** → `OPENAI_API_KEY` in `server/packages/api/.env` for dashboard collection chat
 - **[Replicate API token](https://replicate.com/account/api-tokens)** → `REPLICATE_API_TOKEN` in `models/mcp/.env`
 
 Everything else is wired for local development. Postgres, Redis, and MinIO come from `docker-compose.yaml`.
@@ -164,7 +164,7 @@ The seed creates:
 - example OCR results, descriptions, embeddings, segmentations, and run history
 - a local debug dashboard session
 
-Because `API_DEBUG=true` is enabled in the committed `.env.example` files, the dashboard can auto-bootstrap into the seeded local session after seeding.
+Because `server/packages/api/.env.example` enables `API_DEBUG=true`, the dashboard can auto-bootstrap into the seeded local session after seeding.
 
 ### 4. Explore the core service
 

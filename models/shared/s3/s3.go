@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -38,13 +37,17 @@ type S3Client struct {
 	config   S3Config
 }
 
-func LoadS3Config() S3Config {
+func LoadS3Config() (S3Config, error) {
 	usePathStyleRaw := strings.TrimSpace(os.Getenv("S3_USE_PATH_STYLE"))
 	usePathStyle := false
 	if usePathStyleRaw != "" {
 		v, err := strconv.ParseBool(usePathStyleRaw)
 		if err != nil {
-			log.Fatalf("invalid S3_USE_PATH_STYLE value %q: %v", usePathStyleRaw, err)
+			return S3Config{}, fmt.Errorf(
+				"invalid S3_USE_PATH_STYLE value %q: %w",
+				usePathStyleRaw,
+				err,
+			)
 		}
 		usePathStyle = v
 	}
@@ -59,14 +62,17 @@ func LoadS3Config() S3Config {
 	}
 
 	if s3Config.AccessKeyID == "" || s3Config.AccessKeySecret == "" || s3Config.BucketName == "" || s3Config.Endpoint == "" || s3Config.Region == "" {
-		log.Fatalf("incomplete S3 configuration")
+		return S3Config{}, fmt.Errorf("incomplete S3 configuration")
 	}
 
-	return s3Config
+	return s3Config, nil
 }
 
-func NewS3Client(ctx context.Context) *S3Client {
-	s3Config := LoadS3Config()
+func NewS3Client(ctx context.Context) (*S3Client, error) {
+	s3Config, err := LoadS3Config()
+	if err != nil {
+		return nil, err
+	}
 
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
@@ -78,7 +84,7 @@ func NewS3Client(ctx context.Context) *S3Client {
 		config.WithBaseEndpoint(s3Config.Endpoint),
 	)
 	if err != nil {
-		log.Fatalf("failed to load S3 config: %v", err)
+		return nil, fmt.Errorf("failed to load S3 config: %w", err)
 	}
 
 	client := awss3.NewFromConfig(cfg, func(options *awss3.Options) {
@@ -88,7 +94,7 @@ func NewS3Client(ctx context.Context) *S3Client {
 	return &S3Client{
 		s3Client: client,
 		config:   s3Config,
-	}
+	}, nil
 }
 
 func (c *S3Client) BucketName() string {

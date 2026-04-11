@@ -15,6 +15,15 @@ function createAuthProxy(target: string | undefined) {
 			target,
 			changeOrigin: true,
 		},
+		"/api/dashboard": {
+			target,
+			changeOrigin: true,
+			configure(proxy) {
+				proxy.on("proxyReq", (proxyReq) => {
+					proxyReq.removeHeader("origin");
+				});
+			},
+		},
 	};
 }
 

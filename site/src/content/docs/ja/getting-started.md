@@ -36,10 +36,10 @@ cp models/mcp/.env.example          models/mcp/.env
 cp client/.env.example              client/.env
 ```
 
-外部サービスで必要なのは次の2つだけです。
+外部サービスで必要なキーは次の2つです。
 
 - **[OpenAI APIキー](https://platform.openai.com/api-keys)** → `models/agents/.env` の `OPENAI_API_KEY`
-- **同じOpenAIキーをダッシュボードでも使う場合** → `server/packages/dashboard/.env` の `OPENAI_API_KEY`
+- **同じOpenAIキーを使う場合（推奨）** → ダッシュボードのコレクションチャット用に `server/packages/api/.env` の `OPENAI_API_KEY`
 - **[Replicate APIトークン](https://replicate.com/account/api-tokens)** → `models/mcp/.env` の `REPLICATE_API_TOKEN`
 
 それ以外はローカル開発向けにほぼ初期設定済みです。Postgres、Redis、MinIO は `docker-compose.yaml` から起動されます。
@@ -64,7 +64,7 @@ Tilt UI で **seed-database** を実行します。
 - OCR結果、説明文、埋め込み、セグメンテーション、実行履歴のサンプル
 - ローカル開発用のダッシュボードセッション
 
-`.env.example` では `API_DEBUG=true` が有効になっているので、シード後はダッシュボードがローカル用セッションに入れる状態になります。
+`server/packages/api/.env.example` では `API_DEBUG=true` が有効になっているので、シード後はダッシュボードがローカル用セッションに入れる状態になります。
 
 Flutter 側でもシード済み API キーを使いたい場合は、`client/.env` に `DEBUG_SEED_API_KEY=...` を設定してください。
 

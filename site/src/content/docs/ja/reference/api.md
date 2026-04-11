@@ -118,10 +118,10 @@ GET /api/dashboard/documents?organizationId=<orgId>&query=<text>&limit=<n>&curso
 
 補足:
 
-- `organizationId` は必須です。
+- `organizationId` は、ローカルデバッグ時またはセッションにアクティブ組織がない場合に必須です。
 - `query` は任意です。
-- 埋め込みがある場合はまず意味検索を試します。
-- 埋め込みがない場合は語彙検索にフォールバックします。
+- 検索では常に語彙検索を含めます。
+- `DOCUMENT_SEARCH_MODE=hybrid` の場合は、埋め込みがあると説明文ベースのセマンティック検索もブレンドします。
 
 レスポンスには次のようなフィールドが含まれます。
 
@@ -166,7 +166,7 @@ GET /api/dashboard/documents/:id/segmentations
 ## 根拠付きコレクションチャット
 
 ```http
-POST /api/documents/chat
+POST /api/dashboard/documents/chat
 ```
 
 補足:
@@ -177,16 +177,18 @@ POST /api/documents/chat
 - 現在の UI は組織単位で使いますが、API 側では `projectIds`、`deviceIds`、`documentIds` も受け取れます。
 - レスポンスは Server-Sent Events でストリーミングされます。
 - 出典カードは `assistant_sources` イベントとして流れ、ドキュメント情報や一致箇所の抜粋を含みます。
+- ダッシュボード本体はこのエンドポイントをローカルの `/api/documents/chat` からプロキシします。
 
 ## ダッシュボードのリアルタイムフィード
 
 ```http
-GET /api/realtime/dashboard
+GET /api/dashboard/realtime
 ```
 
 - Server-Sent Events を使います。
 - ドキュメント系イベント: `document-created`, `ocr-created`, `description-upserted`, `segmentation-created`
 - 実行系イベント: `run-created`, `run-step-changed`, `run-finished`
+- ダッシュボード本体ではローカルの `/api/realtime/dashboard` にプロキシして利用します。
 
 ## ヘルスチェック
 

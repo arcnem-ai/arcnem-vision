@@ -7,11 +7,11 @@ This file is written for AI coding agents. Human contributors should start with 
 - `server/` is a Bun workspace with four packages:
   - `server/packages/api/src/` hosts Hono routes/middleware (auth, uploads, documents, dashboard).
   - `server/packages/db/src/` defines Drizzle schema/migrations. Schema is split into `authSchema.ts`, `projectSchema.ts`, and `agentGraphSchemas.ts` with relationships in `relationships.ts`.
-  - `server/packages/dashboard/` is a React admin UI built with TanStack Router, Tailwind, and shadcn/ui.
+  - `server/packages/dashboard/` is a React admin UI built with TanStack Router, Tailwind, and shadcn/ui. Keep business logic in the API package when possible; the dashboard should mostly proxy/auth and render API-owned state.
   - `server/packages/shared/src/` holds shared env helpers (`createEnvVarGetter` pattern).
 - `models/` is a Go workspace (`go.work`) with modules:
   - `models/agents/` — Gin server with Inngest job handlers and LangGraph workflow execution. Organized by feature: `clients/`, `jobs/`, `graphs/`, `load/`, `tools/`, `server/`, `enums/`, `utils/`.
-  - `models/mcp/` — MCP server with 5 registered tools (CLIP embeddings, descriptions, similarity search). Organized: `server/`, `tools/`, `clients/`.
+  - `models/mcp/` — MCP server with 10 registered tools (OCR, descriptions, embeddings, segmentation, similarity search, scoped browse/search, grounded document reads). Organized: `server/`, `tools/`, `clients/`.
   - `models/db/` — GORM gen introspection tool (`cmd/introspect/`) with generated models in `gen/models/` and queries in `gen/queries/`.
   - `models/cli/` — Bubble Tea TUI (stub).
   - `models/shared/` — Common env loading via godotenv.
@@ -55,7 +55,7 @@ This file is written for AI coding agents. Human contributors should start with 
 ## Environment
 
 Each service has its own `.env` (copy from `.env.example`):
-- `server/packages/api/.env` — S3, Inngest, better-auth secrets, Redis
+- `server/packages/api/.env` — S3, Inngest, better-auth secrets, Redis, and OpenAI/MCP settings for dashboard chat
 - `server/packages/db/.env` — DATABASE_URL
 - `client/.env` — API_URL, CLIENT_ORIGIN, DEBUG_SEED_API_KEY
 - `models/agents/.env` — DATABASE_URL, S3, OPENAI_API_KEY, MCP_SERVER_URL, Inngest

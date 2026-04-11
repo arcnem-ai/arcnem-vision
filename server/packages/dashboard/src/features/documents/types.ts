@@ -1,10 +1,4 @@
-export type JSONValue =
-	| null
-	| string
-	| number
-	| boolean
-	| JSONValue[]
-	| { [key: string]: JSONValue };
+export type { JSONValue } from "@arcnem-vision/shared";
 
 export type DocumentItem = {
 	id: string;
@@ -42,7 +36,7 @@ export type OCRResultItem = {
 	modelLabel: string;
 	text: string;
 	avgConfidence: number | null;
-	result: JSONValue;
+	result: import("@arcnem-vision/shared").JSONValue;
 };
 
 export type DocumentOCRResultsResponse = {

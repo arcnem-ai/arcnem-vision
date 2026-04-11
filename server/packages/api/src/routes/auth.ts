@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { setSignedCookie } from "hono/cookie";
 import { getAPIEnvVar } from "@/env/getAPIEnvVar";
 import { isAPIDebugModeEnabled } from "@/env/isAPIDebugModeEnabled";
+import { verifyAPIKey } from "@/lib/api-keys";
 import { auth } from "@/lib/auth";
 import type { HonoServerContext } from "@/types/serverContext";
 
@@ -86,16 +87,22 @@ authRouter.post("/auth/api-key/verify", async (c) => {
 		});
 	}
 
-	const verifiedKey = await auth.api.verifyApiKey({
-		body: { key },
-		headers: c.req.raw.headers,
-	});
-
-	if (!verifiedKey.valid) {
-		return c.json(verifiedKey, 401);
+	const verifiedKey = await verifyAPIKey(c.get("dbClient"), key);
+	if (!verifiedKey) {
+		return c.json(
+			{
+				valid: false,
+				error: { message: "Unauthorized", code: "INVALID_API_KEY" },
+				key: null,
+			},
+			401,
+		);
 	}
 
-	return c.json(verifiedKey);
+	return c.json({
+		valid: true,
+		key: verifiedKey,
+	});
 });
 
 authRouter.on(["POST", "GET"], "/auth/*", (c) => {

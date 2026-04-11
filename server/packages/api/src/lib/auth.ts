@@ -89,7 +89,7 @@ export const auth = betterAuth({
 				});
 			},
 		}),
-		apiKey({ storage: "secondary-storage", fallbackToDatabase: true }),
+		apiKey({ storage: "secondary-storage" }),
 		organization({
 			allowUserToCreateOrganization: async () =>
 				authFeatureFlags.organizationCreationEnabled,

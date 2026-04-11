@@ -13,8 +13,11 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-func RegisterCreateDescriptionEmbedding(server *mcp.Server) {
-	db := dbclient.NewPGClient()
+func RegisterCreateDescriptionEmbedding(server *mcp.Server) error {
+	db, err := dbclient.NewPGClient()
+	if err != nil {
+		return err
+	}
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "create_description_embedding",
@@ -101,4 +104,6 @@ func RegisterCreateDescriptionEmbedding(server *mcp.Server) {
 			Content: []mcp.Content{&mcp.TextContent{Text: string(outJSON)}},
 		}, out, nil
 	})
+
+	return nil
 }

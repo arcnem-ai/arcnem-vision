@@ -21,9 +21,15 @@ const clipImageMaxBytes = 8 * 1024 * 1024
 const clipImageMaxDimension = 2048
 const clipImageMaxDownloadBytes = 128 * 1024 * 1024
 
-func RegisterCreateDocumentEmbedding(server *mcp.Server) {
-	replicateClient := clients.NewReplicateClient()
-	db := dbclient.NewPGClient()
+func RegisterCreateDocumentEmbedding(server *mcp.Server) error {
+	replicateClient, err := clients.NewReplicateClient()
+	if err != nil {
+		return err
+	}
+	db, err := dbclient.NewPGClient()
+	if err != nil {
+		return err
+	}
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "create_document_embedding",
@@ -162,4 +168,6 @@ func RegisterCreateDocumentEmbedding(server *mcp.Server) {
 			Content: []mcp.Content{&mcp.TextContent{Text: string(outJSON)}},
 		}, out, nil
 	})
+
+	return nil
 }

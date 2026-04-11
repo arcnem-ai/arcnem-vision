@@ -80,7 +80,7 @@ func runReplicateVersionedPrediction(ctx context.Context, modelName string, vers
 func waitForReplicatePrediction(ctx context.Context, token string, payload map[string]any) (map[string]any, error) {
 	for {
 		if errVal, hasErr := payload["error"]; hasErr && errVal != nil {
-			return nil, fmt.Errorf("replicate prediction error: %v", errVal)
+			return nil, fmt.Errorf("replicate prediction error: %s", asString(errVal))
 		}
 
 		status := strings.TrimSpace(asString(payload["status"]))
@@ -106,7 +106,11 @@ func waitForReplicatePrediction(ctx context.Context, token string, payload map[s
 			payload = nextPayload
 		case "failed", "canceled", "cancelled":
 			if errVal, hasErr := payload["error"]; hasErr && errVal != nil {
-				return nil, fmt.Errorf("replicate prediction %s: %v", status, errVal)
+				return nil, fmt.Errorf(
+					"replicate prediction %s: %s",
+					status,
+					asString(errVal),
+				)
 			}
 			return nil, fmt.Errorf("replicate prediction did not succeed status=%q", status)
 		default:

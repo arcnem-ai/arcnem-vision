@@ -1,3 +1,9 @@
+import type { ChatScope, DocumentChatCitation } from "@arcnem-vision/shared";
+import {
+	collectionSearcherResponseSchema,
+	readDocumentContextOutputSchema,
+	searchDocumentsInScopeOutputSchema,
+} from "@arcnem-vision/shared";
 import { ChatOpenAI } from "@langchain/openai";
 import {
 	createPatchToolCallsMiddleware,
@@ -6,16 +12,13 @@ import {
 } from "deepagents";
 import { createAgent, type ToolRuntime, tool } from "langchain";
 import { z } from "zod";
-import { DASHBOARD_ENV_VAR } from "@/env/dashboardEnvVar";
-import { getDashboardEnvVar } from "@/env/getDashboardEnvVar";
-import type { DashboardMcpClient } from "@/features/documents-chat/server/dashboard-mcp-client";
+import { getApiMcpClient } from "@/clients/apiMcpClient";
+import { API_ENV_VAR } from "@/env/apiEnvVar";
+import { getAPIEnvVar } from "@/env/getAPIEnvVar";
 import {
-	type ChatScope,
-	collectionSearcherResponseSchema,
-	type DocumentChatCitation,
-	readDocumentContextOutputSchema,
-	searchDocumentsInScopeOutputSchema,
-} from "@/features/documents-chat/types";
+	browseDocumentsToolInputSchema,
+	searchDocumentsToolInputSchema,
+} from "./schemas";
 
 type CitationSink = {
 	citations: DocumentChatCitation[];
@@ -25,7 +28,6 @@ type DocumentChatRuntimeContext = {
 	organizationId: string;
 	userId: string;
 	scope: ChatScope;
-	mcpClient: DashboardMcpClient;
 	citationSink: CitationSink;
 };
 
@@ -33,41 +35,24 @@ const runtimeContextSchema = z.object({
 	organizationId: z.string().min(1),
 	userId: z.string().min(1),
 	scope: z.any(),
-	mcpClient: z.any(),
 	citationSink: z.any(),
 });
 
-export const searchDocumentsToolInputSchema = z.object({
-	query: z.string().min(1).describe("The user question or search phrase."),
-	limit: z
-		.number()
-		.int()
-		.min(1)
-		.max(8)
-		.default(5)
-		.describe(
-			"Maximum number of matching documents to retrieve. Always provide a value and use 5 unless the user explicitly asks for a different breadth.",
-		),
-});
-
-const browseDocumentsToolInputSchema = z.object({
-	limit: z
-		.number()
-		.int()
-		.min(1)
-		.max(8)
-		.default(5)
-		.describe(
-			"Maximum number of recent documents to browse. Always provide a value and use 5 unless broader coverage is needed.",
-		),
-});
+function toMcpScope(scope: ChatScope) {
+	return {
+		organization_id: scope.organizationId,
+		project_ids: scope.projectIds,
+		device_ids: scope.deviceIds,
+		document_ids: scope.documentIds,
+	};
+}
 
 const browseDocumentsTool = tool(
 	async (
 		input: z.infer<typeof browseDocumentsToolInputSchema>,
 		runtime: ToolRuntime<Record<string, never>, DocumentChatRuntimeContext>,
 	) => {
-		const response = await runtime.context.mcpClient.callTool(
+		const response = await getApiMcpClient().callTool(
 			"browse_documents_in_scope",
 			{
 				limit: input.limit,
@@ -93,7 +78,7 @@ const searchDocumentsTool = tool(
 		input: z.infer<typeof searchDocumentsToolInputSchema>,
 		runtime: ToolRuntime<Record<string, never>, DocumentChatRuntimeContext>,
 	) => {
-		const response = await runtime.context.mcpClient.callTool(
+		const response = await getApiMcpClient().callTool(
 			"search_documents_in_scope",
 			{
 				query: input.query,
@@ -120,13 +105,10 @@ const readDocumentContextTool = tool(
 		input: { documentIds: string[] },
 		runtime: ToolRuntime<Record<string, never>, DocumentChatRuntimeContext>,
 	) => {
-		const response = await runtime.context.mcpClient.callTool(
-			"read_document_context",
-			{
-				document_ids: input.documentIds,
-				scope: toMcpScope(runtime.context.scope),
-			},
-		);
+		const response = await getApiMcpClient().callTool("read_document_context", {
+			document_ids: input.documentIds,
+			scope: toMcpScope(runtime.context.scope),
+		});
 		const parsed = readDocumentContextOutputSchema.parse(response);
 		runtime.context.citationSink.citations.push(
 			...parsed.documents.map((document) => document.citation),
@@ -180,19 +162,10 @@ export function createCitationSink(): CitationSink {
 	return { citations: [] };
 }
 
-function toMcpScope(scope: ChatScope) {
-	return {
-		organization_id: scope.organizationId,
-		project_ids: scope.projectIds,
-		device_ids: scope.deviceIds,
-		document_ids: scope.documentIds,
-	};
-}
-
 function buildDocumentChatAgent() {
 	const model = new ChatOpenAI({
-		apiKey: getDashboardEnvVar(DASHBOARD_ENV_VAR.OPENAI_API_KEY),
-		model: process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
+		apiKey: getAPIEnvVar(API_ENV_VAR.OPENAI_API_KEY),
+		model: getAPIEnvVar(API_ENV_VAR.OPENAI_MODEL),
 		temperature: 0.1,
 	});
 
