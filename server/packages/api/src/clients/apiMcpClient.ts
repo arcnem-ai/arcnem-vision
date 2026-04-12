@@ -3,8 +3,6 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { API_ENV_VAR } from "@/env/apiEnvVar";
 import { getAPIEnvVar } from "@/env/getAPIEnvVar";
 
-const MCP_SERVER_URL = getAPIEnvVar(API_ENV_VAR.MCP_SERVER_URL);
-
 export class ApiMcpClient {
 	private readonly client = new Client(
 		{
@@ -16,18 +14,24 @@ export class ApiMcpClient {
 		},
 	);
 
-	private readonly transport = new StreamableHTTPClientTransport(
-		new URL(MCP_SERVER_URL),
-	);
+	private transport: StreamableHTTPClientTransport | undefined;
 
 	private connected = false;
+
+	private getTransport() {
+		this.transport ??= new StreamableHTTPClientTransport(
+			new URL(getAPIEnvVar(API_ENV_VAR.MCP_SERVER_URL)),
+		);
+
+		return this.transport;
+	}
 
 	async connect() {
 		if (this.connected) {
 			return;
 		}
 
-		await this.client.connect(this.transport);
+		await this.client.connect(this.getTransport());
 		this.connected = true;
 	}
 
@@ -73,7 +77,7 @@ export class ApiMcpClient {
 	}
 
 	async close() {
-		if (!this.connected) {
+		if (!this.connected || !this.transport) {
 			return;
 		}
 
