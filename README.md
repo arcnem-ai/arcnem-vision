@@ -173,6 +173,7 @@ Because `server/packages/api/.env.example` enables `API_DEBUG=true`, the dashboa
 3. In **Workflow Library**, browse templates and open the canvas to see how graphs are composed.
 4. In **Docs**, inspect seeded documents or upload a new one from the dashboard.
 5. In **Runs**, expand a run to inspect initial state, per-step deltas, final state, and errors.
+6. Open `http://localhost:3000/api/openapi.json` to inspect the generated service API spec.
 
 ### 5. Test automated device ingestion
 
@@ -236,6 +237,46 @@ arcnem-vision/
 | [docs/langgraphgo.md](docs/langgraphgo.md) | LangGraph orchestration patterns and graph execution notes |
 | [docs/langchaingo.md](docs/langchaingo.md) | LangChain and tool-integration notes |
 | [docs/genui.md](docs/genui.md) | Flutter GenUI experiments and widget protocol details |
+
+## Testing
+
+Use the CI-safe suites for the default feedback loop:
+
+- `cd server && bun test`
+- `cd models/agents && go test ./...`
+
+For the fuller local service API flow, run:
+
+```sh
+make live-service-test
+```
+
+That command is the full local entrypoint. It brings up infra, migrates and
+seeds the database, starts the required services, verifies health, then uploads
+a real image, acknowledges it, executes the selected workflow, polls for
+completion, and verifies the document can be published.
+
+It reuses the existing `.env.docker` files for secrets and service config, but
+it overrides the infra endpoints at runtime so the probe runs against a
+separate local Postgres, Redis, and MinIO stack instead of your normal dev
+state. The isolated API container also gets an explicit local
+`S3_PUBLIC_BASE_URL`, so the publish step verifies a real public URL instead of
+relying on fallback behavior.
+
+Use `make live-service-stack-down` afterward if you want to stop the stack that
+the live test started and remove its isolated volumes.
+
+## Service API
+
+The service API is the project-scoped orchestration surface for non-device clients.
+
+- `GET /api/service/workflows` lists available workflows for the API key's organization.
+- `POST /api/service/uploads/presign` declares upload intent, including visibility.
+- `POST /api/service/uploads/ack` verifies the object and creates the document.
+- `POST /api/service/workflow-executions` queues a workflow against explicit document ids or a scoped selection.
+- `GET /api/service/workflow-executions/:id` reads execution state.
+- `GET /api/service/documents` and `POST /api/service/documents/visibility` cover document inspection and publishing.
+- `GET /api/openapi.json` serves the generated OpenAPI spec for this surface.
 
 ## Contributing
 

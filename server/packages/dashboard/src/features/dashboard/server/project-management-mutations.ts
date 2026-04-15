@@ -3,17 +3,21 @@ import {
 	createDeviceApiKeyInputSchema,
 	createDeviceInputSchema,
 	createProjectInputSchema,
+	createServiceApiKeyInputSchema,
+	deleteServiceApiKeyInputSchema,
 	deviceApiKeyUpdateResponseSchema,
 	deviceCreateResponseSchema,
 	deviceUpdateResponseSchema,
+	type GeneratedAPIKey,
 	type GeneratedDeviceAPIKey,
-	generatedDeviceApiKeyResponseSchema,
+	generatedApiKeyResponseSchema,
 	idResponseSchema,
 	projectSummarySchema,
 	setDeviceArchivedInputSchema,
 	setProjectArchivedInputSchema,
 	updateDeviceApiKeyInputSchema,
 	updateDeviceInputSchema,
+	updateServiceApiKeyInputSchema,
 } from "@arcnem-vision/shared";
 import { createServerFn } from "@tanstack/react-start";
 import { fetchDashboardAPI } from "@/lib/api-server";
@@ -73,7 +77,24 @@ export const createDeviceAPIKey = createServerFn({ method: "POST" })
 					body: data,
 					fallbackErrorMessage: "Failed to create API key.",
 				},
-				generatedDeviceApiKeyResponseSchema,
+				generatedApiKeyResponseSchema,
+			),
+	);
+
+export const createServiceAPIKey = createServerFn({ method: "POST" })
+	.inputValidator((input: unknown) =>
+		createServiceApiKeyInputSchema.parse(input),
+	)
+	.handler(
+		async ({ data }): Promise<GeneratedAPIKey> =>
+			fetchDashboardAPI(
+				"/dashboard/service-api-keys",
+				{
+					method: "POST",
+					body: data,
+					fallbackErrorMessage: "Failed to create service API key.",
+				},
+				generatedApiKeyResponseSchema,
 			),
 	);
 
@@ -102,6 +123,38 @@ export const deleteDeviceAPIKey = createServerFn({ method: "POST" })
 				method: "POST",
 				body: data,
 				fallbackErrorMessage: "Failed to delete API key.",
+			},
+			idResponseSchema,
+		),
+	);
+
+export const updateServiceAPIKey = createServerFn({ method: "POST" })
+	.inputValidator((input: unknown) =>
+		updateServiceApiKeyInputSchema.parse(input),
+	)
+	.handler(async ({ data }) =>
+		fetchDashboardAPI(
+			"/dashboard/service-api-keys/update",
+			{
+				method: "POST",
+				body: data,
+				fallbackErrorMessage: "Failed to update service API key.",
+			},
+			deviceApiKeyUpdateResponseSchema,
+		),
+	);
+
+export const deleteServiceAPIKey = createServerFn({ method: "POST" })
+	.inputValidator((input: unknown) =>
+		deleteServiceApiKeyInputSchema.parse(input),
+	)
+	.handler(async ({ data }) =>
+		fetchDashboardAPI(
+			"/dashboard/service-api-keys/delete",
+			{
+				method: "POST",
+				body: data,
+				fallbackErrorMessage: "Failed to delete service API key.",
 			},
 			idResponseSchema,
 		),

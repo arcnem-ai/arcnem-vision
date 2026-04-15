@@ -7,6 +7,7 @@ import {
 } from "@/lib/dashboard-documents";
 import {
 	acknowledgePresignedUpload,
+	isDocumentVisibility,
 	issuePresignedUpload,
 	parseAckRequestBody,
 	parsePresignRequestBody,
@@ -65,6 +66,7 @@ export function registerDashboardDocumentUploadRoutes(
 							objectKeySource: "dashboard",
 						},
 						contentType,
+						documentVisibility: "org",
 					}),
 				);
 			} catch (error) {
@@ -97,10 +99,17 @@ export function registerDashboardDocumentUploadRoutes(
 				);
 			}
 
+			if (!isDocumentVisibility(uploadForKey.visibility)) {
+				return c.json({ message: "Upload has invalid visibility" }, 500);
+			}
+
 			const acknowledgedUpload = await acknowledgePresignedUpload({
 				dbClient,
 				s3Client: c.get("s3Client"),
-				upload: uploadForKey,
+				upload: {
+					...uploadForKey,
+					visibility: uploadForKey.visibility,
+				},
 				queueProcessing: {
 					enabled: false,
 				},

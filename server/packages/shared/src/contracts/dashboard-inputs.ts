@@ -38,7 +38,7 @@ export const workflowTemplateDraftSchema = workflowDraftSchema.extend({
 
 export type WorkflowTemplateDraft = z.infer<typeof workflowTemplateDraftSchema>;
 
-export const generatedDeviceApiKeySchema = z.object({
+export const generatedApiKeySchema = z.object({
 	id: z.string().min(1),
 	name: z.string().nullable(),
 	value: z.string().min(1),
@@ -46,7 +46,15 @@ export const generatedDeviceApiKeySchema = z.object({
 	prefix: z.string().nullable(),
 });
 
-export type GeneratedDeviceAPIKey = z.infer<typeof generatedDeviceApiKeySchema>;
+export type GeneratedAPIKey = z.infer<typeof generatedApiKeySchema>;
+
+export const generatedDeviceApiKeySchema = generatedApiKeySchema;
+
+export type GeneratedDeviceAPIKey = GeneratedAPIKey;
+
+export const generatedServiceApiKeySchema = generatedApiKeySchema;
+
+export type GeneratedServiceAPIKey = GeneratedAPIKey;
 
 export const createProjectInputSchema = z.object({
 	name: z.string().min(1),
@@ -69,13 +77,28 @@ export const createDeviceApiKeyInputSchema = z.object({
 	name: z.string().min(1),
 });
 
+export const createServiceApiKeyInputSchema = z.object({
+	projectId: z.string().min(1),
+	name: z.string().min(1),
+});
+
 export const updateDeviceApiKeyInputSchema = z.object({
 	apiKeyId: z.string().min(1),
 	name: z.string().min(1),
 	enabled: z.boolean(),
 });
 
+export const updateServiceApiKeyInputSchema = z.object({
+	apiKeyId: z.string().min(1),
+	name: z.string().min(1),
+	enabled: z.boolean(),
+});
+
 export const deleteDeviceApiKeyInputSchema = z.object({
+	apiKeyId: z.string().min(1),
+});
+
+export const deleteServiceApiKeyInputSchema = z.object({
 	apiKeyId: z.string().min(1),
 });
 

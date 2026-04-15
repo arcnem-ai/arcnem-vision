@@ -51,6 +51,7 @@ func newApikey(db *gorm.DB, opts ...gen.DOOption) apikey {
 	_apikey.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_apikey.Permissions = field.NewString(tableName, "permissions")
 	_apikey.Metadata = field.NewString(tableName, "metadata")
+	_apikey.Kind = field.NewString(tableName, "kind")
 
 	_apikey.fillFieldMap()
 
@@ -85,6 +86,7 @@ type apikey struct {
 	UpdatedAt           field.Time
 	Permissions         field.String
 	Metadata            field.String
+	Kind                field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -125,6 +127,7 @@ func (a *apikey) updateTableName(table string) *apikey {
 	a.UpdatedAt = field.NewTime(table, "updated_at")
 	a.Permissions = field.NewString(table, "permissions")
 	a.Metadata = field.NewString(table, "metadata")
+	a.Kind = field.NewString(table, "kind")
 
 	a.fillFieldMap()
 
@@ -149,7 +152,7 @@ func (a *apikey) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (a *apikey) fillFieldMap() {
-	a.fieldMap = make(map[string]field.Expr, 24)
+	a.fieldMap = make(map[string]field.Expr, 25)
 	a.fieldMap["id"] = a.ID
 	a.fieldMap["name"] = a.Name
 	a.fieldMap["start"] = a.Start
@@ -174,6 +177,7 @@ func (a *apikey) fillFieldMap() {
 	a.fieldMap["updated_at"] = a.UpdatedAt
 	a.fieldMap["permissions"] = a.Permissions
 	a.fieldMap["metadata"] = a.Metadata
+	a.fieldMap["kind"] = a.Kind
 }
 
 func (a apikey) clone(db *gorm.DB) apikey {

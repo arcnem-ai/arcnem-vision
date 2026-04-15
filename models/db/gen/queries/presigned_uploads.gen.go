@@ -36,6 +36,7 @@ func newPresignedUpload(db *gorm.DB, opts ...gen.DOOption) presignedUpload {
 	_presignedUpload.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_presignedUpload.OrganizationID = field.NewString(tableName, "organization_id")
 	_presignedUpload.ProjectID = field.NewString(tableName, "project_id")
+	_presignedUpload.Visibility = field.NewString(tableName, "visibility")
 
 	_presignedUpload.fillFieldMap()
 
@@ -55,6 +56,7 @@ type presignedUpload struct {
 	UpdatedAt      field.Time
 	OrganizationID field.String
 	ProjectID      field.String
+	Visibility     field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -80,6 +82,7 @@ func (p *presignedUpload) updateTableName(table string) *presignedUpload {
 	p.UpdatedAt = field.NewTime(table, "updated_at")
 	p.OrganizationID = field.NewString(table, "organization_id")
 	p.ProjectID = field.NewString(table, "project_id")
+	p.Visibility = field.NewString(table, "visibility")
 
 	p.fillFieldMap()
 
@@ -108,7 +111,7 @@ func (p *presignedUpload) GetFieldByName(fieldName string) (field.OrderExpr, boo
 }
 
 func (p *presignedUpload) fillFieldMap() {
-	p.fieldMap = make(map[string]field.Expr, 9)
+	p.fieldMap = make(map[string]field.Expr, 10)
 	p.fieldMap["id"] = p.ID
 	p.fieldMap["bucket"] = p.Bucket
 	p.fieldMap["object_key"] = p.ObjectKey
@@ -118,6 +121,7 @@ func (p *presignedUpload) fillFieldMap() {
 	p.fieldMap["updated_at"] = p.UpdatedAt
 	p.fieldMap["organization_id"] = p.OrganizationID
 	p.fieldMap["project_id"] = p.ProjectID
+	p.fieldMap["visibility"] = p.Visibility
 }
 
 func (p presignedUpload) clone(db *gorm.DB) presignedUpload {

@@ -28,11 +28,13 @@ export const issuePresignedUpload = async ({
 	s3Client,
 	target,
 	contentType,
+	documentVisibility,
 }: {
 	dbClient: PGDB;
 	s3Client: S3Client;
 	target: UploadTarget;
 	contentType: string;
+	documentVisibility: "private" | "org" | "public";
 }) => {
 	const objectKey = buildObjectKey(target, contentType);
 	const uploadUrl = s3Client.presign(objectKey, {
@@ -48,6 +50,7 @@ export const issuePresignedUpload = async ({
 			organizationId: target.organizationId,
 			projectId: target.projectId,
 			deviceId: target.deviceId,
+			visibility: documentVisibility,
 			status: "issued",
 		})
 		.returning({

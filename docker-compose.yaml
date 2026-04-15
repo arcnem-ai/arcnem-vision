@@ -2,7 +2,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg18
     ports:
-      - "5480:5432"
+      - "${POSTGRES_HOST_PORT:-5480}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
     environment:
@@ -14,11 +14,16 @@ services:
       - listen_addresses=*
       - -c
       - wal_level=logical
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7.2-alpine
     ports:
-      - "6381:6379"
+      - "${REDIS_HOST_PORT:-6381}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -30,8 +35,8 @@ services:
   minio:
     image: minio/minio
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_API_HOST_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
     volumes:
       - minio_data:/data
     environment:
@@ -53,6 +58,7 @@ services:
       /bin/sh -c "
       mc alias set local http://minio:9000 minioadmin minioadmin;
       mc mb local/arcnem-vision --ignore-existing;
+      mc anonymous set download local/arcnem-vision;
       "
 
 volumes:

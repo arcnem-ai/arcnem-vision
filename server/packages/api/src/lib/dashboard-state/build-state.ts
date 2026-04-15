@@ -11,6 +11,7 @@ import {
 	loadDashboardDevices,
 	loadDashboardOrganization,
 	loadDashboardProjects,
+	loadDashboardServiceAPIKeys,
 	loadDashboardWorkflows,
 	loadDashboardWorkflowTemplates,
 } from "./queries";
@@ -44,6 +45,7 @@ export async function buildDashboardState(
 			organization: null,
 			projects: [],
 			devices: [],
+			serviceApiKeys: [],
 			workflows: [],
 			workflowTemplates: [],
 			modelCatalog,
@@ -58,6 +60,7 @@ export async function buildDashboardState(
 			organization: null,
 			projects: [],
 			devices: [],
+			serviceApiKeys: [],
 			workflows: [],
 			workflowTemplates: [],
 			modelCatalog,
@@ -74,6 +77,7 @@ export async function buildDashboardState(
 			organization: null,
 			projects: [],
 			devices: [],
+			serviceApiKeys: [],
 			workflows: [],
 			workflowTemplates: [],
 			modelCatalog,
@@ -81,10 +85,11 @@ export async function buildDashboardState(
 		};
 	}
 
-	const [projectRows, deviceRows, workflowRows, templateRows] =
+	const [projectRows, deviceRows, serviceKeyRows, workflowRows, templateRows] =
 		await Promise.all([
 			loadDashboardProjects(db, organizationId, includeArchived),
 			loadDashboardDevices(db, organizationId, includeArchived),
+			loadDashboardServiceAPIKeys(db, organizationId, includeArchived),
 			loadDashboardWorkflows(db, organizationId),
 			loadDashboardWorkflowTemplates(db, organizationId),
 		]);
@@ -100,6 +105,17 @@ export async function buildDashboardState(
 			device.projectId,
 			(apiKeyCountByProjectId.get(device.projectId) ?? 0) +
 				device.apikeys.length,
+		);
+	}
+	const serviceApiKeyCountByProjectId = new Map<string, number>();
+	for (const apiKey of serviceKeyRows) {
+		serviceApiKeyCountByProjectId.set(
+			apiKey.projectId,
+			(serviceApiKeyCountByProjectId.get(apiKey.projectId) ?? 0) + 1,
+		);
+		apiKeyCountByProjectId.set(
+			apiKey.projectId,
+			(apiKeyCountByProjectId.get(apiKey.projectId) ?? 0) + 1,
 		);
 	}
 
@@ -132,6 +148,7 @@ export async function buildDashboardState(
 			archivedAt: project.archivedAt?.toISOString() ?? null,
 			deviceCount: deviceCountByProjectId.get(project.id) ?? 0,
 			apiKeyCount: apiKeyCountByProjectId.get(project.id) ?? 0,
+			serviceApiKeyCount: serviceApiKeyCountByProjectId.get(project.id) ?? 0,
 		})),
 		devices: deviceRows.map((device) => {
 			const updatedAt = new Date(device.updatedAt);
@@ -168,6 +185,22 @@ export async function buildDashboardState(
 				})),
 			};
 		}),
+		serviceApiKeys: serviceKeyRows.map((apiKey) => ({
+			id: apiKey.id,
+			projectId: apiKey.projectId,
+			name: apiKey.name,
+			start: apiKey.start,
+			prefix: apiKey.prefix,
+			enabled: apiKey.enabled,
+			createdAt: apiKey.createdAt.toISOString(),
+			updatedAt: apiKey.updatedAt.toISOString(),
+			lastRequest: apiKey.lastRequest?.toISOString() ?? null,
+			expiresAt: apiKey.expiresAt?.toISOString() ?? null,
+			requestCount: apiKey.requestCount,
+			rateLimitEnabled: apiKey.rateLimitEnabled,
+			rateLimitMax: apiKey.rateLimitMax,
+			rateLimitTimeWindow: apiKey.rateLimitTimeWindow,
+		})),
 		workflows: workflowRows.map((workflow) => {
 			const nodes = workflow.agentGraphNodes.map((node, index) =>
 				mapPersistedWorkflowNode(node, index),

@@ -44,15 +44,18 @@ import {
 	createDevice,
 	createDeviceAPIKey,
 	createProject,
+	createServiceAPIKey,
 	deleteDeviceAPIKey,
+	deleteServiceAPIKey,
 	setDeviceArchived,
 	setProjectArchived,
 	updateDevice,
 	updateDeviceAPIKey,
+	updateServiceAPIKey,
 } from "@/features/dashboard/server-fns";
 import type {
 	DashboardData,
-	GeneratedDeviceAPIKey,
+	GeneratedAPIKey,
 	StatusMessage,
 } from "@/features/dashboard/types";
 import { cn } from "@/lib/utils";
@@ -84,6 +87,7 @@ type PendingConfirmation =
 			kind: "api-key-delete";
 			apiKeyId: string;
 			keyLabel: string;
+			keyKind: "device" | "service";
 	  };
 
 function relativeTime(iso: string | null): string {
@@ -154,8 +158,11 @@ export function ProjectDevicePanel({
 	const createDeviceFn = useServerFn(createDevice);
 	const updateDeviceFn = useServerFn(updateDevice);
 	const createDeviceAPIKeyFn = useServerFn(createDeviceAPIKey);
+	const createServiceAPIKeyFn = useServerFn(createServiceAPIKey);
 	const updateDeviceAPIKeyFn = useServerFn(updateDeviceAPIKey);
+	const updateServiceAPIKeyFn = useServerFn(updateServiceAPIKey);
 	const deleteDeviceAPIKeyFn = useServerFn(deleteDeviceAPIKey);
+	const deleteServiceAPIKeyFn = useServerFn(deleteServiceAPIKey);
 	const setProjectArchivedFn = useServerFn(setProjectArchived);
 	const setDeviceArchivedFn = useServerFn(setDeviceArchived);
 
@@ -176,10 +183,13 @@ export function ProjectDevicePanel({
 	const [newKeyNamesByDevice, setNewKeyNamesByDevice] = useState<
 		Record<string, string>
 	>({});
+	const [newServiceKeyNamesByProject, setNewServiceKeyNamesByProject] =
+		useState<Record<string, string>>({});
 	const [panelMessage, setPanelMessage] = useState<StatusMessage | null>(null);
-	const [revealedKey, setRevealedKey] = useState<GeneratedDeviceAPIKey | null>(
-		null,
-	);
+	const [revealedKey, setRevealedKey] = useState<GeneratedAPIKey | null>(null);
+	const [revealedKeyContextLabel, setRevealedKeyContextLabel] = useState<
+		string | null
+	>(null);
 	const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
 
 	const [creatingProject, setCreatingProject] = useState(false);
@@ -188,6 +198,8 @@ export function ProjectDevicePanel({
 	const [creatingKeyForDeviceId, setCreatingKeyForDeviceId] = useState<
 		string | null
 	>(null);
+	const [creatingServiceKeyForProjectId, setCreatingServiceKeyForProjectId] =
+		useState<string | null>(null);
 	const [savingApiKeyId, setSavingApiKeyId] = useState<string | null>(null);
 	const [deletingApiKeyId, setDeletingApiKeyId] = useState<string | null>(null);
 	const [settingProjectArchiveId, setSettingProjectArchiveId] = useState<
@@ -225,8 +237,8 @@ export function ProjectDevicePanel({
 			),
 		);
 		setApiKeyDrafts(
-			Object.fromEntries(
-				dashboard.devices.flatMap((device) =>
+			Object.fromEntries([
+				...dashboard.devices.flatMap((device) =>
 					device.apiKeys.map((apiKey) => [
 						apiKey.id,
 						{
@@ -235,12 +247,26 @@ export function ProjectDevicePanel({
 						},
 					]),
 				),
-			),
+				...dashboard.serviceApiKeys.map((apiKey) => [
+					apiKey.id,
+					{
+						name: apiKey.name ?? "",
+						enabled: apiKey.enabled,
+					},
+				]),
+			]),
 		);
 		setNewKeyNamesByDevice((current) => {
 			const next: Record<string, string> = {};
 			for (const device of dashboard.devices) {
 				next[device.id] = current[device.id] ?? `${device.name} upload key`;
+			}
+			return next;
+		});
+		setNewServiceKeyNamesByProject((current) => {
+			const next: Record<string, string> = {};
+			for (const project of dashboard.projects) {
+				next[project.id] = current[project.id] ?? `${project.name} service key`;
 			}
 			return next;
 		});
@@ -251,14 +277,17 @@ export function ProjectDevicePanel({
 			return;
 		}
 
-		const keyStillExists = dashboard.devices.some((device) =>
-			device.apiKeys.some((apiKey) => apiKey.id === revealedKey.id),
-		);
+		const keyStillExists =
+			dashboard.devices.some((device) =>
+				device.apiKeys.some((apiKey) => apiKey.id === revealedKey.id),
+			) ||
+			dashboard.serviceApiKeys.some((apiKey) => apiKey.id === revealedKey.id);
 		if (!keyStillExists) {
 			setRevealedKey(null);
+			setRevealedKeyContextLabel(null);
 			setCopiedKeyId(null);
 		}
-	}, [dashboard.devices, revealedKey]);
+	}, [dashboard.devices, dashboard.serviceApiKeys, revealedKey]);
 
 	const selectedProject = useMemo(
 		() =>
@@ -275,6 +304,14 @@ export function ProjectDevicePanel({
 		[dashboard.devices, selectedProjectId],
 	);
 
+	const serviceApiKeysForProject = useMemo(
+		() =>
+			dashboard.serviceApiKeys.filter(
+				(apiKey) => apiKey.projectId === selectedProjectId,
+			),
+		[dashboard.serviceApiKeys, selectedProjectId],
+	);
+
 	const deviceNameByKeyId = useMemo(
 		() =>
 			new Map(
@@ -285,9 +322,11 @@ export function ProjectDevicePanel({
 		[dashboard.devices],
 	);
 
-	const revealedKeyDeviceName = revealedKey
-		? (deviceNameByKeyId.get(revealedKey.id) ?? "Selected device")
-		: null;
+	const revealedKeyOwnerName =
+		revealedKeyContextLabel ??
+		(revealedKey
+			? (deviceNameByKeyId.get(revealedKey.id) ?? "Selected target")
+			: null);
 	const selectedProjectIsArchived = Boolean(selectedProject?.archivedAt);
 
 	const canCreateDevice =
@@ -518,6 +557,11 @@ export function ProjectDevicePanel({
 				},
 			});
 			setRevealedKey(createdKey);
+			setRevealedKeyContextLabel(
+				deviceNameByKeyId.get(createdKey.id) ??
+					dashboard.devices.find((device) => device.id === deviceId)?.name ??
+					"Selected device",
+			);
 			setCopiedKeyId(null);
 			setNewKeyNamesByDevice((current) => ({
 				...current,
@@ -539,14 +583,57 @@ export function ProjectDevicePanel({
 		}
 	};
 
-	const handleSaveAPIKey = async (apiKeyId: string) => {
+	const handleCreateProjectAPIKey = async (projectId: string) => {
+		setCreatingServiceKeyForProjectId(projectId);
+		setPanelMessage(null);
+		try {
+			const createdKey = await createServiceAPIKeyFn({
+				data: {
+					projectId,
+					name: newServiceKeyNamesByProject[projectId] ?? "",
+				},
+			});
+			setRevealedKey(createdKey);
+			setRevealedKeyContextLabel(
+				dashboard.projects.find((project) => project.id === projectId)?.name ??
+					"Selected project",
+			);
+			setCopiedKeyId(null);
+			setNewServiceKeyNamesByProject((current) => ({
+				...current,
+				[projectId]: "",
+			}));
+			setPanelMessage({
+				tone: "success",
+				text: "Service API key created. Copy the secret now; it will not be shown again.",
+			});
+			await router.invalidate();
+		} catch (error) {
+			setPanelMessage({
+				tone: "error",
+				text:
+					error instanceof Error
+						? error.message
+						: "Failed to create service API key.",
+			});
+		} finally {
+			setCreatingServiceKeyForProjectId(null);
+		}
+	};
+
+	const handleSaveAPIKey = async (
+		apiKeyId: string,
+		keyKind: "device" | "service",
+	) => {
 		const draft = apiKeyDrafts[apiKeyId];
 		if (!draft) return;
 
 		setSavingApiKeyId(apiKeyId);
 		setPanelMessage(null);
 		try {
-			await updateDeviceAPIKeyFn({
+			const updateAPIKey =
+				keyKind === "service" ? updateServiceAPIKeyFn : updateDeviceAPIKeyFn;
+			await updateAPIKey({
 				data: {
 					apiKeyId,
 					name: draft.name,
@@ -569,17 +656,23 @@ export function ProjectDevicePanel({
 		}
 	};
 
-	const handleDeleteAPIKey = async (apiKeyId: string) => {
+	const handleDeleteAPIKey = async (
+		apiKeyId: string,
+		keyKind: "device" | "service",
+	) => {
 		setDeletingApiKeyId(apiKeyId);
 		setPanelMessage(null);
 		try {
-			await deleteDeviceAPIKeyFn({
+			const deleteAPIKey =
+				keyKind === "service" ? deleteServiceAPIKeyFn : deleteDeviceAPIKeyFn;
+			await deleteAPIKey({
 				data: {
 					apiKeyId,
 				},
 			});
 			if (revealedKey?.id === apiKeyId) {
 				setRevealedKey(null);
+				setRevealedKeyContextLabel(null);
 				setCopiedKeyId(null);
 			}
 			setPanelMessage({
@@ -627,11 +720,13 @@ export function ProjectDevicePanel({
 	const requestDeleteAPIKeyConfirmation = (
 		apiKeyId: string,
 		keyLabel: string,
+		keyKind: "device" | "service",
 	) => {
 		setPendingConfirmation({
 			kind: "api-key-delete",
 			apiKeyId,
 			keyLabel,
+			keyKind,
 		});
 	};
 
@@ -708,7 +803,10 @@ export function ProjectDevicePanel({
 					);
 					break;
 				case "api-key-delete":
-					await handleDeleteAPIKey(pendingConfirmation.apiKeyId);
+					await handleDeleteAPIKey(
+						pendingConfirmation.apiKeyId,
+						pendingConfirmation.keyKind,
+					);
 					break;
 			}
 		} finally {
@@ -982,8 +1080,8 @@ export function ProjectDevicePanel({
 										New API key ready
 									</CardTitle>
 									<CardDescription className="mt-1 text-amber-900/80">
-										Use this secret for {revealedKeyDeviceName}. It is only
-										shown once.
+										Use this secret for {revealedKeyOwnerName}. It is only shown
+										once.
 									</CardDescription>
 								</div>
 								<Button
@@ -1003,7 +1101,7 @@ export function ProjectDevicePanel({
 								{revealedKey.value}
 							</div>
 							<p className="mt-3 text-xs text-amber-950/80">
-								Store this secret in the device now. After refresh, only the
+								Store this secret in the client now. After refresh, only the
 								identifier {revealedKey.start ?? revealedKey.prefix ?? "prefix"}
 								will remain visible.
 							</p>
@@ -1038,13 +1136,13 @@ export function ProjectDevicePanel({
 								<CardDescription className="mt-2 max-w-2xl">
 									{selectedProjectIsArchived
 										? "This project is archived. Restore it to add devices or issue new keys."
-										: "Wire each device to a workflow, then issue the API keys it needs for uploads."}
+										: "Wire each device to a workflow, then issue device keys for ingestion and service keys for orchestrators."}
 								</CardDescription>
 							</div>
 							{selectedProject ? (
 								<div
 									className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 text-sm"
-									style={{ minWidth: 220 }}
+									style={{ minWidth: 260 }}
 								>
 									<div>
 										<p className="text-xs uppercase tracking-[0.2em] text-slate-400">
@@ -1060,6 +1158,22 @@ export function ProjectDevicePanel({
 										</p>
 										<p className="mt-1 font-medium text-slate-700">
 											{selectedProject.apiKeyCount}
+										</p>
+									</div>
+									<div>
+										<p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+											Service keys
+										</p>
+										<p className="mt-1 font-medium text-slate-700">
+											{selectedProject.serviceApiKeyCount}
+										</p>
+									</div>
+									<div>
+										<p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+											Devices
+										</p>
+										<p className="mt-1 font-medium text-slate-700">
+											{selectedProject.deviceCount}
 										</p>
 									</div>
 									{selectedProjectIsArchived ? (
@@ -1130,6 +1244,239 @@ export function ProjectDevicePanel({
 					</CardHeader>
 
 					<CardContent className="space-y-4 px-4 pb-5 sm:px-6">
+						{selectedProject ? (
+							<div className="rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,252,245,0.98),rgba(255,255,255,0.98))] p-4 shadow-[0_12px_35px_rgba(15,23,42,0.04)] sm:p-5">
+								<div className="flex flex-wrap items-start justify-between gap-3">
+									<div>
+										<div className="flex items-center gap-2">
+											<div className="rounded-xl bg-amber-500/90 p-2 text-white">
+												<KeyRound className="size-4" />
+											</div>
+											<div>
+												<p className="font-display text-lg text-slate-900">
+													Service API keys
+												</p>
+												<p className="text-sm text-slate-500">
+													Issue project-scoped keys for orchestrators and other
+													non-device clients.
+												</p>
+											</div>
+										</div>
+									</div>
+									<Badge
+										variant="outline"
+										className="rounded-full border-slate-200 bg-white text-slate-600"
+									>
+										{serviceApiKeysForProject.length} keys
+									</Badge>
+								</div>
+
+								<div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white/80 p-4">
+									<div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+										<KeyRound className="size-4 text-amber-600" />
+										Issue a new service key
+									</div>
+									<div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+										<Input
+											value={
+												newServiceKeyNamesByProject[selectedProject.id] ?? ""
+											}
+											onChange={(event) =>
+												setNewServiceKeyNamesByProject((current) => ({
+													...current,
+													[selectedProject.id]: event.target.value,
+												}))
+											}
+											placeholder={`${selectedProject.name} service key`}
+											disabled={selectedProjectIsArchived}
+										/>
+										<Button
+											type="button"
+											variant="outline"
+											onClick={() =>
+												void handleCreateProjectAPIKey(selectedProject.id)
+											}
+											disabled={
+												selectedProjectIsArchived ||
+												creatingServiceKeyForProjectId === selectedProject.id ||
+												(
+													newServiceKeyNamesByProject[selectedProject.id] ?? ""
+												).trim().length === 0
+											}
+											className="rounded-full border-amber-300 bg-white text-amber-950 hover:bg-amber-50"
+										>
+											{creatingServiceKeyForProjectId === selectedProject.id
+												? "Creating..."
+												: "Create key"}
+										</Button>
+									</div>
+									<p className="mt-3 text-xs text-slate-500">
+										{selectedProjectIsArchived
+											? "Restore this project before issuing another service key."
+											: "Use service keys for workflows, uploads, and document orchestration outside the device path."}
+									</p>
+								</div>
+
+								{serviceApiKeysForProject.length === 0 ? (
+									<div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center">
+										<KeyRound className="mx-auto size-7 text-slate-300" />
+										<p className="mt-2 text-sm font-medium text-slate-600">
+											No service API keys for this project
+										</p>
+										<p className="mt-1 text-xs text-muted-foreground">
+											Create one above for server-side or orchestration clients.
+										</p>
+									</div>
+								) : (
+									<div className="mt-4 space-y-3">
+										{serviceApiKeysForProject.map((apiKey) => {
+											const apiKeyDraft = apiKeyDrafts[apiKey.id] ?? {
+												name: apiKey.name ?? "",
+												enabled: apiKey.enabled,
+											};
+											const apiKeyIsDirty =
+												apiKeyDraft.name !== (apiKey.name ?? "") ||
+												apiKeyDraft.enabled !== apiKey.enabled;
+
+											return (
+												<div
+													key={apiKey.id}
+													className="rounded-2xl border border-slate-200 bg-white p-4"
+												>
+													<div className="flex flex-wrap items-start justify-between gap-3">
+														<div>
+															<div className="flex items-center gap-2">
+																<p className="font-medium text-slate-900">
+																	{formatKeyLabel(
+																		apiKey.start,
+																		apiKey.prefix,
+																		apiKey.id,
+																	)}
+																</p>
+																<Badge
+																	variant="outline"
+																	className={cn(
+																		"rounded-full",
+																		apiKey.enabled
+																			? "border-emerald-200 bg-emerald-50 text-emerald-700"
+																			: "border-slate-200 bg-slate-50 text-slate-500",
+																	)}
+																>
+																	{apiKey.enabled ? "Enabled" : "Paused"}
+																</Badge>
+															</div>
+															<p className="mt-1 text-xs text-slate-500">
+																Created {formatDateTime(apiKey.createdAt)}. Last
+																request {relativeTime(apiKey.lastRequest)}.
+															</p>
+														</div>
+														<Button
+															type="button"
+															variant="ghost"
+															size="sm"
+															onClick={() =>
+																requestDeleteAPIKeyConfirmation(
+																	apiKey.id,
+																	formatKeyLabel(
+																		apiKey.start,
+																		apiKey.prefix,
+																		apiKey.id,
+																	),
+																	"service",
+																)
+															}
+															disabled={
+																selectedProjectIsArchived ||
+																deletingApiKeyId === apiKey.id
+															}
+															className="text-slate-500 hover:text-rose-600"
+														>
+															{deletingApiKeyId === apiKey.id
+																? "Deleting..."
+																: "Delete"}
+														</Button>
+													</div>
+
+													<div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
+														<Input
+															value={apiKeyDraft.name}
+															onChange={(event) =>
+																setApiKeyDrafts((current) => ({
+																	...current,
+																	[apiKey.id]: {
+																		...apiKeyDraft,
+																		name: event.target.value,
+																	},
+																}))
+															}
+															placeholder="Service API key name"
+															disabled={selectedProjectIsArchived}
+														/>
+														<Toggle
+															pressed={apiKeyDraft.enabled}
+															onPressedChange={(pressed) =>
+																setApiKeyDrafts((current) => ({
+																	...current,
+																	[apiKey.id]: {
+																		...apiKeyDraft,
+																		enabled: pressed,
+																	},
+																}))
+															}
+															variant="outline"
+															size="sm"
+															className="rounded-full px-4"
+															disabled={selectedProjectIsArchived}
+														>
+															{apiKeyDraft.enabled ? "Enabled" : "Disabled"}
+														</Toggle>
+														<Button
+															type="button"
+															variant="outline"
+															onClick={() =>
+																void handleSaveAPIKey(apiKey.id, "service")
+															}
+															disabled={
+																selectedProjectIsArchived ||
+																!apiKeyIsDirty ||
+																apiKeyDraft.name.trim().length === 0 ||
+																savingApiKeyId === apiKey.id
+															}
+															className="rounded-full px-4"
+														>
+															{savingApiKeyId === apiKey.id
+																? "Saving..."
+																: "Save"}
+														</Button>
+													</div>
+
+													<div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+														<span>
+															Rate limit{" "}
+															{formatRateLimit(
+																apiKey.rateLimitMax,
+																apiKey.rateLimitTimeWindow,
+																apiKey.rateLimitEnabled,
+															)}
+														</span>
+														<span>
+															Recorded requests{" "}
+															{apiKey.requestCount.toLocaleString()}
+														</span>
+														{apiKey.expiresAt ? (
+															<span>
+																Expires {formatDateTime(apiKey.expiresAt)}
+															</span>
+														) : null}
+													</div>
+												</div>
+											);
+										})}
+									</div>
+								)}
+							</div>
+						) : null}
+
 						{!selectedProject ? (
 							<div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 px-4 py-12 text-center">
 								<FolderOpen className="mx-auto size-8 text-slate-300" />
@@ -1441,6 +1788,7 @@ export function ProjectDevicePanel({
 																				apiKey.prefix,
 																				apiKey.id,
 																			),
+																			"device",
 																		)
 																	}
 																	disabled={
@@ -1492,7 +1840,7 @@ export function ProjectDevicePanel({
 																	type="button"
 																	variant="outline"
 																	onClick={() =>
-																		void handleSaveAPIKey(apiKey.id)
+																		void handleSaveAPIKey(apiKey.id, "device")
 																	}
 																	disabled={
 																		deviceIsArchived ||

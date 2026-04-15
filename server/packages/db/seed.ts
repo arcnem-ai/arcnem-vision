@@ -1,5 +1,9 @@
 import { extname } from "node:path";
-import { createEnvVarGetter } from "@arcnem-vision/shared";
+import {
+	createEnvVarGetter,
+	DEFAULT_DEVICE_API_KEY_PERMISSIONS,
+	DEFAULT_SERVICE_API_KEY_PERMISSIONS,
+} from "@arcnem-vision/shared";
 import { S3Client } from "bun";
 import { eq, sql } from "drizzle-orm";
 import {
@@ -43,6 +47,9 @@ const plainOCRConditionApiKey =
 	"seed_ocr_cond_D9m2P5q8R1s4T7u0V3w6X9y2Z5a8B1c4D7e0F3g6H9j2";
 const plainOCRSupervisorApiKey =
 	"seed_ocr_sup_G7n4Q1r8S5t2U9v6W3x0Y7z4A1b8C5d2E9f6G3h0J7k4";
+const plainServiceApiKey =
+	"seed_srv_J5m8Q2r6S9t3U7v1W4x8Y2z6A9b3C7d1E4f8G2h6J9k3L7m1P4";
+const seededRemoteSensingWorkflowId = "019d90bd-b369-7653-944e-a4832e34a16d";
 const seedDashboardSessionToken =
 	"seed_dashboard_session_s4M8xR2vJ7nK1qP5wL9cD3fH6tY0uB4";
 const seededDashboardUserEmail =
@@ -56,6 +63,12 @@ const deepseekOCRVersion =
 	"cb3b474fbfc56b1664c8c7841550bccecbe7b74c30e45ce938ffca1180b4dff5";
 const dotsOCRVersion =
 	"91ce60f4885d7ca6e095755e25d0f9ff2bcfe963c816937ece4be50d811f26c4";
+const deviceAPIKeyPermissionsJSON = JSON.stringify(
+	DEFAULT_DEVICE_API_KEY_PERMISSIONS,
+);
+const serviceAPIKeyPermissionsJSON = JSON.stringify(
+	DEFAULT_SERVICE_API_KEY_PERMISSIONS,
+);
 
 const S3_ENV_VAR = {
 	S3_ACCESS_KEY_ID: "S3_ACCESS_KEY_ID",
@@ -620,6 +633,7 @@ const seed = async () => {
 	);
 	const hashedOCRConditionApiKey = await hashApiKey(plainOCRConditionApiKey);
 	const hashedOCRSupervisorApiKey = await hashApiKey(plainOCRSupervisorApiKey);
+	const hashedServiceApiKey = await hashApiKey(plainServiceApiKey);
 	const { bucket, client: s3Client } = getSeedS3Client();
 	const uploadedSeedDocuments = await uploadSeedDocumentsToS3(
 		s3Client,
@@ -1163,6 +1177,148 @@ const seed = async () => {
 		if (!findSimilarDescsTool)
 			throw new Error("Failed to create find_similar_descriptions tool");
 
+		// ── Agent Graph (workflow 0: remote sensing scene review) ──
+
+		const [remoteSensingGraph] = await tx
+			.insert(agentGraphs)
+			.values({
+				id: seededRemoteSensingWorkflowId,
+				name: "Remote Sensing Scene Review",
+				description:
+					"Reviews an Earth-observation scene for data center construction and power infrastructure, saves a concise analysis, and embeds the written review for retrieval.",
+				entryNode: "review_scene",
+				organizationId: organization.id,
+			})
+			.returning({ id: agentGraphs.id });
+		if (!remoteSensingGraph) {
+			throw new Error("Failed to create remote sensing agent graph");
+		}
+
+		const [reviewSceneNode] = await tx
+			.insert(agentGraphNodes)
+			.values({
+				nodeKey: "review_scene",
+				nodeType: "worker",
+				inputKey: "temp_url",
+				outputKey: "scene_review",
+				config: {
+					system_message:
+						"You analyze Earth-observation imagery for data center construction and related infrastructure. Review visible land clearing, grading, access roads, concrete pads, structural shells, roofing progress, cooling yards, substations, transmission tie-ins, staging areas, parking, and any obvious anomalies. Return a short caption-style plain-text review grounded only in what is visible. Use 1 sentence, never exceed 35 words or 240 characters, and avoid markdown or unsupported inference.",
+					max_iterations: 3,
+					input_mode: "image_url",
+					input_prompt:
+						"Review this satellite scene in exactly 1 sentence with at most 35 words and 240 characters. Focus on the most important visible data center construction and related utility signals. Keep it factual, caption-like, and avoid markdown.",
+				},
+				agentGraphId: remoteSensingGraph.id,
+				modelId: gpt41MiniModel.id,
+			})
+			.returning({ id: agentGraphNodes.id });
+		if (!reviewSceneNode) {
+			throw new Error("Failed to create review_scene node");
+		}
+
+		const [saveSceneReviewNode] = await tx
+			.insert(agentGraphNodes)
+			.values({
+				nodeKey: "save_scene_review",
+				nodeType: "tool",
+				config: {
+					input_mapping: {
+						text: "scene_review",
+						model_provider: "_const:OPENAI",
+						model_name: "_const:gpt-4.1-mini",
+						model_version: "_const:",
+					},
+					output_mapping: {
+						description_id: "document_description_id",
+					},
+				},
+				agentGraphId: remoteSensingGraph.id,
+			})
+			.returning({ id: agentGraphNodes.id });
+		if (!saveSceneReviewNode) {
+			throw new Error("Failed to create save_scene_review node");
+		}
+
+		const [embedSceneReviewNode] = await tx
+			.insert(agentGraphNodes)
+			.values({
+				nodeKey: "embed_scene_review",
+				nodeType: "tool",
+				config: {
+					input_mapping: {
+						text: "scene_review",
+						document_description_id: "document_description_id",
+					},
+				},
+				agentGraphId: remoteSensingGraph.id,
+			})
+			.returning({ id: agentGraphNodes.id });
+		if (!embedSceneReviewNode) {
+			throw new Error("Failed to create embed_scene_review node");
+		}
+
+		await tx.insert(agentGraphNodeTools).values([
+			{
+				agentGraphNodeId: saveSceneReviewNode.id,
+				toolId: createDocDescTool.id,
+			},
+			{
+				agentGraphNodeId: embedSceneReviewNode.id,
+				toolId: createDescEmbTool.id,
+			},
+		]);
+
+		await tx.insert(agentGraphEdges).values([
+			{
+				fromNode: "review_scene",
+				toNode: "save_scene_review",
+				agentGraphId: remoteSensingGraph.id,
+			},
+			{
+				fromNode: "save_scene_review",
+				toNode: "embed_scene_review",
+				agentGraphId: remoteSensingGraph.id,
+			},
+			{
+				fromNode: "embed_scene_review",
+				toNode: "END",
+				agentGraphId: remoteSensingGraph.id,
+			},
+		]);
+
+		const [serviceApiKey] = await tx
+			.insert(apikeys)
+			.values({
+				name: "Seed Service API Key",
+				start: plainServiceApiKey.slice(0, 6),
+				prefix: "seed",
+				key: hashedServiceApiKey,
+				userId: user.id,
+				organizationId: organization.id,
+				projectId: project.id,
+				kind: "service",
+				deviceId: null,
+				enabled: true,
+				rateLimitEnabled: true,
+				rateLimitTimeWindow: 86_400_000,
+				rateLimitMax: 10_000,
+				requestCount: 0,
+				createdAt: now,
+				updatedAt: now,
+				permissions: serviceAPIKeyPermissionsJSON,
+				metadata: JSON.stringify({
+					source: "seed.ts",
+					role: "service",
+				}),
+			})
+			.returning({
+				id: apikeys.id,
+			});
+		if (!serviceApiKey) {
+			throw new Error("Failed to create seed service API key");
+		}
+
 		// ── Agent Graph (workflow 1: describe → save → embed → find similar) ──
 
 		const [pipelineGraph] = await tx
@@ -1369,6 +1525,7 @@ const seed = async () => {
 				userId: user.id,
 				organizationId: organization.id,
 				projectId: project.id,
+				kind: "device",
 				deviceId: pipelineDevice.id,
 				enabled: true,
 				rateLimitEnabled: true,
@@ -1377,7 +1534,7 @@ const seed = async () => {
 				requestCount: 0,
 				createdAt: now,
 				updatedAt: now,
-				permissions: JSON.stringify({ uploads: ["presign", "ack"] }),
+				permissions: deviceAPIKeyPermissionsJSON,
 				metadata: JSON.stringify({ source: "seed.ts" }),
 			})
 			.returning({
@@ -1575,6 +1732,7 @@ const seed = async () => {
 				userId: user.id,
 				organizationId: organization.id,
 				projectId: project.id,
+				kind: "device",
 				deviceId: qualityReviewDevice.id,
 				enabled: true,
 				rateLimitEnabled: true,
@@ -1583,7 +1741,7 @@ const seed = async () => {
 				requestCount: 0,
 				createdAt: now,
 				updatedAt: now,
-				permissions: JSON.stringify({ uploads: ["presign", "ack"] }),
+				permissions: deviceAPIKeyPermissionsJSON,
 				metadata: JSON.stringify({
 					source: "seed.ts",
 					workflow: "quality-review",
@@ -2041,6 +2199,7 @@ const seed = async () => {
 				userId: user.id,
 				organizationId: organization.id,
 				projectId: project.id,
+				kind: "device",
 				deviceId: segmentationDevice.id,
 				enabled: true,
 				rateLimitEnabled: true,
@@ -2049,7 +2208,7 @@ const seed = async () => {
 				requestCount: 0,
 				createdAt: now,
 				updatedAt: now,
-				permissions: JSON.stringify({ uploads: ["presign", "ack"] }),
+				permissions: deviceAPIKeyPermissionsJSON,
 				metadata: JSON.stringify({
 					source: "seed.ts",
 					workflow: "segmentation-showcase",
@@ -2227,6 +2386,7 @@ const seed = async () => {
 				userId: user.id,
 				organizationId: organization.id,
 				projectId: project.id,
+				kind: "device",
 				deviceId: semanticSegmentationDevice.id,
 				enabled: true,
 				rateLimitEnabled: true,
@@ -2235,7 +2395,7 @@ const seed = async () => {
 				requestCount: 0,
 				createdAt: now,
 				updatedAt: now,
-				permissions: JSON.stringify({ uploads: ["presign", "ack"] }),
+				permissions: deviceAPIKeyPermissionsJSON,
 				metadata: JSON.stringify({
 					source: "seed.ts",
 					workflow: "semantic-segmentation-showcase",
@@ -2498,6 +2658,7 @@ const seed = async () => {
 				userId: user.id,
 				organizationId: organization.id,
 				projectId: project.id,
+				kind: "device",
 				deviceId: ocrConditionDevice.id,
 				enabled: true,
 				rateLimitEnabled: true,
@@ -2506,7 +2667,7 @@ const seed = async () => {
 				requestCount: 0,
 				createdAt: now,
 				updatedAt: now,
-				permissions: JSON.stringify({ uploads: ["presign", "ack"] }),
+				permissions: deviceAPIKeyPermissionsJSON,
 				metadata: JSON.stringify({
 					source: "seed.ts",
 					workflow: "ocr-condition",
@@ -2808,6 +2969,7 @@ const seed = async () => {
 				userId: user.id,
 				organizationId: organization.id,
 				projectId: project.id,
+				kind: "device",
 				deviceId: ocrSupervisorDevice.id,
 				enabled: true,
 				rateLimitEnabled: true,
@@ -2816,7 +2978,7 @@ const seed = async () => {
 				requestCount: 0,
 				createdAt: now,
 				updatedAt: now,
-				permissions: JSON.stringify({ uploads: ["presign", "ack"] }),
+				permissions: deviceAPIKeyPermissionsJSON,
 				metadata: JSON.stringify({
 					source: "seed.ts",
 					workflow: "ocr-supervisor",
@@ -3304,6 +3466,10 @@ const seed = async () => {
 		// the intended sharing model in the dashboard.
 		const workflowTemplates = [
 			await cloneWorkflowToTemplate(tx, {
+				workflowId: remoteSensingGraph.id,
+				organizationId: organization.id,
+			}),
+			await cloneWorkflowToTemplate(tx, {
 				workflowId: pipelineGraph.id,
 				organizationId: organization.id,
 				visibility: "public",
@@ -3341,6 +3507,8 @@ const seed = async () => {
 			secondaryOrganization,
 			project,
 			secondaryProject,
+			serviceApiKey,
+			remoteSensingGraph,
 			pipelineDevice,
 			pipelineApiKey,
 			pipelineGraph,
@@ -3444,6 +3612,8 @@ const seed = async () => {
 			"Seeded OTP Login User: not created (set SEED_DASHBOARD_USER_EMAIL to enable)",
 		);
 	}
+	console.log(`Service API Key ID: ${result.serviceApiKey.id}`);
+	console.log(`Service API Key (plain): ${plainServiceApiKey}`);
 	console.log(
 		`Device (workflow 1): ${result.pipelineDevice.slug} (${result.pipelineDevice.id})`,
 	);
@@ -3478,7 +3648,10 @@ const seed = async () => {
 	);
 	console.log(`API Key ID (workflow 6): ${result.ocrSupervisorApiKey.id}`);
 	console.log(`API Key (plain, workflow 6): ${plainOCRSupervisorApiKey}`);
-	console.log(`\nAgent Graph (workflow 1): ${result.pipelineGraph.id}`);
+	console.log(
+		`\nAgent Graph (workflow 0, remote sensing): ${result.remoteSensingGraph.id}`,
+	);
+	console.log(`Agent Graph (workflow 1): ${result.pipelineGraph.id}`);
 	console.log(`Agent Graph (workflow 2): ${result.qualityReviewGraph.id}`);
 	console.log(
 		`Agent Graph (workflow 3, language segmentation): ${result.segmentationGraph.id}`,

@@ -14,4 +14,12 @@ func RegisterJobs(inngestClient inngestgo.Client, dbClient *gorm.DB, s3Client *c
 		inngestgo.EventTrigger("document/process.upload", nil),
 		seedInitialWithContext,
 	)
+
+	executeWorkflowWithContext := WithJobContext(dbClient, s3Client, mcpClient, ExecuteWorkflow)
+	inngestgo.CreateFunction(inngestClient, inngestgo.FunctionOpts{
+		ID: "workflow-execute",
+	},
+		inngestgo.EventTrigger("workflow/execute", nil),
+		executeWorkflowWithContext,
+	)
 }

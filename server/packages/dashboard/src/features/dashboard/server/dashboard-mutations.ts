@@ -7,11 +7,14 @@ export {
 	createDevice,
 	createDeviceAPIKey,
 	createProject,
+	createServiceAPIKey,
 	deleteDeviceAPIKey,
+	deleteServiceAPIKey,
 	setDeviceArchived,
 	setProjectArchived,
 	updateDevice,
 	updateDeviceAPIKey,
+	updateServiceAPIKey,
 } from "./project-management-mutations";
 export {
 	createWorkflow,

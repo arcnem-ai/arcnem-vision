@@ -78,7 +78,7 @@ const createDocumentAndVerifyUpload = async ({
 					contentType: verifiedObject.contentType,
 					eTag: verifiedObject.eTag,
 					sizeBytes: verifiedObject.size,
-					visibility: "org",
+					visibility: upload.visibility,
 					lastModifiedAt: verifiedObject.lastModifiedAt,
 					organizationId: upload.organizationId,
 					projectId: upload.projectId,

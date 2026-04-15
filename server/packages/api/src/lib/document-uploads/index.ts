@@ -1,9 +1,14 @@
 export { acknowledgePresignedUpload } from "./acknowledge";
 export type {
 	AcknowledgedUpload,
+	DocumentVisibility,
 	PendingUpload,
 	QueueProcessingOptions,
 	VerifiedUploadObject,
+} from "./acknowledge.types";
+export {
+	DOCUMENT_VISIBILITIES,
+	isDocumentVisibility,
 } from "./acknowledge.types";
 export { fail, toDocumentUploadErrorResponse } from "./errors";
 export type { DocumentUploadErrorPayload } from "./errors.types";

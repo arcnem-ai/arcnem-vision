@@ -25,6 +25,7 @@ ENV NODE_ENV=production
 
 COPY --from=deps --chown=app:app /app/node_modules ./node_modules
 COPY --from=deps --chown=app:app /app/packages/db/node_modules ./packages/db/node_modules
+COPY --from=deps --chown=app:app /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=deps --chown=app:app /app/packages/api/node_modules ./packages/api/node_modules
 COPY --chown=app:app package.json bun.lock ./
 COPY --chown=app:app packages/shared ./packages/shared

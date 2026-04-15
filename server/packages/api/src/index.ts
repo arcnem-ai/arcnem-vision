@@ -2,6 +2,7 @@ import { getDB } from "@arcnem-vision/db/server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
+import { openAPIRouteHandler } from "hono-openapi";
 import { pinoLogger } from "hono-pino";
 import { serve } from "inngest/hono";
 import { auth } from "@/lib/auth";
@@ -14,6 +15,7 @@ import { isAPIDebugModeEnabled } from "./env/isAPIDebugModeEnabled";
 import { dashboardRouter } from "./routes/dashboard";
 import { dashboardDocumentsRouter } from "./routes/dashboardDocuments";
 import { documentsRouter } from "./routes/documents";
+import { serviceRouter } from "./routes/service";
 import { uploadRouter } from "./routes/upload";
 import type { HonoServerContext } from "./types/serverContext";
 
@@ -98,6 +100,7 @@ const routes = [
 	uploadRouter,
 	ackUploadRouter,
 	documentsRouter,
+	serviceRouter,
 	dashboardDocumentsRouter,
 	dashboardRouter,
 ];
@@ -105,6 +108,39 @@ const routes = [
 routes.forEach((route) => {
 	app.basePath("/api").route("/", route);
 });
+
+app.get(
+	"/api/openapi.json",
+	openAPIRouteHandler(app, {
+		documentation: {
+			openapi: "3.1.0",
+			info: {
+				title: "Arcnem Vision Service API",
+				version: "1.0.0",
+				description:
+					"Project-scoped image ingestion and workflow orchestration API for non-device clients.",
+			},
+			tags: [
+				{
+					name: "Service",
+					description:
+						"Upload images, acknowledge documents, run workflows, and manage visibility with service API keys.",
+				},
+			],
+			security: [{ ApiKeyAuth: [] }],
+			components: {
+				securitySchemes: {
+					ApiKeyAuth: {
+						type: "apiKey",
+						in: "header",
+						name: "x-api-key",
+					},
+				},
+			},
+		},
+		includeEmptyPaths: false,
+	}),
+);
 
 app.get("/health", async (c) => c.json({ status: "ok" }));
 

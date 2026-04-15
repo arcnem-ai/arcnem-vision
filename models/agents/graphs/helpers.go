@@ -35,11 +35,16 @@ func loadStateString(state map[string]any, key string) (string, error) {
 	}
 
 	text, ok := value.(string)
-	if !ok {
-		return "", fmt.Errorf("state %q has type %T, expected string", key, value)
+	if ok {
+		return text, nil
 	}
 
-	return text, nil
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return "", fmt.Errorf("state %q has type %T and could not be JSON encoded: %w", key, value, err)
+	}
+
+	return string(encoded), nil
 }
 
 func loadStateMessages(state map[string]any, key string) ([]llms.MessageContent, error) {

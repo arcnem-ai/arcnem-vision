@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
 	deviceApiKeySchema,
+	serviceApiKeySchema,
 	workflowEdgeSchema,
 	workflowModelOptionSchema,
 	workflowNodeSampleSchema,
@@ -45,6 +46,7 @@ export const dashboardDataSchema = z.object({
 			archivedAt: z.string().nullable(),
 			deviceCount: z.number().int().nonnegative(),
 			apiKeyCount: z.number().int().nonnegative(),
+			serviceApiKeyCount: z.number().int().nonnegative(),
 		}),
 	),
 	devices: z.array(
@@ -62,6 +64,7 @@ export const dashboardDataSchema = z.object({
 			apiKeys: z.array(deviceApiKeySchema),
 		}),
 	),
+	serviceApiKeys: z.array(serviceApiKeySchema),
 	workflows: z.array(
 		z.object({
 			id: z.string().min(1),

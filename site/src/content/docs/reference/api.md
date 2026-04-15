@@ -1,11 +1,12 @@
 ---
 title: API Examples
-description: Device ingestion, dashboard uploads, workflow queueing, and realtime feed examples.
+description: Device ingestion, service orchestration, dashboard uploads, workflow queueing, and realtime feed examples.
 ---
 
-Arcnem Vision exposes two primary operational APIs:
+Arcnem Vision exposes three primary operational APIs:
 
 - a **device/API-key ingestion path** for automated uploads
+- a **service/API-key orchestration path** for project-scoped non-device clients
 - a **dashboard/session path** for operator-driven uploads, browsing, and workflow queueing
 
 ## Device Ingestion
@@ -37,6 +38,113 @@ curl -X POST http://localhost:3000/api/uploads/ack \
 ```
 
 After step 3, the API verifies the object, creates the document, and emits `document/process.upload`. The agents service loads the device's assigned workflow and executes it.
+
+## Service API
+
+The service API is the face-neutral orchestration surface for server-side clients.
+
+### Discover workflows
+
+```http
+GET /api/service/workflows
+```
+
+### Create a presigned upload
+
+```http
+POST /api/service/uploads/presign
+```
+
+Body:
+
+```json
+{
+  "contentType": "image/png",
+  "size": 12345,
+  "visibility": "private"
+}
+```
+
+Visibility is declared at presign time. `ack` simply confirms the uploaded object and materializes the document.
+
+### Acknowledge the upload
+
+```http
+POST /api/service/uploads/ack
+```
+
+Body:
+
+```json
+{
+  "objectKey": "uploads/.../service-api/.../image.png"
+}
+```
+
+### Queue a workflow execution
+
+```http
+POST /api/service/workflow-executions
+```
+
+Body:
+
+```json
+{
+  "workflowId": "<agentGraphId>",
+  "documentIds": ["<documentId>"],
+  "initialState": {
+    "analysis_label": "orbit"
+  }
+}
+```
+
+You can also select documents by scope:
+
+```json
+{
+  "workflowId": "<agentGraphId>",
+  "scope": {
+    "deviceBound": false
+  }
+}
+```
+
+### Inspect an execution
+
+```http
+GET /api/service/workflow-executions/:id
+```
+
+### List or read documents
+
+```http
+GET /api/service/documents?limit=20&deviceBound=false
+GET /api/service/documents/:id
+```
+
+### Change document visibility
+
+```http
+POST /api/service/documents/visibility
+```
+
+Body:
+
+```json
+{
+  "documentIds": ["<documentId>"],
+  "visibility": "public"
+}
+```
+
+### OpenAPI
+
+```http
+GET /api/openapi.json
+```
+
+This spec is generated from the shared service contracts so the public surface and the implementation stay aligned.
 
 ## Dashboard Uploads
 
@@ -104,6 +212,7 @@ This lets operators compare workflows, rerun analysis, or process dashboard-uplo
 ## Auth Model
 
 - **Device ingestion** uses API keys scoped to organization, project, and device.
+- **Service orchestration** uses API keys scoped to organization and project.
 - API keys are stored as SHA-256 hashes.
 - **Dashboard operations** use better-auth session cookies.
 - Local debug mode can bootstrap a seeded session when `API_DEBUG=true`.

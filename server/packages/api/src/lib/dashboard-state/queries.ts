@@ -84,6 +84,45 @@ export async function loadDashboardDevices(
 	});
 }
 
+export async function loadDashboardServiceAPIKeys(
+	db: PGDB,
+	organizationId: string,
+	includeArchived: boolean,
+) {
+	return db.query.apikeys
+		.findMany({
+			where: (row, { and, eq }) =>
+				and(eq(row.organizationId, organizationId), eq(row.kind, "service")),
+			columns: {
+				id: true,
+				projectId: true,
+				name: true,
+				start: true,
+				prefix: true,
+				enabled: true,
+				createdAt: true,
+				updatedAt: true,
+				lastRequest: true,
+				expiresAt: true,
+				requestCount: true,
+				rateLimitEnabled: true,
+				rateLimitMax: true,
+				rateLimitTimeWindow: true,
+			},
+			with: {
+				projects: {
+					columns: {
+						archivedAt: true,
+					},
+				},
+			},
+			orderBy: (row, { desc, asc }) => [desc(row.createdAt), asc(row.id)],
+		})
+		.then((rows) =>
+			rows.filter((row) => includeArchived || row.projects?.archivedAt == null),
+		);
+}
+
 export async function loadDashboardWorkflows(db: PGDB, organizationId: string) {
 	return db.query.agentGraphs.findMany({
 		where: (row, { eq }) => eq(row.organizationId, organizationId),

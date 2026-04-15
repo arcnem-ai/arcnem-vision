@@ -114,7 +114,7 @@ export type WorkflowTemplateSummary = z.infer<
 	typeof workflowTemplateSummarySchema
 >;
 
-export const deviceApiKeySchema = z.object({
+export const managedApiKeySchema = z.object({
 	id: z.string().min(1),
 	name: z.string().nullable(),
 	start: z.string().nullable(),
@@ -130,7 +130,17 @@ export const deviceApiKeySchema = z.object({
 	rateLimitTimeWindow: z.number().int().nonnegative(),
 });
 
+export type ManagedAPIKey = z.infer<typeof managedApiKeySchema>;
+
+export const deviceApiKeySchema = managedApiKeySchema;
+
 export type DeviceAPIKey = z.infer<typeof deviceApiKeySchema>;
+
+export const serviceApiKeySchema = managedApiKeySchema.extend({
+	projectId: z.string().min(1),
+});
+
+export type ServiceAPIKey = z.infer<typeof serviceApiKeySchema>;
 
 export const workflowModelOptionSchema = z.object({
 	id: z.string().min(1),

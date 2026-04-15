@@ -61,16 +61,21 @@ Each service has its own `.env` (copy from `.env.example`):
 - `models/agents/.env` — DATABASE_URL, S3, OPENAI_API_KEY, MCP_SERVER_URL, Inngest
 - `models/mcp/.env` — REPLICATE_API_TOKEN, DATABASE_URL, MCP server name/version
 - `models/db/.env` — DATABASE_URL
+- Use one canonical env var name per setting. Do not add alias fallbacks like `A ?? B`, repo-specific compatibility shims, or silent default lookups for critical config. Rename callers in one pass instead.
 
 ## Coding Style & Naming Conventions
 - TypeScript uses Biome (`server/biome.json`): tabs, double quotes, import organization. Run `cd server && bunx biome check packages`.
 - Dart follows `flutter_lints` (`client/analysis_options.yaml`); use `UpperCamelCase` for classes/widgets and `lowerCamelCase` for fields/methods. Error handling uses `fpdart` Either/TaskEither pattern.
 - Go should be formatted with `gofmt`; keep package names lowercase and organize by feature (`clients/`, `jobs/`, `graphs/`, `server/`, `tools/`).
+- For app-domain string fields like `kind`, `status`, and `visibility`, keep the database type as plain text and enforce allowed values in application logic. Do not add enum-style DB check constraints for those fields.
 
 ## Testing Guidelines
 - Current automated tests are minimal (existing example: `client/test/widget_test.dart`).
 - For client changes, run `cd client && flutter test`.
 - For new TS/Go features, add colocated tests (`*.test.ts`, `*_test.go`) and run the relevant module test command before opening a PR.
+- Keep the default CI-safe suite deterministic.
+- For broader local assurance around the service API, use `cd server && bun test` for CI-safe coverage and `make live-service-test` for the fuller upload -> ack -> execute -> publish probe.
+- `make live-service-test` is the entrypoint for the local end-to-end probe. It reuses the existing `.env.docker` files, but boots an isolated Postgres/Redis/MinIO stack plus dedicated API/agents/MCP containers before running the probe.
 
 ## Commit & Pull Request Guidelines
 - Follow the existing commit style: short, imperative subjects (examples from history: `Upload ack`, `Align drizzle version`, `gemma gen ui`).

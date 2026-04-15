@@ -2,6 +2,7 @@ import {
 	ALLOWED_IMAGE_MIME_TYPES,
 	MAX_UPLOAD_SIZE_BYTES,
 } from "@/constants/uploads";
+import { isDocumentVisibility } from "./acknowledge.types";
 import { fail } from "./errors";
 import type { ParsedAckRequest, ParsedPresignRequest } from "./requests.types";
 
@@ -25,6 +26,7 @@ export const parsePresignRequestBody = (
 	const payload = body as Record<string, unknown>;
 	const contentType = payload.contentType;
 	const size = payload.size;
+	const visibility = payload.visibility;
 
 	if (typeof contentType !== "string" || contentType.trim().length === 0) {
 		fail(400, "contentType is required");
@@ -48,8 +50,13 @@ export const parsePresignRequestBody = (
 		);
 	}
 
+	if (visibility !== undefined && !isDocumentVisibility(visibility)) {
+		fail(400, "visibility must be one of private, org, or public");
+	}
+
 	return {
 		contentType: normalizedContentType,
+		visibility: visibility as ParsedPresignRequest["visibility"],
 	};
 };
 

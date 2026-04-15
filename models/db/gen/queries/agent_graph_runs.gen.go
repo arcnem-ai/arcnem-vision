@@ -35,6 +35,7 @@ func newAgentGraphRun(db *gorm.DB, opts ...gen.DOOption) agentGraphRun {
 	_agentGraphRun.Error = field.NewString(tableName, "error")
 	_agentGraphRun.StartedAt = field.NewTime(tableName, "started_at")
 	_agentGraphRun.FinishedAt = field.NewTime(tableName, "finished_at")
+	_agentGraphRun.ProjectID = field.NewString(tableName, "project_id")
 
 	_agentGraphRun.fillFieldMap()
 
@@ -53,6 +54,7 @@ type agentGraphRun struct {
 	Error        field.String
 	StartedAt    field.Time
 	FinishedAt   field.Time
+	ProjectID    field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -77,6 +79,7 @@ func (a *agentGraphRun) updateTableName(table string) *agentGraphRun {
 	a.Error = field.NewString(table, "error")
 	a.StartedAt = field.NewTime(table, "started_at")
 	a.FinishedAt = field.NewTime(table, "finished_at")
+	a.ProjectID = field.NewString(table, "project_id")
 
 	a.fillFieldMap()
 
@@ -105,7 +108,7 @@ func (a *agentGraphRun) GetFieldByName(fieldName string) (field.OrderExpr, bool)
 }
 
 func (a *agentGraphRun) fillFieldMap() {
-	a.fieldMap = make(map[string]field.Expr, 8)
+	a.fieldMap = make(map[string]field.Expr, 9)
 	a.fieldMap["id"] = a.ID
 	a.fieldMap["agent_graph_id"] = a.AgentGraphID
 	a.fieldMap["status"] = a.Status
@@ -114,6 +117,7 @@ func (a *agentGraphRun) fillFieldMap() {
 	a.fieldMap["error"] = a.Error
 	a.fieldMap["started_at"] = a.StartedAt
 	a.fieldMap["finished_at"] = a.FinishedAt
+	a.fieldMap["project_id"] = a.ProjectID
 }
 
 func (a agentGraphRun) clone(db *gorm.DB) agentGraphRun {

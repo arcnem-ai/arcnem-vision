@@ -12,7 +12,7 @@ import {
 	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
-import { organizations } from "./authSchema";
+import { organizations, projects } from "./authSchema";
 import { models } from "./projectSchema";
 
 export const tools = pgTable(
@@ -203,6 +203,9 @@ export const agentGraphRuns = pgTable(
 		agentGraphId: uuid("agent_graph_id")
 			.notNull()
 			.references(() => agentGraphs.id, { onDelete: "cascade" }),
+		projectId: uuid("project_id").references(() => projects.id, {
+			onDelete: "set null",
+		}),
 		status: text().notNull().default("running"),
 		initialState: jsonb("initial_state"),
 		finalState: jsonb("final_state"),
@@ -212,6 +215,7 @@ export const agentGraphRuns = pgTable(
 	},
 	(t) => [
 		index("agent_graph_runs_graph_id_idx").on(t.agentGraphId),
+		index("agent_graph_runs_project_id_idx").on(t.projectId),
 		index("agent_graph_runs_status_idx").on(t.status),
 		check(
 			"agent_graph_runs_status_known",

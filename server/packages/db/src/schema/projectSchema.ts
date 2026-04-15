@@ -91,6 +91,7 @@ export const presignedUploads = pgTable(
 			.notNull()
 			.references(() => projects.id, { onDelete: "cascade" }),
 		deviceId: uuid("device_id").references(() => devices.id),
+		visibility: text("visibility").notNull().default("org"),
 		status: text().notNull().default("issued"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at")

@@ -43,6 +43,13 @@
       "when": 1775560249966,
       "tag": "0005_dapper_callisto",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776172179481,
+      "tag": "0006_service_api_core",
+      "breakpoints": true
     }
   ]
 }

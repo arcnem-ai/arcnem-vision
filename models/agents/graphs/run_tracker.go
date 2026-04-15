@@ -29,12 +29,33 @@ type RunTracker struct {
 	steps map[string]*dbmodels.AgentGraphRunStep
 }
 
+type RunTrackerOptions struct {
+	RunID     string
+	ProjectID string
+}
+
 // NewRunTracker creates a new run record and returns a tracker.
 func NewRunTracker(
 	db *gorm.DB,
 	agentGraphID string,
 	organizationID string,
 	initialState map[string]any,
+) (*RunTracker, error) {
+	return NewRunTrackerWithOptions(
+		db,
+		agentGraphID,
+		organizationID,
+		initialState,
+		RunTrackerOptions{},
+	)
+}
+
+func NewRunTrackerWithOptions(
+	db *gorm.DB,
+	agentGraphID string,
+	organizationID string,
+	initialState map[string]any,
+	options RunTrackerOptions,
 ) (*RunTracker, error) {
 	stateJSON, err := json.Marshal(initialState)
 	if err != nil {
@@ -44,10 +65,37 @@ func NewRunTracker(
 
 	run := &dbmodels.AgentGraphRun{
 		AgentGraphID: agentGraphID,
+		ProjectID:    toNullableString(options.ProjectID),
 		Status:       "running",
 		InitialState: &stateStr,
 	}
-	if err := db.Create(run).Error; err != nil {
+	if options.RunID != "" {
+		run.ID = options.RunID
+		now := time.Now()
+		updates := map[string]any{
+			"agent_graph_id": agentGraphID,
+			"project_id":     toNullableString(options.ProjectID),
+			"status":         "running",
+			"initial_state":  stateStr,
+			"error":          nil,
+			"finished_at":    nil,
+			"started_at":     now,
+		}
+		tx := db.Model(&dbmodels.AgentGraphRun{}).
+			Where("id = ?", options.RunID).
+			Updates(updates)
+		if tx.Error != nil {
+			return nil, fmt.Errorf("failed to update run record: %w", tx.Error)
+		}
+		if tx.RowsAffected == 0 {
+			run.StartedAt = now
+			if err := db.Create(run).Error; err != nil {
+				return nil, fmt.Errorf("failed to create run record: %w", err)
+			}
+		} else {
+			run.StartedAt = now
+		}
+	} else if err := db.Create(run).Error; err != nil {
 		return nil, fmt.Errorf("failed to create run record: %w", err)
 	}
 
@@ -61,6 +109,14 @@ func NewRunTracker(
 	tracker.publish(realtime.DashboardReasonRunCreated)
 
 	return tracker, nil
+}
+
+func toNullableString(value string) *string {
+	if value == "" {
+		return nil
+	}
+
+	return &value
 }
 
 // OnEvent implements graph.TraceHook.

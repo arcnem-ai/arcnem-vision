@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { generatedDeviceApiKeySchema } from "./dashboard-inputs";
+import { generatedApiKeySchema } from "./dashboard-inputs";
 
 export const idResponseSchema = z.object({
 	id: z.string().min(1),
@@ -47,7 +47,9 @@ export const deviceApiKeyUpdateResponseSchema = z.object({
 	name: z.string().nullable(),
 });
 
-export const generatedDeviceApiKeyResponseSchema = generatedDeviceApiKeySchema;
+export const generatedApiKeyResponseSchema = generatedApiKeySchema;
+export const generatedDeviceApiKeyResponseSchema = generatedApiKeySchema;
+export const generatedServiceApiKeyResponseSchema = generatedApiKeySchema;
 
 export const workflowTemplateCreatedResponseSchema = z.object({
 	id: z.string().min(1),

@@ -1,6 +1,7 @@
 import { schema } from "@arcnem-vision/db";
 import {
 	createDeviceApiKeyInputSchema,
+	DEFAULT_DEVICE_API_KEY_PERMISSIONS,
 	deleteDeviceApiKeyInputSchema,
 	type GeneratedDeviceAPIKey,
 	updateDeviceApiKeyInputSchema,
@@ -62,13 +63,14 @@ dashboardDeviceAPIKeysRouter.post("/dashboard/device-api-keys", async (c) => {
 			userId: access.context.session.userId,
 			organizationId: access.context.organizationId,
 			projectId: device.projectId,
+			kind: "device",
 			deviceId: device.id,
 			enabled: true,
 			rateLimitEnabled: true,
 			rateLimitTimeWindow: 86_400_000,
 			rateLimitMax: 10_000,
 			requestCount: 0,
-			permissions: JSON.stringify({ uploads: ["presign", "ack"] }),
+			permissions: JSON.stringify(DEFAULT_DEVICE_API_KEY_PERMISSIONS),
 			metadata: JSON.stringify({ source: "dashboard" }),
 		})
 		.returning({
@@ -105,6 +107,7 @@ dashboardDeviceAPIKeysRouter.post(
 				and(
 					eq(row.id, parsed.data.apiKeyId),
 					eq(row.organizationId, access.context.organizationId),
+					eq(row.kind, "device"),
 				),
 			columns: { id: true, deviceId: true },
 		});
@@ -114,11 +117,15 @@ dashboardDeviceAPIKeysRouter.post(
 				404,
 			);
 		}
+		if (!apiKey.deviceId) {
+			return c.json({ message: "API key is not attached to a device." }, 409);
+		}
+		const deviceId = apiKey.deviceId;
 
 		const device = await db.query.devices.findFirst({
 			where: (row, { and, eq }) =>
 				and(
-					eq(row.id, apiKey.deviceId),
+					eq(row.id, deviceId),
 					eq(row.organizationId, access.context.organizationId),
 				),
 			columns: { id: true, archivedAt: true },
@@ -168,6 +175,7 @@ dashboardDeviceAPIKeysRouter.post(
 				and(
 					eq(row.id, parsed.data.apiKeyId),
 					eq(row.organizationId, access.context.organizationId),
+					eq(row.kind, "device"),
 				),
 			columns: { id: true, deviceId: true },
 		});
@@ -177,11 +185,15 @@ dashboardDeviceAPIKeysRouter.post(
 				404,
 			);
 		}
+		if (!apiKey.deviceId) {
+			return c.json({ message: "API key is not attached to a device." }, 409);
+		}
+		const deviceId = apiKey.deviceId;
 
 		const device = await db.query.devices.findFirst({
 			where: (row, { and, eq }) =>
 				and(
-					eq(row.id, apiKey.deviceId),
+					eq(row.id, deviceId),
 					eq(row.organizationId, access.context.organizationId),
 				),
 			columns: { id: true, archivedAt: true },

@@ -1,5 +1,18 @@
 import type { Inngest } from "inngest";
 
+export const DOCUMENT_VISIBILITIES = ["private", "org", "public"] as const;
+
+export type DocumentVisibility = (typeof DOCUMENT_VISIBILITIES)[number];
+
+export function isDocumentVisibility(
+	value: unknown,
+): value is DocumentVisibility {
+	return (
+		typeof value === "string" &&
+		(DOCUMENT_VISIBILITIES as readonly string[]).includes(value)
+	);
+}
+
 export type PendingUpload = {
 	id: string;
 	bucket: string;
@@ -7,6 +20,7 @@ export type PendingUpload = {
 	organizationId: string;
 	projectId: string;
 	deviceId: string | null;
+	visibility: DocumentVisibility;
 };
 
 export type VerifiedUploadObject = {

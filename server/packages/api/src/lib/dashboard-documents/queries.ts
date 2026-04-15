@@ -48,6 +48,7 @@ export async function findIssuedDashboardUpload(
 			organizationId: presignedUploads.organizationId,
 			projectId: presignedUploads.projectId,
 			deviceId: presignedUploads.deviceId,
+			visibility: presignedUploads.visibility,
 		})
 		.from(presignedUploads)
 		.where(

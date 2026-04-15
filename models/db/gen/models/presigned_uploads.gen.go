@@ -21,6 +21,7 @@ type PresignedUpload struct {
 	UpdatedAt      time.Time `gorm:"column:updated_at;type:timestamp without time zone;not null;default:now()" json:"updated_at"`
 	OrganizationID string    `gorm:"column:organization_id;type:uuid;not null" json:"organization_id"`
 	ProjectID      string    `gorm:"column:project_id;type:uuid;not null" json:"project_id"`
+	Visibility     string    `gorm:"column:visibility;type:text;not null;default:org" json:"visibility"`
 }
 
 // TableName PresignedUpload's table name

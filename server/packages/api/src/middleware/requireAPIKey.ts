@@ -1,22 +1,15 @@
-import { schema } from "@arcnem-vision/db";
-import type { ApiKey } from "better-auth/plugins";
-import { eq } from "drizzle-orm";
+import type { MiddlewareHandler } from "hono";
 import { createMiddleware } from "hono/factory";
 import { isAPIDebugModeEnabled } from "@/env/isAPIDebugModeEnabled";
-import { verifyAPIKey } from "@/lib/api-keys";
+import {
+	type APIKeyPermissionDomain,
+	apiKeyHasPermission,
+	findAPIKeyForDebugMode,
+	verifyAPIKey,
+} from "@/lib/api-keys";
 import type { HonoServerContext } from "@/types/serverContext";
 
-const { apikeys } = schema;
 const isDebugMode = isAPIDebugModeEnabled();
-
-const hashAPIKey = async (key: string): Promise<string> => {
-	const digest = await crypto.subtle.digest(
-		"SHA-256",
-		new TextEncoder().encode(key),
-	);
-
-	return Buffer.from(digest).toString("base64url");
-};
 
 export const requireAPIKey = createMiddleware<HonoServerContext>(
 	async (c, next) => {
@@ -25,18 +18,13 @@ export const requireAPIKey = createMiddleware<HonoServerContext>(
 
 		if (isDebugMode) {
 			const dbClient = c.get("dbClient");
-			const hashedKey = await hashAPIKey(apiKey);
-			const [debugApiKey] = await dbClient
-				.select({ id: apikeys.id })
-				.from(apikeys)
-				.where(eq(apikeys.key, hashedKey))
-				.limit(1);
+			const debugApiKey = await findAPIKeyForDebugMode(dbClient, apiKey);
 
 			if (!debugApiKey) {
 				return c.json({ message: "Unauthorized" }, 401);
 			}
 
-			c.set("apiKey", { id: debugApiKey.id } as Omit<ApiKey, "key">);
+			c.set("apiKey", debugApiKey);
 			await next();
 			return;
 		}
@@ -45,7 +33,40 @@ export const requireAPIKey = createMiddleware<HonoServerContext>(
 		if (!verifiedKey) {
 			return c.json({ message: "Unauthorized" }, 401);
 		}
-		c.set("apiKey", verifiedKey as Omit<ApiKey, "key">);
+		c.set("apiKey", verifiedKey);
+
+		await next();
+	},
+);
+
+export function requireAPIKeyPermission(
+	domain: APIKeyPermissionDomain,
+	action: string,
+): MiddlewareHandler<HonoServerContext> {
+	return createMiddleware<HonoServerContext>(async (c, next) => {
+		const apiKey = c.get("apiKey");
+		if (!apiKey) {
+			return c.json({ message: "Unauthorized" }, 401);
+		}
+
+		if (!apiKeyHasPermission(apiKey, domain, action)) {
+			return c.json({ message: "Forbidden" }, 403);
+		}
+
+		await next();
+	});
+}
+
+export const requireServiceAPIKey = createMiddleware<HonoServerContext>(
+	async (c, next) => {
+		const apiKey = c.get("apiKey");
+		if (!apiKey) {
+			return c.json({ message: "Unauthorized" }, 401);
+		}
+
+		if (apiKey.kind !== "service") {
+			return c.json({ message: "Service API key required" }, 403);
+		}
 
 		await next();
 	},

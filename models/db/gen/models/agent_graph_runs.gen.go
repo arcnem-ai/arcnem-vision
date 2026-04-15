@@ -20,6 +20,7 @@ type AgentGraphRun struct {
 	Error        *string    `gorm:"column:error;type:text" json:"error"`
 	StartedAt    time.Time  `gorm:"column:started_at;type:timestamp without time zone;not null;default:now()" json:"started_at"`
 	FinishedAt   *time.Time `gorm:"column:finished_at;type:timestamp without time zone" json:"finished_at"`
+	ProjectID    *string    `gorm:"column:project_id;type:uuid" json:"project_id"`
 }
 
 // TableName AgentGraphRun's table name

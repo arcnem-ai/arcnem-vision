@@ -384,6 +384,10 @@ export const agentGraphRunsRelations = relations(
 			fields: [agentGraphRuns.agentGraphId],
 			references: [agentGraphs.id],
 		}),
+		projects: one(projects, {
+			fields: [agentGraphRuns.projectId],
+			references: [projects.id],
+		}),
 		agentGraphRunSteps: many(agentGraphRunSteps),
 	}),
 );

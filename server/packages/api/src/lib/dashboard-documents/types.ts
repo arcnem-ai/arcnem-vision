@@ -115,6 +115,7 @@ export type DashboardIssuedUpload = {
 	organizationId: string;
 	projectId: string;
 	deviceId: string | null;
+	visibility: string;
 };
 
 export type DashboardDocumentAccessResolution =

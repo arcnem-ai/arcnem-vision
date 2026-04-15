@@ -25,6 +25,7 @@ ENV RUNNING_IN_DOCKER=true
 
 COPY --from=deps --chown=migrations:migrations /app/node_modules ./node_modules
 COPY --from=deps --chown=migrations:migrations /app/packages/db/node_modules ./packages/db/node_modules
+COPY --from=deps --chown=migrations:migrations /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --chown=migrations:migrations package.json bun.lock ./
 COPY --chown=migrations:migrations packages/shared/package.json ./packages/shared/
 COPY --chown=migrations:migrations packages/db/package.json ./packages/db/

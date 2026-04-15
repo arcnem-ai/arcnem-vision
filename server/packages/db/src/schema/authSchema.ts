@@ -129,9 +129,8 @@ export const apikeys = pgTable(
 		projectId: uuid("project_id")
 			.notNull()
 			.references(() => projects.id, { onDelete: "cascade" }),
-		deviceId: uuid(`device_id`)
-			.notNull()
-			.references(() => devices.id),
+		kind: text("kind").notNull().default("device"),
+		deviceId: uuid(`device_id`).references(() => devices.id),
 		refillInterval: integer("refill_interval"),
 		refillAmount: integer("refill_amount"),
 		lastRefillAt: timestamp("last_refill_at"),
