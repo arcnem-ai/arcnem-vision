@@ -38,6 +38,13 @@ function buildFakeDB(
 				execute: (
 					query: unknown,
 				) => Promise<{ rows: Array<Record<string, unknown>> }>;
+				update: (table: unknown) => {
+					set: (values: Record<string, unknown>) => {
+						where: (
+							clause: unknown,
+						) => Promise<{ rows: Array<Record<string, unknown>> }>;
+					};
+				};
 			}) => Promise<T>,
 		) =>
 			callback({
@@ -45,6 +52,14 @@ function buildFakeDB(
 					calls.push(query);
 					return queuedResponses.shift() ?? { rows: [] };
 				},
+				update: (table: unknown) => ({
+					set: (values: Record<string, unknown>) => ({
+						where: async (clause: unknown) => {
+							calls.push({ type: "update", table, values, clause });
+							return queuedResponses.shift() ?? { rows: [] };
+						},
+					}),
+				}),
 			}),
 	} as unknown as PGDB;
 
