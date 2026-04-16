@@ -8,7 +8,7 @@ export type DocumentItem = {
 	createdAt: string;
 	description: string | null;
 	projectId: string;
-	deviceId: string | null;
+	apiKeyId: string | null;
 	thumbnailUrl: string;
 	distance: number | null;
 };

@@ -22,7 +22,7 @@ export type VerifiedAPIKey = {
 	userId: string;
 	organizationId: string;
 	projectId: string;
-	deviceId: string | null;
+	agentGraphId: string | null;
 	kind: APIKeyKind;
 	permissions: APIKeyPermissions;
 	metadata: Record<string, unknown> | null;
@@ -52,7 +52,7 @@ function parseJSONRecord(value: string | null): Record<string, unknown> | null {
 }
 
 function normalizeKind(value: string | null): APIKeyKind {
-	return value === "service" ? "service" : "device";
+	return value === "service" ? "service" : "workflow";
 }
 
 function toVerifiedAPIKey(row: {
@@ -60,7 +60,7 @@ function toVerifiedAPIKey(row: {
 	userId: string;
 	organizationId: string;
 	projectId: string;
-	deviceId: string | null;
+	agentGraphId: string | null;
 	kind: string | null;
 	permissions: string | null;
 	metadata: string | null;
@@ -70,7 +70,7 @@ function toVerifiedAPIKey(row: {
 		userId: row.userId,
 		organizationId: row.organizationId,
 		projectId: row.projectId,
-		deviceId: row.deviceId,
+		agentGraphId: row.agentGraphId,
 		kind: normalizeKind(row.kind),
 		permissions: resolveAPIKeyPermissions(
 			row.permissions,
@@ -91,7 +91,7 @@ export async function verifyAPIKey(
 			userId: apikeys.userId,
 			organizationId: apikeys.organizationId,
 			projectId: apikeys.projectId,
-			deviceId: apikeys.deviceId,
+			agentGraphId: apikeys.agentGraphId,
 			kind: apikeys.kind,
 			permissions: apikeys.permissions,
 			metadata: apikeys.metadata,
@@ -120,7 +120,7 @@ export async function findAPIKeyForDebugMode(
 			userId: apikeys.userId,
 			organizationId: apikeys.organizationId,
 			projectId: apikeys.projectId,
-			deviceId: apikeys.deviceId,
+			agentGraphId: apikeys.agentGraphId,
 			kind: apikeys.kind,
 			permissions: apikeys.permissions,
 			metadata: apikeys.metadata,

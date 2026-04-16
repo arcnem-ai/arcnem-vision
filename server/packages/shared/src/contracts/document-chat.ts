@@ -4,7 +4,7 @@ export const chatScopeSchema = z.object({
 	kind: z.literal("organization"),
 	organizationId: z.string().min(1),
 	projectIds: z.array(z.string().min(1)).optional(),
-	deviceIds: z.array(z.string().min(1)).optional(),
+	apiKeyIds: z.array(z.string().min(1)).optional(),
 	documentIds: z.array(z.string().min(1)).optional(),
 });
 
@@ -14,8 +14,8 @@ export const documentChatCitationSchema = z.object({
 	documentId: z.string().min(1),
 	projectId: z.string().min(1),
 	projectName: z.string().min(1),
-	deviceId: z.string().min(1).nullable().optional(),
-	deviceName: z.string().min(1).nullable().optional(),
+	apiKeyId: z.string().min(1).nullable().optional(),
+	apiKeyName: z.string().min(1).nullable().optional(),
 	label: z.string().min(1),
 	excerpt: z.string().min(1),
 	matchReason: z.string().min(1),
@@ -27,8 +27,8 @@ export const documentSearchMatchSchema = z.object({
 	documentId: z.string().min(1),
 	projectId: z.string().min(1),
 	projectName: z.string().min(1),
-	deviceId: z.string().min(1).nullable().optional(),
-	deviceName: z.string().min(1).nullable().optional(),
+	apiKeyId: z.string().min(1).nullable().optional(),
+	apiKeyName: z.string().min(1).nullable().optional(),
 	label: z.string().min(1),
 	snippet: z.string().min(1),
 	matchReason: z.string().min(1),
@@ -64,8 +64,8 @@ export const documentContextItemSchema = z.object({
 	documentId: z.string().min(1),
 	projectId: z.string().min(1),
 	projectName: z.string().min(1),
-	deviceId: z.string().min(1).nullable().optional(),
-	deviceName: z.string().min(1).nullable().optional(),
+	apiKeyId: z.string().min(1).nullable().optional(),
+	apiKeyName: z.string().min(1).nullable().optional(),
 	label: z.string().min(1),
 	description: z.string().optional(),
 	ocrExcerpts: z.array(documentOCRExcerptSchema).default([]),
@@ -91,10 +91,10 @@ export const collectionSearcherResponseSchema = z.object({
 				documentId: z.string().min(1),
 				label: z.string().min(1),
 				projectName: z.string().min(1),
-				deviceName: z
+				apiKeyName: z
 					.string()
 					.nullable()
-					.describe("Device name when present, otherwise null."),
+					.describe("API key name when present, otherwise null."),
 				matchReason: z.string().min(1),
 				snippet: z.string().min(1),
 				keyFacts: z.array(z.string().min(1)).max(5),

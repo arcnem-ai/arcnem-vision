@@ -8,7 +8,7 @@ import type {
 type DashboardDocumentSearchScope = {
 	organization_id: string;
 	project_ids?: string[];
-	device_ids?: string[];
+	api_key_ids?: string[];
 	dashboard_uploads_only?: true;
 };
 
@@ -27,8 +27,8 @@ export function buildDashboardDocumentSearchScope(
 	if (filters.projectId) {
 		scope.project_ids = [filters.projectId];
 	}
-	if (filters.deviceId) {
-		scope.device_ids = [filters.deviceId];
+	if (filters.apiKeyId) {
+		scope.api_key_ids = [filters.apiKeyId];
 	}
 	if (filters.dashboardUploadsOnly) {
 		scope.dashboard_uploads_only = true;
@@ -80,7 +80,7 @@ function parseDashboardDocumentSearchMatches(
 			sizeBytes,
 			createdAt: match.createdAt,
 			projectId: match.projectId,
-			deviceId: typeof match.deviceId === "string" ? match.deviceId : null,
+			apiKeyId: typeof match.apiKeyId === "string" ? match.apiKeyId : null,
 			snippet: match.snippet,
 		};
 	});
@@ -98,7 +98,7 @@ function mapDashboardSearchMatchToRow(
 		description: match.snippet,
 		distance: null,
 		projectId: match.projectId,
-		deviceId: match.deviceId,
+		apiKeyId: match.apiKeyId,
 	};
 }
 
@@ -123,10 +123,10 @@ export async function searchDashboardDocumentsByMeaning(
 				return false;
 			}
 			if (filters.dashboardUploadsOnly) {
-				return match.deviceId == null;
+				return match.apiKeyId == null;
 			}
-			if (filters.deviceId) {
-				return match.deviceId === filters.deviceId;
+			if (filters.apiKeyId) {
+				return match.apiKeyId === filters.apiKeyId;
 			}
 			return true;
 		})

@@ -170,6 +170,6 @@ describe("OpenAI schema compatibility", () => {
 				? documentItemSchema.required
 				: [];
 
-		expect(required).toContain("deviceName");
+		expect(required).toContain("apiKeyName");
 	});
 });

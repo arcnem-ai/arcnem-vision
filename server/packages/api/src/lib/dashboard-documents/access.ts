@@ -156,7 +156,7 @@ export async function findDashboardDocumentById(
 			createdAt: documents.createdAt,
 			description: documentDescriptions.text,
 			projectId: documents.projectId,
-			deviceId: documents.deviceId,
+			apiKeyId: documents.apiKeyId,
 			organizationId: documents.organizationId,
 		})
 		.from(documents)

@@ -34,25 +34,25 @@ describe("service route helpers", () => {
 			parseServiceDocumentListQuery({
 				limit: "25",
 				documentIds: "doc-1, doc-2",
-				deviceBound: "false",
+				apiKeyBound: "false",
 			}),
 		).toEqual({
 			ok: true,
 			data: {
 				limit: 25,
 				documentIds: ["doc-1", "doc-2"],
-				deviceBound: false,
+				apiKeyBound: false,
 			},
 		});
 
 		expect(
 			parseServiceDocumentListQuery({
-				deviceIds: "device-1",
-				deviceBound: "false",
+				apiKeyIds: "key-1",
+				apiKeyBound: "false",
 			}),
 		).toEqual({
 			ok: false,
-			message: "deviceIds cannot be combined with deviceBound=false",
+			message: "apiKeyIds cannot be combined with apiKeyBound=false",
 		});
 
 		expect(
@@ -66,11 +66,11 @@ describe("service route helpers", () => {
 
 		expect(
 			parseServiceDocumentListQuery({
-				deviceBound: "maybe",
+				apiKeyBound: "maybe",
 			}),
 		).toEqual({
 			ok: false,
-			message: "deviceBound must be true or false",
+			message: "apiKeyBound must be true or false",
 		});
 	});
 
@@ -89,14 +89,14 @@ describe("service route helpers", () => {
 		expect(
 			buildExecutionScope(
 				{
-					deviceIds: ["device-1"],
-					deviceBound: true,
+					apiKeyIds: ["key-1"],
+					apiKeyBound: true,
 				},
 				["doc-1", "doc-2"],
 			),
 		).toEqual({
-			deviceIds: ["device-1"],
-			deviceBound: true,
+			apiKeyIds: ["key-1"],
+			apiKeyBound: true,
 			documentIds: ["doc-1", "doc-2"],
 		});
 	});
@@ -106,7 +106,7 @@ describe("service route helpers", () => {
 			analysis_label: "smoke-test",
 			nested: { confidence: "high" },
 		};
-		const executionScope = buildExecutionScope({ deviceBound: false }, [
+		const executionScope = buildExecutionScope({ apiKeyBound: false }, [
 			"doc-1",
 		]);
 
@@ -117,7 +117,7 @@ describe("service route helpers", () => {
 			nested: { confidence: "high" },
 			project_id: "project-1",
 			scope: {
-				deviceBound: false,
+				apiKeyBound: false,
 				documentIds: ["doc-1"],
 			},
 		});
@@ -128,7 +128,7 @@ describe("service route helpers", () => {
 	});
 
 	test("buildWorkflowExecutionEventData forwards the seeded state", () => {
-		const executionScope = buildExecutionScope({ deviceBound: false }, [
+		const executionScope = buildExecutionScope({ apiKeyBound: false }, [
 			"doc-1",
 		]);
 		const seededState = buildSeededInitialState(
@@ -150,14 +150,14 @@ describe("service route helpers", () => {
 			workflow_id: "workflow-1",
 			document_ids: ["doc-1"],
 			scope: {
-				deviceBound: false,
+				apiKeyBound: false,
 				documentIds: ["doc-1"],
 			},
 			initial_state: {
 				analysis_label: "smoke-test",
 				project_id: "project-1",
 				scope: {
-					deviceBound: false,
+					apiKeyBound: false,
 					documentIds: ["doc-1"],
 				},
 			},

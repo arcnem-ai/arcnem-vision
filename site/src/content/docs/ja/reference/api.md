@@ -174,7 +174,7 @@ POST /api/dashboard/documents/chat
 - セッション認証済みで、アクティブな組織コンテキストに入っている必要があります。
 - リクエストボディは TanStack AI のチャット形式に沿っています。
 - `messages` に加えて `conversationId` と `scope` を任意で渡せます。
-- 現在の UI は組織単位で使いますが、API 側では `projectIds`、`deviceIds`、`documentIds` も受け取れます。
+- 現在の UI は組織単位で使いますが、API 側では `projectIds`、`apiKeyIds`、`documentIds` も受け取れます。
 - レスポンスは Server-Sent Events でストリーミングされます。
 - 出典カードは `assistant_sources` イベントとして流れ、ドキュメント情報や一致箇所の抜粋を含みます。
 - ダッシュボード本体はこのエンドポイントをローカルの `/api/documents/chat` からプロキシします。

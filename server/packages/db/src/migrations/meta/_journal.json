@@ -50,6 +50,13 @@
       "when": 1776172179481,
       "tag": "0006_service_api_core",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776312362806,
+      "tag": "0007_api_key_workflows",
+      "breakpoints": true
     }
   ]
 }

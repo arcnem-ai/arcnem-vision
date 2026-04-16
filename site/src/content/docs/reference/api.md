@@ -1,17 +1,17 @@
 ---
 title: API Examples
-description: Device ingestion, service orchestration, dashboard uploads, workflow queueing, and realtime feed examples.
+description: Workflow-key ingestion, service orchestration, dashboard uploads, workflow queueing, and realtime feed examples.
 ---
 
 Arcnem Vision exposes three primary operational APIs:
 
-- a **device/API-key ingestion path** for automated uploads
-- a **service/API-key orchestration path** for project-scoped non-device clients
+- a **workflow/API-key ingestion path** for automated uploads
+- a **service/API-key orchestration path** for project-scoped service clients
 - a **dashboard/session path** for operator-driven uploads, browsing, and workflow queueing
 
-## Device Ingestion
+## Workflow-Key Ingestion
 
-This is the automated path used by devices or external integrations.
+This is the automated path used by workflow-key clients or external integrations.
 
 ### 1. Get a presigned upload URL
 
@@ -37,7 +37,7 @@ curl -X POST http://localhost:3000/api/uploads/ack \
   -d '{"objectKey":"uploads/.../photo.png"}'
 ```
 
-After step 3, the API verifies the object, creates the document, and emits `document/process.upload`. The agents service loads the device's assigned workflow and executes it.
+After step 3, the API verifies the object, creates the document, and emits `document/process.upload`. The agents service loads the workflow key's bound workflow and executes it.
 
 ## Service API
 
@@ -105,7 +105,7 @@ You can also select documents by scope:
 {
   "workflowId": "<agentGraphId>",
   "scope": {
-    "deviceBound": false
+    "apiKeyBound": false
   }
 }
 ```
@@ -119,7 +119,7 @@ GET /api/service/workflow-executions/:id
 ### List or read documents
 
 ```http
-GET /api/service/documents?limit=20&deviceBound=false
+GET /api/service/documents?limit=20&apiKeyBound=false
 GET /api/service/documents/:id
 ```
 
@@ -180,7 +180,7 @@ Body:
 }
 ```
 
-This creates the document and publishes a dashboard document event. Unlike the device path, it does **not** auto-run a workflow. Operators choose which saved workflow to queue next.
+This creates the document and publishes a dashboard document event. Unlike the workflow-key path, it does **not** auto-run a workflow. Operators choose which saved workflow to queue next.
 
 ## Queue Any Workflow Against A Saved Document
 
@@ -207,11 +207,11 @@ Response:
 }
 ```
 
-This lets operators compare workflows, rerun analysis, or process dashboard-uploaded documents without changing a device's default assignment.
+This lets operators compare workflows, rerun analysis, or process dashboard-uploaded documents without changing a workflow key's default assignment.
 
 ## Auth Model
 
-- **Device ingestion** uses API keys scoped to organization, project, and device.
+- **Workflow ingestion** uses API keys scoped to organization and project, with a direct `agentGraphId` binding.
 - **Service orchestration** uses API keys scoped to organization and project.
 - API keys are stored as SHA-256 hashes.
 - **Dashboard operations** use better-auth session cookies.
@@ -282,7 +282,7 @@ Notes:
 
 - Dashboard auth is session-based and scoped to the active organization.
 - The request body follows the TanStack AI chat shape.
-- The current UI uses organization scope, while the endpoint also accepts optional `projectIds`, `deviceIds`, and `documentIds`.
+- The current UI uses organization scope, while the endpoint also accepts optional `projectIds`, `apiKeyIds`, and `documentIds`.
 - Responses stream over Server-Sent Events.
 - Source cards are emitted as `assistant_sources` events and include document metadata plus matched excerpts.
 - The dashboard bundle proxies this endpoint locally at `/api/documents/chat`.

@@ -12,7 +12,7 @@ Arcnem Vision is a multi-service computer vision platform with a Flutter client,
 - `client/` — Flutter app (Dart). Auth via API key. GenUI chat interface with on-device Gemma for intent parsing, camera capture, document gallery. Uses `fpdart` for functional error handling, `flutter_gemma` for on-device LLM, `genui` for dynamic UI composition.
 - `server/` — Bun workspace with four packages:
   - `packages/api/` — Hono HTTP server with better-auth (email+password, API keys, organizations). Routes mounted at `/api`. Inngest handler at `/api/inngest`. Middleware: CORS, request ID, pino logging, session extraction, S3/Inngest/DB client injection.
-  - `packages/db/` — Drizzle ORM schema and migrations against pgvector/pg18. Schema split into `authSchema.ts` (users, orgs, projects, devices, apikeys), `projectSchema.ts` (documents, embeddings, descriptions, models, presigned uploads), and `agentGraphSchemas.ts` (tools, templates, graphs, nodes, edges, runs, steps). Relationships defined in `relationships.ts`.
+  - `packages/db/` — Drizzle ORM schema and migrations against pgvector/pg18. Schema split into `authSchema.ts` (users, orgs, projects, apikeys), `projectSchema.ts` (documents, embeddings, descriptions, models, presigned uploads), and `agentGraphSchemas.ts` (tools, templates, graphs, nodes, edges, runs, steps). Relationships defined in `relationships.ts`.
   - `packages/dashboard/` — React admin UI with TanStack Router, Tailwind CSS, and shadcn/ui. Keep business logic in `packages/api/`; the dashboard should mainly proxy auth/chat/realtime and render API-owned state. Uses Vite + React 19.
   - `packages/shared/` — Shared env var helpers (`createEnvVarGetter` pattern).
 - `models/` — Go workspace (`go.work`) with modules:
@@ -26,7 +26,7 @@ Arcnem Vision is a multi-service computer vision platform with a Flutter client,
 
 **Agent graph system:** Graphs are defined in the database with a template/instance pattern. Templates define reusable workflows (entry node, state schema, nodes, edges, tools). Instances bind templates to organizations. Nodes have types: `worker` (ReAct agent with tools), `tool` (single MCP tool call with input/output mapping), `supervisor` (multi-agent orchestration). Execution is traced in `agent_graph_runs` and `agent_graph_run_steps`.
 
-**Auth model:** better-auth with API key plugin. API keys are scoped to org/project/device, stored as SHA-256 hashes. Flutter client authenticates via API key verification. Redis used as secondary session storage. Dashboard uses session-based auth.
+**Auth model:** better-auth with API key plugin. API keys are scoped to org/project, with workflow keys carrying a direct `agentGraphId` binding and service keys remaining project-scoped orchestration keys. Keys are stored as SHA-256 hashes. Flutter client authenticates via API key verification. Redis used as secondary session storage. Dashboard uses session-based auth.
 
 ## Development Commands
 
@@ -120,7 +120,7 @@ Each service has its own `.env` (copy from `.env.example`):
 
 - All primary keys use UUIDv7 (time-ordered).
 - Embeddings are 768-dimensional vectors (CLIP via Replicate) with HNSW cosine indexes.
-- Documents link to organizations, projects, and devices.
+- Documents link to organizations, projects, and API keys.
 - Document descriptions are LLM-generated text representations, also embedded for similarity search.
 - Agent graphs use a template/instance pattern: `agent_graph_templates` → `agent_graphs`, with nodes, edges, and tools at both levels.
 - Execution tracing: `agent_graph_runs` (status, initial/final state, errors) → `agent_graph_run_steps` (per-node state deltas, ordered).

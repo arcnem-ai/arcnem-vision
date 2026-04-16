@@ -62,7 +62,7 @@ export function registerDashboardDocumentUploadRoutes(
 						s3Client: c.get("s3Client"),
 						target: {
 							...uploadTarget,
-							deviceId: null,
+							apiKeyId: null,
 							objectKeySource: "dashboard",
 						},
 						contentType,

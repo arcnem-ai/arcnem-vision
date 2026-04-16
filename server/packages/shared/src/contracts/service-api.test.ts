@@ -18,16 +18,16 @@ describe("service API schemas", () => {
 		}
 	});
 
-	test("rejects contradictory device filters", () => {
+	test("rejects contradictory api key filters", () => {
 		const parsed = serviceDocumentScopeSchema.safeParse({
-			deviceIds: ["device-1"],
-			deviceBound: false,
+			apiKeyIds: ["key-1"],
+			apiKeyBound: false,
 		});
 
 		expect(parsed.success).toBe(false);
 		if (!parsed.success) {
 			expect(parsed.error.issues[0]?.message).toContain(
-				"deviceIds cannot be combined",
+				"apiKeyIds cannot be combined",
 			);
 		}
 	});
@@ -49,8 +49,8 @@ describe("service API schemas", () => {
 		const parsed = serviceWorkflowExecutionRequestSchema.safeParse({
 			workflowId: "workflow-1",
 			scope: {
-				deviceIds: ["device-1"],
-				deviceBound: true,
+				apiKeyIds: ["key-1"],
+				apiKeyBound: true,
 			},
 			initialState: {
 				analysis_label: "smoke-test",
@@ -66,8 +66,8 @@ describe("service API schemas", () => {
 
 	test("rejects contradictory document list filters", () => {
 		const parsed = serviceDocumentListQuerySchema.safeParse({
-			deviceIds: ["device-1"],
-			deviceBound: false,
+			apiKeyIds: ["key-1"],
+			apiKeyBound: false,
 		});
 
 		expect(parsed.success).toBe(false);

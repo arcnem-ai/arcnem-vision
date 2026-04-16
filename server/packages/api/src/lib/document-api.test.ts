@@ -8,7 +8,7 @@ const baseRow = {
 	sizeBytes: 123,
 	createdAt: "2026-04-14T00:00:00.000Z",
 	description: "Test image",
-	deviceId: null,
+	apiKeyId: null,
 };
 
 const s3Client = {

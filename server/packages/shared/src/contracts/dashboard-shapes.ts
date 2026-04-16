@@ -132,11 +132,17 @@ export const managedApiKeySchema = z.object({
 
 export type ManagedAPIKey = z.infer<typeof managedApiKeySchema>;
 
-export const deviceApiKeySchema = managedApiKeySchema;
+export const workflowApiKeySchema = managedApiKeySchema.extend({
+	kind: z.literal("workflow"),
+	projectId: z.string().min(1),
+	agentGraphId: z.string().min(1),
+	workflowName: z.string().nullable(),
+});
 
-export type DeviceAPIKey = z.infer<typeof deviceApiKeySchema>;
+export type WorkflowAPIKey = z.infer<typeof workflowApiKeySchema>;
 
 export const serviceApiKeySchema = managedApiKeySchema.extend({
+	kind: z.literal("service"),
 	projectId: z.string().min(1),
 });
 

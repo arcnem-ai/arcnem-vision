@@ -48,9 +48,9 @@ export const generatedApiKeySchema = z.object({
 
 export type GeneratedAPIKey = z.infer<typeof generatedApiKeySchema>;
 
-export const generatedDeviceApiKeySchema = generatedApiKeySchema;
+export const generatedWorkflowApiKeySchema = generatedApiKeySchema;
 
-export type GeneratedDeviceAPIKey = GeneratedAPIKey;
+export type GeneratedWorkflowAPIKey = GeneratedAPIKey;
 
 export const generatedServiceApiKeySchema = generatedApiKeySchema;
 
@@ -60,32 +60,22 @@ export const createProjectInputSchema = z.object({
 	name: z.string().min(1),
 });
 
-export const createDeviceInputSchema = z.object({
+export const createWorkflowApiKeyInputSchema = z.object({
 	projectId: z.string().min(1),
 	name: z.string().min(1),
 	agentGraphId: z.string().min(1),
 });
 
-export const updateDeviceInputSchema = z.object({
-	deviceId: z.string().min(1),
+export const updateWorkflowApiKeyInputSchema = z.object({
+	apiKeyId: z.string().min(1),
 	name: z.string().min(1),
+	enabled: z.boolean(),
 	agentGraphId: z.string().min(1),
-});
-
-export const createDeviceApiKeyInputSchema = z.object({
-	deviceId: z.string().min(1),
-	name: z.string().min(1),
 });
 
 export const createServiceApiKeyInputSchema = z.object({
 	projectId: z.string().min(1),
 	name: z.string().min(1),
-});
-
-export const updateDeviceApiKeyInputSchema = z.object({
-	apiKeyId: z.string().min(1),
-	name: z.string().min(1),
-	enabled: z.boolean(),
 });
 
 export const updateServiceApiKeyInputSchema = z.object({
@@ -94,27 +84,9 @@ export const updateServiceApiKeyInputSchema = z.object({
 	enabled: z.boolean(),
 });
 
-export const deleteDeviceApiKeyInputSchema = z.object({
-	apiKeyId: z.string().min(1),
-});
-
-export const deleteServiceApiKeyInputSchema = z.object({
-	apiKeyId: z.string().min(1),
-});
-
 export const setProjectArchivedInputSchema = z.object({
 	projectId: z.string().min(1),
 	archived: z.boolean(),
-});
-
-export const setDeviceArchivedInputSchema = z.object({
-	deviceId: z.string().min(1),
-	archived: z.boolean(),
-});
-
-export const assignWorkflowInputSchema = z.object({
-	deviceId: z.string().min(1),
-	agentGraphId: z.string().min(1),
 });
 
 export const createWorkflowInputSchema = workflowDraftSchema;

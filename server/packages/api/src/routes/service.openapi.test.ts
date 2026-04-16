@@ -42,7 +42,7 @@ describe("service openapi", () => {
 		});
 		expect(spec.paths["/service/documents"]?.get?.parameters).toEqual(
 			expect.arrayContaining([
-				expect.objectContaining({ name: "deviceBound", in: "query" }),
+				expect.objectContaining({ name: "apiKeyBound", in: "query" }),
 			]),
 		);
 	});

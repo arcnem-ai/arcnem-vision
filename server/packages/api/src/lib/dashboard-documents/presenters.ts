@@ -26,7 +26,7 @@ export function toDocumentItem(
 		description: row.description,
 		distance: row.distance == null ? null : Number(row.distance),
 		projectId: row.projectId,
-		deviceId: row.deviceId,
+		apiKeyId: row.apiKeyId,
 		thumbnailUrl: s3Client.presign(row.objectKey, {
 			method: "GET",
 			expiresIn: PRESIGN_GET_EXPIRES_IN_SECONDS,

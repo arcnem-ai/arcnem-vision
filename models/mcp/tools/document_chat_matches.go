@@ -47,7 +47,7 @@ func buildDocumentSearchMatch(
 		row.OCRText,
 		row.ObjectKey,
 		row.ProjectName,
-		row.DeviceName,
+		row.APIKeyName,
 	)
 	if snippet == "" {
 		snippet = buildPreferredExcerpt(row.DescriptionText, row.OCRText, row.ObjectKey)
@@ -60,8 +60,8 @@ func buildDocumentSearchMatch(
 		DocumentID:  row.DocumentID,
 		ProjectID:   row.ProjectID,
 		ProjectName: row.ProjectName,
-		DeviceID:    row.DeviceID,
-		DeviceName:  row.DeviceName,
+		APIKeyID:    row.APIKeyID,
+		APIKeyName:  row.APIKeyName,
 		Label:       label,
 		Excerpt:     snippet,
 		MatchReason: matchReason,
@@ -75,8 +75,8 @@ func buildDocumentSearchMatch(
 		CreatedAt:   row.CreatedAt.Format(time.RFC3339),
 		ProjectID:   row.ProjectID,
 		ProjectName: row.ProjectName,
-		DeviceID:    row.DeviceID,
-		DeviceName:  row.DeviceName,
+		APIKeyID:    row.APIKeyID,
+		APIKeyName:  row.APIKeyName,
 		Label:       label,
 		Snippet:     snippet,
 		MatchReason: matchReason,

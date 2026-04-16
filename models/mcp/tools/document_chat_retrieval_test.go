@@ -7,8 +7,8 @@ import (
 
 func TestBuildDocumentSearchMatchesIncludesDocumentMetadata(t *testing.T) {
 	createdAt := time.Date(2026, time.April, 6, 12, 0, 0, 0, time.UTC)
-	deviceID := "device-123"
-	deviceName := "Dock 3"
+	apiKeyID := "key-123"
+	apiKeyName := "Dock 3 workflow key"
 
 	matches := buildDocumentSearchMatches(
 		[]documentSearchRow{
@@ -19,8 +19,8 @@ func TestBuildDocumentSearchMatchesIncludesDocumentMetadata(t *testing.T) {
 				SizeBytes:       4096,
 				ProjectID:       "project-123",
 				ProjectName:     "Seed Project",
-				DeviceID:        &deviceID,
-				DeviceName:      &deviceName,
+				APIKeyID:        &apiKeyID,
+				APIKeyName:      &apiKeyName,
 				DescriptionText: "A black dog standing on a path in bright sunlight.",
 				CreatedAt:       createdAt,
 				Score:           0.42,

@@ -539,7 +539,7 @@ The Arcnem Vision client currently authenticates via API key and uploads images 
 - **Dynamic result displays**: Instead of a snackbar after upload, render rich DocumentCard surfaces showing processing status, classification results, and confidence scores.
 - **Interactive search**: Let the AI generate search result UIs from pgvector similarity queries — clickable cards, sortable lists, or comparison views.
 - **Conversational document analysis**: Build a chat interface where users ask questions about uploaded documents and the AI responds with generated UIs (charts, annotated images, data tables).
-- **Form generation**: Let the AI dynamically build project/device configuration forms based on context.
+- **Form generation**: Let the AI dynamically build project/API-key configuration forms based on context.
 
 ### Recommended Provider for Arcnem Vision
 

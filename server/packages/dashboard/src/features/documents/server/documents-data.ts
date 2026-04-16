@@ -14,7 +14,7 @@ export const getDocuments = createServerFn({ method: "GET" })
 			limit?: number;
 			query?: string;
 			projectId?: string;
-			deviceId?: string;
+			apiKeyId?: string;
 			dashboardUploadsOnly?: boolean;
 		}) => input,
 	)
@@ -24,7 +24,7 @@ export const getDocuments = createServerFn({ method: "GET" })
 		if (data.cursor) params.set("cursor", data.cursor);
 		if (data.query?.trim()) params.set("query", data.query.trim());
 		if (data.projectId?.trim()) params.set("projectId", data.projectId.trim());
-		if (data.deviceId?.trim()) params.set("deviceId", data.deviceId.trim());
+		if (data.apiKeyId?.trim()) params.set("apiKeyId", data.apiKeyId.trim());
 		if (data.dashboardUploadsOnly) params.set("dashboardUploadsOnly", "true");
 
 		return fetchDashboardAPI<DocumentsResponse>(

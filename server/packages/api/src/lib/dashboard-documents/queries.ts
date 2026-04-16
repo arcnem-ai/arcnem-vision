@@ -47,7 +47,7 @@ export async function findIssuedDashboardUpload(
 			objectKey: presignedUploads.objectKey,
 			organizationId: presignedUploads.organizationId,
 			projectId: presignedUploads.projectId,
-			deviceId: presignedUploads.deviceId,
+			apiKeyId: presignedUploads.apiKeyId,
 			visibility: presignedUploads.visibility,
 		})
 		.from(presignedUploads)
@@ -74,9 +74,9 @@ export async function listDashboardDocumentPage(
 		conditions.push(eq(documents.projectId, filters.projectId));
 	}
 	if (filters.dashboardUploadsOnly) {
-		conditions.push(isNull(documents.deviceId));
-	} else if (filters.deviceId) {
-		conditions.push(eq(documents.deviceId, filters.deviceId));
+		conditions.push(isNull(documents.apiKeyId));
+	} else if (filters.apiKeyId) {
+		conditions.push(eq(documents.apiKeyId, filters.apiKeyId));
 	}
 	if (filters.cursor) {
 		conditions.push(lt(documents.id, filters.cursor));
@@ -91,7 +91,7 @@ export async function listDashboardDocumentPage(
 			createdAt: documents.createdAt,
 			description: documentDescriptions.text,
 			projectId: documents.projectId,
-			deviceId: documents.deviceId,
+			apiKeyId: documents.apiKeyId,
 		})
 		.from(documents)
 		.leftJoin(

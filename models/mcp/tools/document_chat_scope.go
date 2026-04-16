@@ -13,8 +13,8 @@ func buildDocumentScopeFilters(alias string, scope ChatDocumentScope) (string, [
 		clauses = append(clauses, fmt.Sprintf("%s.project_id IN ?", alias))
 		args = append(args, ids)
 	}
-	if ids := dedupeNonEmpty(scope.DeviceIDs); len(ids) > 0 {
-		clauses = append(clauses, fmt.Sprintf("%s.device_id IN ?", alias))
+	if ids := dedupeNonEmpty(scope.APIKeyIDs); len(ids) > 0 {
+		clauses = append(clauses, fmt.Sprintf("%s.api_key_id IN ?", alias))
 		args = append(args, ids)
 	}
 	if ids := dedupeNonEmpty(scope.DocumentIDs); len(ids) > 0 {
@@ -22,7 +22,7 @@ func buildDocumentScopeFilters(alias string, scope ChatDocumentScope) (string, [
 		args = append(args, ids)
 	}
 	if scope.DashboardUploadsOnly {
-		clauses = append(clauses, fmt.Sprintf("%s.device_id IS NULL", alias))
+		clauses = append(clauses, fmt.Sprintf("%s.api_key_id IS NULL", alias))
 	}
 
 	return strings.Join(clauses, " AND "), args

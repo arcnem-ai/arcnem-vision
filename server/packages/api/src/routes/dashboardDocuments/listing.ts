@@ -30,14 +30,14 @@ export function registerDashboardDocumentListingRoutes(
 		const cursor = c.req.query("cursor");
 		const query = c.req.query("query")?.trim() ?? "";
 		const projectId = c.req.query("projectId")?.trim() ?? "";
-		const deviceId = c.req.query("deviceId")?.trim() ?? "";
+		const apiKeyId = c.req.query("apiKeyId")?.trim() ?? "";
 		const dashboardUploadsOnly = c.req.query("dashboardUploadsOnly") === "true";
 		const limit = Math.min(Math.max(Number(limitParam) || 20, 1), 100);
 
-		if (deviceId && dashboardUploadsOnly) {
+		if (apiKeyId && dashboardUploadsOnly) {
 			return c.json(
 				{
-					message: "deviceId cannot be combined with dashboardUploadsOnly",
+					message: "apiKeyId cannot be combined with dashboardUploadsOnly",
 				},
 				400,
 			);
@@ -57,7 +57,7 @@ export function registerDashboardDocumentListingRoutes(
 				limit,
 				{
 					projectId: projectId || undefined,
-					deviceId: deviceId || undefined,
+					apiKeyId: apiKeyId || undefined,
 					dashboardUploadsOnly,
 				},
 			);
@@ -71,7 +71,7 @@ export function registerDashboardDocumentListingRoutes(
 		const page = await listDashboardDocumentPage(dbClient, {
 			organizationId,
 			projectId: projectId || undefined,
-			deviceId: deviceId || undefined,
+			apiKeyId: apiKeyId || undefined,
 			dashboardUploadsOnly,
 			cursor: cursor || undefined,
 			limit,

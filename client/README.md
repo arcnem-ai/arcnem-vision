@@ -8,7 +8,7 @@ Flutter app for Arcnem Vision — capture images, talk to AI agents, and browse 
 - **On-device Gemma** — Intent parsing happens locally using `flutter_gemma`. Your queries are understood before they leave the phone.
 - **Camera capture** — Take a photo and feed it directly into the agent pipeline.
 - **Document gallery** — Browse, search, and view processed documents with their embeddings and descriptions.
-- **API key auth** — Scoped to organization, project, and device.
+- **API key auth** — Scoped to organization and project, with workflow keys binding to default workflows.
 
 ## Stack
 

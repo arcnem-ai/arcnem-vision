@@ -1,10 +1,10 @@
 export type {
 	DashboardData,
-	DeviceAPIKey,
 	GeneratedAPIKey,
-	GeneratedDeviceAPIKey,
 	GeneratedServiceAPIKey,
+	GeneratedWorkflowAPIKey,
 	ServiceAPIKey,
+	WorkflowAPIKey,
 	WorkflowDraft,
 	WorkflowEdge,
 	WorkflowModelOption,

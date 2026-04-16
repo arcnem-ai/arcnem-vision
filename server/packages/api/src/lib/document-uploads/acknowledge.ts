@@ -82,7 +82,7 @@ const createDocumentAndVerifyUpload = async ({
 					lastModifiedAt: verifiedObject.lastModifiedAt,
 					organizationId: upload.organizationId,
 					projectId: upload.projectId,
-					deviceId: upload.deviceId,
+					apiKeyId: upload.apiKeyId,
 				})
 				.returning({
 					id: documents.id,

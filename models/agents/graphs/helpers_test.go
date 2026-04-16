@@ -32,7 +32,7 @@ func TestLoadStateStringJSONEncodesStructuredValues(t *testing.T) {
 func TestLoadStateStringJSONEncodesObjects(t *testing.T) {
 	value, err := loadStateString(map[string]any{
 		"scope": map[string]any{
-			"deviceBound": false,
+			"apiKeyBound": false,
 			"documentIds": []string{"doc-1"},
 		},
 	}, "scope")
@@ -45,7 +45,7 @@ func TestLoadStateStringJSONEncodesObjects(t *testing.T) {
 		t.Fatalf("expected valid json object, got error: %v", err)
 	}
 
-	if decoded["deviceBound"] != false {
-		t.Fatalf("expected deviceBound=false, got %#v", decoded["deviceBound"])
+	if decoded["apiKeyBound"] != false {
+		t.Fatalf("expected apiKeyBound=false, got %#v", decoded["apiKeyBound"])
 	}
 }

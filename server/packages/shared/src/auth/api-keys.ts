@@ -1,4 +1,4 @@
-export type APIKeyKind = "device" | "service";
+export type APIKeyKind = "workflow" | "service";
 
 export type APIKeyPermissionDomain = "uploads" | "documents" | "workflows";
 
@@ -12,7 +12,7 @@ const API_KEY_PERMISSION_DOMAINS: APIKeyPermissionDomain[] = [
 	"workflows",
 ];
 
-export const DEFAULT_DEVICE_API_KEY_PERMISSIONS: APIKeyPermissions = {
+export const DEFAULT_WORKFLOW_API_KEY_PERMISSIONS: APIKeyPermissions = {
 	uploads: ["presign", "ack"],
 	documents: ["list", "read", "similar"],
 };
@@ -51,7 +51,7 @@ export function getDefaultAPIKeyPermissions(
 ): APIKeyPermissions {
 	return kind === "service"
 		? DEFAULT_SERVICE_API_KEY_PERMISSIONS
-		: DEFAULT_DEVICE_API_KEY_PERMISSIONS;
+		: DEFAULT_WORKFLOW_API_KEY_PERMISSIONS;
 }
 
 export function resolveAPIKeyPermissions(

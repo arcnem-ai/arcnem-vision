@@ -1,10 +1,10 @@
 # Arcnem Vision Dashboard
 
-React dashboard for managing projects, devices, API keys, workflows, uploaded documents, grounded Docs-tab chat, and live run inspection.
+React dashboard for managing projects, workflow keys, service keys, workflows, uploaded documents, grounded Docs-tab chat, and live run inspection.
 
 ## What this package does
 
-- **Projects & Devices tab**: create projects, register devices, assign default workflows, and issue or rotate device API keys.
+- **Projects & API Keys tab**: create projects, issue workflow keys bound to default workflows, and manage service keys for broader orchestration.
 - **Workflow Library tab**: create/edit graph workflows with a visual canvas, browse reusable templates, and start a new workflow from any template.
 - **Docs tab**: browse uploads, run semantic search, ask grounded questions across the current collection, upload directly from the dashboard, inspect related OCR and segmented outputs, and queue workflows against any document.
 - **Runs tab**: inspect execution history and per-step state changes with realtime refresh.
@@ -49,10 +49,10 @@ Dashboard chat, realtime, and auth all proxy through the API server now. Keep `s
 
 - Documents search is wired to `query` on `/api/dashboard/documents`
 - Search blends lexical ranking with semantic description matches when `DOCUMENT_SEARCH_MODE=hybrid` and embeddings are available
-- Search filters are pushed into the API/MCP scope so project, device, and dashboard-upload filters rank within the requested slice
+- Search filters are pushed into the API/MCP scope so project, API key, and dashboard-upload filters rank within the requested slice
 - Docs collection chat posts to the local `/api/documents/chat` proxy, which forwards to `/api/dashboard/documents/chat`
 - The current chat launcher is organization-scoped and grounds answers in descriptions, OCR text, and related segmentation context
-- Chat responses stream over Server-Sent Events and can attach source cards with project/device badges plus matched excerpts
+- Chat responses stream over Server-Sent Events and can attach source cards with project/API-key badges plus matched excerpts
 - Dashboard uploads use `/api/dashboard/documents/uploads/presign` and `/api/dashboard/documents/uploads/ack`
 - Related segmentation outputs are fetched from `/api/dashboard/documents/:id/segmentations`
 - Selecting a document lets operators queue any saved workflow against it with `/api/dashboard/documents/:id/run`

@@ -84,7 +84,7 @@ func ExecuteWorkflow(ctx context.Context, input inngestgo.Input[inputs.ExecuteWo
 				"visibility":      document.Visibility,
 				"organization_id": document.OrganizationID,
 				"project_id":      document.ProjectID,
-				"device_id":       document.DeviceID,
+				"api_key_id":      document.APIKeyID,
 				"created_at":      document.CreatedAt.Format(time.RFC3339),
 				"temp_url":        tempURL,
 			})

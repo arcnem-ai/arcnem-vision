@@ -248,7 +248,7 @@ GenUI can extend the Arcnem Vision client with:
 - **Dynamic result displays**: Rich DocumentCard surfaces showing processing status, classification results, and confidence scores.
 - **Interactive search**: Search result UIs from pgvector similarity queries — clickable cards, sortable lists, or comparison views.
 - **Conversational document analysis**: Chat interface where users ask questions and the AI responds with generated UIs (charts, annotated images, data tables).
-- **Form generation**: AI dynamically builds project/device configuration forms based on context.
+- **Form generation**: AI dynamically builds project/API-key configuration forms based on context.
 
 ### Recommended Provider
 

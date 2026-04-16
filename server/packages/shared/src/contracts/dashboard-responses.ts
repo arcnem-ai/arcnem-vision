@@ -17,21 +17,9 @@ export const projectSummarySchema = z.object({
 	slug: z.string().min(1),
 });
 
-export const deviceCreateResponseSchema = z.object({
+export const workflowApiKeyResponseSchema = z.object({
 	id: z.string().min(1),
 	name: z.string().min(1),
-	slug: z.string().min(1),
-	agentGraphId: z.string().min(1),
-});
-
-export const deviceUpdateResponseSchema = z.object({
-	id: z.string().min(1),
-	name: z.string().min(1),
-	agentGraphId: z.string().min(1),
-});
-
-export const deviceWorkflowAssignmentResponseSchema = z.object({
-	id: z.string().min(1),
 	agentGraphId: z.string().min(1),
 });
 
@@ -41,14 +29,14 @@ export const archiveStateResponseSchema = z.object({
 	archivedAt: z.string().nullable(),
 });
 
-export const deviceApiKeyUpdateResponseSchema = z.object({
+export const apiKeyUpdateResponseSchema = z.object({
 	id: z.string().min(1),
 	enabled: z.boolean(),
 	name: z.string().nullable(),
 });
 
 export const generatedApiKeyResponseSchema = generatedApiKeySchema;
-export const generatedDeviceApiKeyResponseSchema = generatedApiKeySchema;
+export const generatedWorkflowApiKeyResponseSchema = generatedApiKeySchema;
 export const generatedServiceApiKeyResponseSchema = generatedApiKeySchema;
 
 export const workflowTemplateCreatedResponseSchema = z.object({

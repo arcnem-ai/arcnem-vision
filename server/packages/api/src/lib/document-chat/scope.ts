@@ -1,4 +1,4 @@
-import { devices, documents, projects } from "@arcnem-vision/db/schema";
+import { apikeys, documents, projects } from "@arcnem-vision/db/schema";
 import type { PGDB } from "@arcnem-vision/db/server";
 import type { ChatScope } from "@arcnem-vision/shared";
 import { and, count, eq, inArray } from "drizzle-orm";
@@ -47,7 +47,7 @@ export async function resolveRequestedChatScope(
 		kind: "organization",
 		organizationId: authOrganizationId,
 		projectIds: dedupeIds(scope.projectIds),
-		deviceIds: dedupeIds(scope.deviceIds),
+		apiKeyIds: dedupeIds(scope.apiKeyIds),
 		documentIds: dedupeIds(scope.documentIds),
 	};
 
@@ -69,16 +69,16 @@ export async function resolveRequestedChatScope(
 		},
 	);
 	await assertScopeIdsBelongToOrganization(
-		normalizedScope.deviceIds,
-		"deviceIds",
+		normalizedScope.apiKeyIds,
+		"apiKeyIds",
 		async (ids) => {
 			const [{ total }] = await db
 				.select({ total: count() })
-				.from(devices)
+				.from(apikeys)
 				.where(
 					and(
-						eq(devices.organizationId, authOrganizationId),
-						inArray(devices.id, ids),
+						eq(apikeys.organizationId, authOrganizationId),
+						inArray(apikeys.id, ids),
 					),
 				);
 

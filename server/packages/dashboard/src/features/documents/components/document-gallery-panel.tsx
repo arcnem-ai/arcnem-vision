@@ -57,7 +57,7 @@ import { cn } from "@/lib/utils";
 const ALL_PROJECTS_FILTER = "all-projects";
 const ALL_SOURCES_FILTER = "all-sources";
 const DASHBOARD_UPLOADS_FILTER = "dashboard-uploads";
-const DEVICE_SOURCE_FILTER_PREFIX = "device:";
+const API_KEY_SOURCE_FILTER_PREFIX = "api-key:";
 
 function formatBytes(bytes: number): string {
 	if (bytes < 1024) return `${bytes} B`;
@@ -107,17 +107,35 @@ function replaceDocument(
 	return replaced ? nextItems : items;
 }
 
-function getDocumentSourceLabel(deviceName: string | null | undefined) {
-	return deviceName ?? "Dashboard Upload";
+type SourceAPIKey =
+	| DashboardData["workflowApiKeys"][number]
+	| DashboardData["serviceApiKeys"][number];
+
+function isWorkflowAPIKey(
+	apiKey: SourceAPIKey | null | undefined,
+): apiKey is DashboardData["workflowApiKeys"][number] {
+	return apiKey?.kind === "workflow";
 }
 
-function getDeviceSourceFilterValue(deviceId: string) {
-	return `${DEVICE_SOURCE_FILTER_PREFIX}${deviceId}`;
+function getDocumentSourceLabel(apiKey: SourceAPIKey | null | undefined) {
+	if (!apiKey) {
+		return "Dashboard Upload";
+	}
+
+	if (apiKey.name?.trim()) {
+		return apiKey.name;
+	}
+
+	return apiKey.kind === "workflow" ? "Workflow key" : "Service key";
 }
 
-function getDeviceIdFromSourceFilterValue(value: string) {
-	return value.startsWith(DEVICE_SOURCE_FILTER_PREFIX)
-		? value.slice(DEVICE_SOURCE_FILTER_PREFIX.length)
+function getAPIKeySourceFilterValue(apiKeyId: string) {
+	return `${API_KEY_SOURCE_FILTER_PREFIX}${apiKeyId}`;
+}
+
+function getAPIKeyIdFromSourceFilterValue(value: string) {
+	return value.startsWith(API_KEY_SOURCE_FILTER_PREFIX)
+		? value.slice(API_KEY_SOURCE_FILTER_PREFIX.length)
 		: null;
 }
 
@@ -377,7 +395,7 @@ function DocumentDetailModal({
 	selectedDocument,
 	selectedDocumentProjectName,
 	selectedDocumentSourceLabel,
-	selectedDocumentDevice,
+	selectedDocumentAPIKey,
 	selectedWorkflowId,
 	selectedWorkflowName,
 	workflows,
@@ -396,7 +414,7 @@ function DocumentDetailModal({
 	selectedDocument: DocumentItem;
 	selectedDocumentProjectName: string;
 	selectedDocumentSourceLabel: string;
-	selectedDocumentDevice: DashboardData["devices"][number] | null;
+	selectedDocumentAPIKey: SourceAPIKey | null;
 	selectedWorkflowId: string;
 	selectedWorkflowName: string | null;
 	workflows: DashboardData["workflows"];
@@ -686,19 +704,26 @@ function DocumentDetailModal({
 										</Select>
 
 										<div className="space-y-1 text-sm text-slate-500">
-											{selectedDocument.deviceId ? (
+											{selectedDocumentAPIKey?.kind === "workflow" ? (
 												<p>
-													Source device workflow:{" "}
+													Bound workflow:{" "}
 													<span className="font-medium text-slate-700">
-														{selectedDocumentDevice?.workflowName ??
+														{selectedDocumentAPIKey.workflowName ??
 															"Not assigned"}
+													</span>
+												</p>
+											) : selectedDocumentAPIKey ? (
+												<p>
+													Source key type:{" "}
+													<span className="font-medium text-slate-700">
+														Service key
 													</span>
 												</p>
 											) : (
 												<p>
 													Source:{" "}
 													<span className="font-medium text-slate-700">
-														Dashboard upload with no device binding
+														Dashboard upload with no API key binding
 													</span>
 												</p>
 											)}
@@ -786,14 +811,16 @@ export function DocumentGalleryPanel({
 	organizationId,
 	organizationName,
 	projects,
-	devices,
+	workflowApiKeys,
+	serviceApiKeys,
 	workflows,
 }: {
 	initialData: DocumentsResponse;
 	organizationId: string;
 	organizationName: string;
 	projects: DashboardData["projects"];
-	devices: DashboardData["devices"];
+	workflowApiKeys: DashboardData["workflowApiKeys"];
+	serviceApiKeys: DashboardData["serviceApiKeys"];
 	workflows: DashboardData["workflows"];
 }) {
 	const { lastEvent, reconnectCount } = useDashboardRealtime();
@@ -860,22 +887,26 @@ export function DocumentGalleryPanel({
 		() => new Map(projects.map((project) => [project.id, project.name])),
 		[projects],
 	);
-	const devicesById = useMemo(
-		() => new Map(devices.map((device) => [device.id, device])),
-		[devices],
+	const apiKeys = useMemo(
+		() => [...workflowApiKeys, ...serviceApiKeys],
+		[serviceApiKeys, workflowApiKeys],
+	);
+	const apiKeysById = useMemo(
+		() => new Map(apiKeys.map((apiKey) => [apiKey.id, apiKey])),
+		[apiKeys],
 	);
 	const workflowNameById = useMemo(
 		() => new Map(workflows.map((workflow) => [workflow.id, workflow.name])),
 		[workflows],
 	);
-	const filteredDevices = useMemo(() => {
+	const filteredApiKeys = useMemo(() => {
 		if (selectedProjectFilterId === ALL_PROJECTS_FILTER) {
-			return devices;
+			return apiKeys;
 		}
-		return devices.filter(
-			(device) => device.projectId === selectedProjectFilterId,
+		return apiKeys.filter(
+			(apiKey) => apiKey.projectId === selectedProjectFilterId,
 		);
-	}, [devices, selectedProjectFilterId]);
+	}, [apiKeys, selectedProjectFilterId]);
 
 	useEffect(() => {
 		setDocuments(initialData.documents);
@@ -898,34 +929,34 @@ export function DocumentGalleryPanel({
 	}, [projects, selectedProjectFilterId]);
 
 	useEffect(() => {
-		const selectedDeviceId = getDeviceIdFromSourceFilterValue(
+		const selectedAPIKeyId = getAPIKeyIdFromSourceFilterValue(
 			selectedSourceFilterValue,
 		);
 		if (
-			selectedDeviceId &&
-			!filteredDevices.some((device) => device.id === selectedDeviceId)
+			selectedAPIKeyId &&
+			!filteredApiKeys.some((apiKey) => apiKey.id === selectedAPIKeyId)
 		) {
 			setSelectedSourceFilterValue(ALL_SOURCES_FILTER);
 		}
-	}, [filteredDevices, selectedSourceFilterValue]);
+	}, [filteredApiKeys, selectedSourceFilterValue]);
 
 	const onProjectFilterChange = (projectFilterId: string) => {
 		setSelectedProjectFilterId(projectFilterId);
 
-		const selectedDeviceId = getDeviceIdFromSourceFilterValue(
+		const selectedAPIKeyId = getAPIKeyIdFromSourceFilterValue(
 			selectedSourceFilterValue,
 		);
-		if (!selectedDeviceId) {
+		if (!selectedAPIKeyId) {
 			return;
 		}
 
-		const deviceStillAvailable = devices.some(
-			(device) =>
-				device.id === selectedDeviceId &&
+		const apiKeyStillAvailable = apiKeys.some(
+			(apiKey) =>
+				apiKey.id === selectedAPIKeyId &&
 				(projectFilterId === ALL_PROJECTS_FILTER ||
-					device.projectId === projectFilterId),
+					apiKey.projectId === projectFilterId),
 		);
-		if (!deviceStillAvailable) {
+		if (!apiKeyStillAvailable) {
 			setSelectedSourceFilterValue(ALL_SOURCES_FILTER);
 		}
 	};
@@ -943,7 +974,7 @@ export function DocumentGalleryPanel({
 		query?: string;
 		sourceFilterValue?: string;
 	}) => {
-		const deviceId = getDeviceIdFromSourceFilterValue(sourceFilterValue);
+		const apiKeyId = getAPIKeyIdFromSourceFilterValue(sourceFilterValue);
 
 		return {
 			...(cursor ? { cursor } : {}),
@@ -952,7 +983,7 @@ export function DocumentGalleryPanel({
 			...(projectFilterId !== ALL_PROJECTS_FILTER
 				? { projectId: projectFilterId }
 				: {}),
-			...(deviceId ? { deviceId } : {}),
+			...(apiKeyId ? { apiKeyId } : {}),
 			...(sourceFilterValue === DASHBOARD_UPLOADS_FILTER
 				? { dashboardUploadsOnly: true }
 				: {}),
@@ -1028,8 +1059,11 @@ export function DocumentGalleryPanel({
 	});
 
 	const defaultWorkflowIdForDocument = (document: DocumentItem) => {
-		const assignedWorkflowId = document.deviceId
-			? (devicesById.get(document.deviceId)?.agentGraphId ?? "")
+		const sourceApiKey = document.apiKeyId
+			? (apiKeysById.get(document.apiKeyId) ?? null)
+			: null;
+		const assignedWorkflowId = isWorkflowAPIKey(sourceApiKey)
+			? sourceApiKey.agentGraphId
 			: "";
 		if (assignedWorkflowId && workflowNameById.has(assignedWorkflowId)) {
 			return assignedWorkflowId;
@@ -1102,16 +1136,16 @@ export function DocumentGalleryPanel({
 	const selectedDocument = selectedDocumentId
 		? (documents.find((document) => document.id === selectedDocumentId) ?? null)
 		: null;
-	const selectedDocumentDevice = selectedDocument
-		? selectedDocument.deviceId
-			? (devicesById.get(selectedDocument.deviceId) ?? null)
+	const selectedDocumentAPIKey = selectedDocument
+		? selectedDocument.apiKeyId
+			? (apiKeysById.get(selectedDocument.apiKeyId) ?? null)
 			: null
 		: null;
 	const selectedDocumentProjectName = selectedDocument
 		? (projectNameById.get(selectedDocument.projectId) ?? "Unknown project")
 		: null;
 	const selectedDocumentSourceLabel = getDocumentSourceLabel(
-		selectedDocumentDevice?.name,
+		selectedDocumentAPIKey,
 	);
 	const selectedWorkflowName = selectedWorkflowId
 		? (workflowNameById.get(selectedWorkflowId) ?? null)
@@ -1513,14 +1547,14 @@ export function DocumentGalleryPanel({
 										<SelectItem value={DASHBOARD_UPLOADS_FILTER}>
 											Dashboard uploads
 										</SelectItem>
-										{filteredDevices.map((device) => (
+										{filteredApiKeys.map((apiKey) => (
 											<SelectItem
-												key={device.id}
-												value={getDeviceSourceFilterValue(device.id)}
+												key={apiKey.id}
+												value={getAPIKeySourceFilterValue(apiKey.id)}
 											>
 												{selectedProjectFilterId === ALL_PROJECTS_FILTER
-													? `${device.name} · ${projectNameById.get(device.projectId) ?? "Unknown project"}`
-													: device.name}
+													? `${getDocumentSourceLabel(apiKey)} · ${projectNameById.get(apiKey.projectId) ?? "Unknown project"}`
+													: getDocumentSourceLabel(apiKey)}
 											</SelectItem>
 										))}
 									</SelectContent>
@@ -1547,7 +1581,7 @@ export function DocumentGalleryPanel({
 								</CardTitle>
 								<CardDescription className="text-slate-600">
 									Upload a one-off image directly into a project without binding
-									it to a device.
+									it to an API key.
 								</CardDescription>
 							</div>
 						</div>
@@ -1645,7 +1679,7 @@ export function DocumentGalleryPanel({
 								<p className="mt-1 text-sm text-slate-400">
 									{isSearching
 										? "Try a different phrase or clear the search."
-										: "Upload an image here or wait for device uploads to appear."}
+										: "Upload an image here or wait for API-key uploads to appear."}
 								</p>
 							</div>
 						</div>
@@ -1666,7 +1700,7 @@ export function DocumentGalleryPanel({
 									projectNameById.get(doc.projectId) ?? "Unknown project"
 								}
 								sourceLabel={getDocumentSourceLabel(
-									doc.deviceId ? devicesById.get(doc.deviceId)?.name : null,
+									doc.apiKeyId ? apiKeysById.get(doc.apiKeyId) : null,
 								)}
 							/>
 						))}
@@ -1693,7 +1727,7 @@ export function DocumentGalleryPanel({
 					selectedDocument={selectedDocument}
 					selectedDocumentProjectName={selectedDocumentProjectName}
 					selectedDocumentSourceLabel={selectedDocumentSourceLabel}
-					selectedDocumentDevice={selectedDocumentDevice}
+					selectedDocumentAPIKey={selectedDocumentAPIKey}
 					selectedWorkflowId={selectedWorkflowId}
 					selectedWorkflowName={selectedWorkflowName}
 					workflows={workflows}

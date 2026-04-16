@@ -1,25 +1,30 @@
 import { describe, expect, test } from "bun:test";
 import { Hono } from "hono";
 import type { HonoServerContext } from "@/types/serverContext";
-import { requireAPIKeyPermission, requireServiceAPIKey } from "./requireAPIKey";
+import {
+	requireAPIKeyPermission,
+	requireServiceAPIKey,
+	requireWorkflowAPIKey,
+} from "./requireAPIKey";
 
 const baseAPIKey = {
 	id: "key-1",
 	userId: "user-1",
 	organizationId: "org-1",
 	projectId: "project-1",
-	deviceId: null as string | null,
+	agentGraphId: null as string | null,
 	metadata: null,
 };
 
 function buildApp(input: {
 	apiKey:
 		| (typeof baseAPIKey & {
-				kind: "device" | "service";
+				kind: "workflow" | "service";
 				permissions: Record<string, string[]>;
 		  })
 		| null;
 	useServiceGuard?: boolean;
+	useWorkflowGuard?: boolean;
 	usePermissionGuard?: {
 		domain: "uploads" | "documents" | "workflows";
 		action: string;
@@ -47,6 +52,11 @@ function buildApp(input: {
 
 	if (input.useServiceGuard) {
 		app.get("/", requireServiceAPIKey, (c) => c.json({ ok: true }));
+		return app;
+	}
+
+	if (input.useWorkflowGuard) {
+		app.get("/", requireWorkflowAPIKey, (c) => c.json({ ok: true }));
 		return app;
 	}
 
@@ -116,12 +126,12 @@ describe("requireAPIKeyPermission", () => {
 });
 
 describe("requireServiceAPIKey", () => {
-	test("rejects device API keys", async () => {
+	test("rejects workflow API keys", async () => {
 		const response = await buildApp({
 			apiKey: {
 				...baseAPIKey,
-				deviceId: "device-1",
-				kind: "device",
+				agentGraphId: "workflow-1",
+				kind: "workflow",
 				permissions: { uploads: ["presign"] },
 			},
 			useServiceGuard: true,
@@ -141,6 +151,39 @@ describe("requireServiceAPIKey", () => {
 				permissions: { uploads: ["presign"] },
 			},
 			useServiceGuard: true,
+		}).request("/");
+
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ ok: true });
+	});
+});
+
+describe("requireWorkflowAPIKey", () => {
+	test("rejects service API keys", async () => {
+		const response = await buildApp({
+			apiKey: {
+				...baseAPIKey,
+				kind: "service",
+				permissions: { uploads: ["presign"] },
+			},
+			useWorkflowGuard: true,
+		}).request("/");
+
+		expect(response.status).toBe(403);
+		expect(await response.json()).toEqual({
+			message: "Workflow API key required",
+		});
+	});
+
+	test("allows workflow API keys", async () => {
+		const response = await buildApp({
+			apiKey: {
+				...baseAPIKey,
+				agentGraphId: "workflow-1",
+				kind: "workflow",
+				permissions: { uploads: ["presign"] },
+			},
+			useWorkflowGuard: true,
 		}).request("/");
 
 		expect(response.status).toBe(200);

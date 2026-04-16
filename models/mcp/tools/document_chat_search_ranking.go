@@ -99,11 +99,11 @@ func mergeDocumentSearchRows(
 		strings.TrimSpace(incoming.ProjectName) != "" {
 		current.ProjectName = incoming.ProjectName
 	}
-	if current.DeviceID == nil && incoming.DeviceID != nil {
-		current.DeviceID = incoming.DeviceID
+	if current.APIKeyID == nil && incoming.APIKeyID != nil {
+		current.APIKeyID = incoming.APIKeyID
 	}
-	if current.DeviceName == nil && incoming.DeviceName != nil {
-		current.DeviceName = incoming.DeviceName
+	if current.APIKeyName == nil && incoming.APIKeyName != nil {
+		current.APIKeyName = incoming.APIKeyName
 	}
 	if strings.TrimSpace(current.DescriptionText) == "" &&
 		strings.TrimSpace(incoming.DescriptionText) != "" {

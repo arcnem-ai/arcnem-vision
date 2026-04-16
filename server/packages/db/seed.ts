@@ -1,8 +1,8 @@
 import { extname } from "node:path";
 import {
 	createEnvVarGetter,
-	DEFAULT_DEVICE_API_KEY_PERMISSIONS,
 	DEFAULT_SERVICE_API_KEY_PERMISSIONS,
+	DEFAULT_WORKFLOW_API_KEY_PERMISSIONS,
 } from "@arcnem-vision/shared";
 import { S3Client } from "bun";
 import { eq, sql } from "drizzle-orm";
@@ -16,7 +16,6 @@ import {
 	agentGraphTemplates,
 	agentGraphTemplateVersions,
 	apikeys,
-	devices,
 	documentDescriptionEmbeddings,
 	documentDescriptions,
 	documentEmbeddings,
@@ -63,8 +62,8 @@ const deepseekOCRVersion =
 	"cb3b474fbfc56b1664c8c7841550bccecbe7b74c30e45ce938ffca1180b4dff5";
 const dotsOCRVersion =
 	"91ce60f4885d7ca6e095755e25d0f9ff2bcfe963c816937ece4be50d811f26c4";
-const deviceAPIKeyPermissionsJSON = JSON.stringify(
-	DEFAULT_DEVICE_API_KEY_PERMISSIONS,
+const workflowAPIKeyPermissionsJSON = JSON.stringify(
+	DEFAULT_WORKFLOW_API_KEY_PERMISSIONS,
 );
 const serviceAPIKeyPermissionsJSON = JSON.stringify(
 	DEFAULT_SERVICE_API_KEY_PERMISSIONS,
@@ -689,7 +688,6 @@ const seed = async () => {
 				"apikeys",
 				"invitations",
 				"members",
-				"devices",
 				"projects",
 				"accounts",
 				"sessions",
@@ -1298,7 +1296,7 @@ const seed = async () => {
 				organizationId: organization.id,
 				projectId: project.id,
 				kind: "service",
-				deviceId: null,
+				agentGraphId: null,
 				enabled: true,
 				rateLimitEnabled: true,
 				rateLimitTimeWindow: 86_400_000,
@@ -1495,38 +1493,20 @@ const seed = async () => {
 			},
 		]);
 
-		// ── Device (linked to workflow 1 graph) ──
-
-		const [pipelineDevice] = await tx
-			.insert(devices)
-			.values({
-				name: "Seed Device",
-				slug: "seed-device",
-				organizationId: organization.id,
-				projectId: project.id,
-				agentGraphId: pipelineGraph.id,
-			})
-			.returning({
-				id: devices.id,
-				slug: devices.slug,
-			});
-		if (!pipelineDevice)
-			throw new Error("Failed to create seed pipeline device");
-
-		// ── API Key (workflow 1 device) ──
+		// ── Workflow API Key (workflow 1) ──
 
 		const [pipelineApiKey] = await tx
 			.insert(apikeys)
 			.values({
-				name: "Seed Device API Key",
+				name: "Seed Pipeline Workflow Key",
 				start: plainPipelineApiKey.slice(0, 6),
 				prefix: "seed",
 				key: hashedPipelineApiKey,
 				userId: user.id,
 				organizationId: organization.id,
 				projectId: project.id,
-				kind: "device",
-				deviceId: pipelineDevice.id,
+				kind: "workflow",
+				agentGraphId: pipelineGraph.id,
 				enabled: true,
 				rateLimitEnabled: true,
 				rateLimitTimeWindow: 86_400_000,
@@ -1534,7 +1514,7 @@ const seed = async () => {
 				requestCount: 0,
 				createdAt: now,
 				updatedAt: now,
-				permissions: deviceAPIKeyPermissionsJSON,
+				permissions: workflowAPIKeyPermissionsJSON,
 				metadata: JSON.stringify({ source: "seed.ts" }),
 			})
 			.returning({
@@ -1558,7 +1538,7 @@ const seed = async () => {
 					visibility: "org",
 					organizationId: organization.id,
 					projectId: project.id,
-					deviceId: pipelineDevice.id,
+					apiKeyId: pipelineApiKey.id,
 				})),
 			)
 			.returning({
@@ -1704,36 +1684,20 @@ const seed = async () => {
 		// - members -> supervisor (static edges back)
 		// - supervisor -> END (conditional edge when FINISH)
 
-		// ── Device + API key (workflow 2 graph) ──
-
-		const [qualityReviewDevice] = await tx
-			.insert(devices)
-			.values({
-				name: "Seed Quality Review Device",
-				slug: "seed-quality-review-device",
-				organizationId: organization.id,
-				projectId: project.id,
-				agentGraphId: qualityReviewGraph.id,
-			})
-			.returning({
-				id: devices.id,
-				slug: devices.slug,
-			});
-		if (!qualityReviewDevice)
-			throw new Error("Failed to create seed quality review device");
+		// ── Workflow API key (workflow 2 graph) ──
 
 		const [qualityReviewApiKey] = await tx
 			.insert(apikeys)
 			.values({
-				name: "Seed Quality Review Device API Key",
+				name: "Seed Quality Review Workflow Key",
 				start: plainQualityReviewApiKey.slice(0, 6),
 				prefix: "seed",
 				key: hashedQualityReviewApiKey,
 				userId: user.id,
 				organizationId: organization.id,
 				projectId: project.id,
-				kind: "device",
-				deviceId: qualityReviewDevice.id,
+				kind: "workflow",
+				agentGraphId: qualityReviewGraph.id,
 				enabled: true,
 				rateLimitEnabled: true,
 				rateLimitTimeWindow: 86_400_000,
@@ -1741,7 +1705,7 @@ const seed = async () => {
 				requestCount: 0,
 				createdAt: now,
 				updatedAt: now,
-				permissions: deviceAPIKeyPermissionsJSON,
+				permissions: workflowAPIKeyPermissionsJSON,
 				metadata: JSON.stringify({
 					source: "seed.ts",
 					workflow: "quality-review",
@@ -1753,7 +1717,7 @@ const seed = async () => {
 		if (!qualityReviewApiKey)
 			throw new Error("Failed to create seed quality review API key");
 
-		// ── Seed documents for quality review device ──
+		// ── Seed documents for quality review workflow key ──
 
 		const insertedQRDocuments = await tx
 			.insert(documents)
@@ -1768,7 +1732,7 @@ const seed = async () => {
 					visibility: "org",
 					organizationId: organization.id,
 					projectId: project.id,
-					deviceId: qualityReviewDevice.id,
+					apiKeyId: qualityReviewApiKey.id,
 				})),
 			)
 			.returning({
@@ -2172,35 +2136,18 @@ const seed = async () => {
 			},
 		]);
 
-		const [segmentationDevice] = await tx
-			.insert(devices)
-			.values({
-				name: "Seed Segmentation Device",
-				slug: "seed-segmentation-device",
-				organizationId: organization.id,
-				projectId: project.id,
-				agentGraphId: segmentationGraph.id,
-			})
-			.returning({
-				id: devices.id,
-				slug: devices.slug,
-			});
-		if (!segmentationDevice) {
-			throw new Error("Failed to create segmentation device");
-		}
-
 		const [segmentationApiKey] = await tx
 			.insert(apikeys)
 			.values({
-				name: "Seed Segmentation Device API Key",
+				name: "Seed Segmentation Workflow Key",
 				start: plainSegmentationApiKey.slice(0, 6),
 				prefix: "seed",
 				key: hashedSegmentationApiKey,
 				userId: user.id,
 				organizationId: organization.id,
 				projectId: project.id,
-				kind: "device",
-				deviceId: segmentationDevice.id,
+				kind: "workflow",
+				agentGraphId: segmentationGraph.id,
 				enabled: true,
 				rateLimitEnabled: true,
 				rateLimitTimeWindow: 86_400_000,
@@ -2208,7 +2155,7 @@ const seed = async () => {
 				requestCount: 0,
 				createdAt: now,
 				updatedAt: now,
-				permissions: deviceAPIKeyPermissionsJSON,
+				permissions: workflowAPIKeyPermissionsJSON,
 				metadata: JSON.stringify({
 					source: "seed.ts",
 					workflow: "segmentation-showcase",
@@ -2234,7 +2181,7 @@ const seed = async () => {
 					visibility: "org",
 					organizationId: organization.id,
 					projectId: project.id,
-					deviceId: segmentationDevice.id,
+					apiKeyId: segmentationApiKey.id,
 				})),
 			)
 			.returning({
@@ -2359,35 +2306,18 @@ const seed = async () => {
 			},
 		]);
 
-		const [semanticSegmentationDevice] = await tx
-			.insert(devices)
-			.values({
-				name: "Seed Semantic Segmentation Device",
-				slug: "seed-semantic-segmentation-device",
-				organizationId: organization.id,
-				projectId: project.id,
-				agentGraphId: semanticSegmentationGraph.id,
-			})
-			.returning({
-				id: devices.id,
-				slug: devices.slug,
-			});
-		if (!semanticSegmentationDevice) {
-			throw new Error("Failed to create semantic segmentation device");
-		}
-
 		const [semanticSegmentationApiKey] = await tx
 			.insert(apikeys)
 			.values({
-				name: "Seed Semantic Segmentation Device API Key",
+				name: "Seed Semantic Segmentation Workflow Key",
 				start: plainSemanticSegmentationApiKey.slice(0, 6),
 				prefix: "seed",
 				key: hashedSemanticSegmentationApiKey,
 				userId: user.id,
 				organizationId: organization.id,
 				projectId: project.id,
-				kind: "device",
-				deviceId: semanticSegmentationDevice.id,
+				kind: "workflow",
+				agentGraphId: semanticSegmentationGraph.id,
 				enabled: true,
 				rateLimitEnabled: true,
 				rateLimitTimeWindow: 86_400_000,
@@ -2395,7 +2325,7 @@ const seed = async () => {
 				requestCount: 0,
 				createdAt: now,
 				updatedAt: now,
-				permissions: deviceAPIKeyPermissionsJSON,
+				permissions: workflowAPIKeyPermissionsJSON,
 				metadata: JSON.stringify({
 					source: "seed.ts",
 					workflow: "semantic-segmentation-showcase",
@@ -2421,7 +2351,7 @@ const seed = async () => {
 					visibility: "org",
 					organizationId: organization.id,
 					projectId: project.id,
-					deviceId: semanticSegmentationDevice.id,
+					apiKeyId: semanticSegmentationApiKey.id,
 				})),
 			)
 			.returning({
@@ -2631,35 +2561,18 @@ const seed = async () => {
 			},
 		]);
 
-		const [ocrConditionDevice] = await tx
-			.insert(devices)
-			.values({
-				name: "Seed OCR Condition Device",
-				slug: "seed-ocr-condition-device",
-				organizationId: organization.id,
-				projectId: project.id,
-				agentGraphId: ocrConditionGraph.id,
-			})
-			.returning({
-				id: devices.id,
-				slug: devices.slug,
-			});
-		if (!ocrConditionDevice) {
-			throw new Error("Failed to create OCR condition device");
-		}
-
 		const [ocrConditionApiKey] = await tx
 			.insert(apikeys)
 			.values({
-				name: "Seed OCR Condition API Key",
+				name: "Seed OCR Condition Workflow Key",
 				start: plainOCRConditionApiKey.slice(0, 6),
 				prefix: "seed",
 				key: hashedOCRConditionApiKey,
 				userId: user.id,
 				organizationId: organization.id,
 				projectId: project.id,
-				kind: "device",
-				deviceId: ocrConditionDevice.id,
+				kind: "workflow",
+				agentGraphId: ocrConditionGraph.id,
 				enabled: true,
 				rateLimitEnabled: true,
 				rateLimitTimeWindow: 86_400_000,
@@ -2667,7 +2580,7 @@ const seed = async () => {
 				requestCount: 0,
 				createdAt: now,
 				updatedAt: now,
-				permissions: deviceAPIKeyPermissionsJSON,
+				permissions: workflowAPIKeyPermissionsJSON,
 				metadata: JSON.stringify({
 					source: "seed.ts",
 					workflow: "ocr-condition",
@@ -2693,7 +2606,7 @@ const seed = async () => {
 					visibility: "org",
 					organizationId: organization.id,
 					projectId: project.id,
-					deviceId: ocrConditionDevice.id,
+					apiKeyId: ocrConditionApiKey.id,
 				})),
 			)
 			.returning({
@@ -2942,35 +2855,18 @@ const seed = async () => {
 			},
 		]);
 
-		const [ocrSupervisorDevice] = await tx
-			.insert(devices)
-			.values({
-				name: "Seed OCR Supervisor Device",
-				slug: "seed-ocr-supervisor-device",
-				organizationId: organization.id,
-				projectId: project.id,
-				agentGraphId: ocrSupervisorGraph.id,
-			})
-			.returning({
-				id: devices.id,
-				slug: devices.slug,
-			});
-		if (!ocrSupervisorDevice) {
-			throw new Error("Failed to create OCR supervisor device");
-		}
-
 		const [ocrSupervisorApiKey] = await tx
 			.insert(apikeys)
 			.values({
-				name: "Seed OCR Supervisor API Key",
+				name: "Seed OCR Supervisor Workflow Key",
 				start: plainOCRSupervisorApiKey.slice(0, 6),
 				prefix: "seed",
 				key: hashedOCRSupervisorApiKey,
 				userId: user.id,
 				organizationId: organization.id,
 				projectId: project.id,
-				kind: "device",
-				deviceId: ocrSupervisorDevice.id,
+				kind: "workflow",
+				agentGraphId: ocrSupervisorGraph.id,
 				enabled: true,
 				rateLimitEnabled: true,
 				rateLimitTimeWindow: 86_400_000,
@@ -2978,7 +2874,7 @@ const seed = async () => {
 				requestCount: 0,
 				createdAt: now,
 				updatedAt: now,
-				permissions: deviceAPIKeyPermissionsJSON,
+				permissions: workflowAPIKeyPermissionsJSON,
 				metadata: JSON.stringify({
 					source: "seed.ts",
 					workflow: "ocr-supervisor",
@@ -3004,7 +2900,7 @@ const seed = async () => {
 					visibility: "org",
 					organizationId: organization.id,
 					projectId: project.id,
-					deviceId: ocrSupervisorDevice.id,
+					apiKeyId: ocrSupervisorApiKey.id,
 				})),
 			)
 			.returning({
@@ -3509,22 +3405,16 @@ const seed = async () => {
 			secondaryProject,
 			serviceApiKey,
 			remoteSensingGraph,
-			pipelineDevice,
 			pipelineApiKey,
 			pipelineGraph,
-			qualityReviewDevice,
 			qualityReviewApiKey,
 			qualityReviewGraph,
-			segmentationDevice,
 			segmentationApiKey,
 			segmentationGraph,
-			semanticSegmentationDevice,
 			semanticSegmentationApiKey,
 			semanticSegmentationGraph,
-			ocrConditionDevice,
 			ocrConditionApiKey,
 			ocrConditionGraph,
-			ocrSupervisorDevice,
 			ocrSupervisorApiKey,
 			ocrSupervisorGraph,
 			clipModel,
@@ -3614,38 +3504,20 @@ const seed = async () => {
 	}
 	console.log(`Service API Key ID: ${result.serviceApiKey.id}`);
 	console.log(`Service API Key (plain): ${plainServiceApiKey}`);
-	console.log(
-		`Device (workflow 1): ${result.pipelineDevice.slug} (${result.pipelineDevice.id})`,
-	);
 	console.log(`API Key ID (workflow 1): ${result.pipelineApiKey.id}`);
 	console.log(`API Key (plain, workflow 1): ${plainPipelineApiKey}`);
-	console.log(
-		`Device (workflow 2): ${result.qualityReviewDevice.slug} (${result.qualityReviewDevice.id})`,
-	);
 	console.log(`API Key ID (workflow 2): ${result.qualityReviewApiKey.id}`);
 	console.log(`API Key (plain, workflow 2): ${plainQualityReviewApiKey}`);
-	console.log(
-		`Device (workflow 3, language segmentation): ${result.segmentationDevice.slug} (${result.segmentationDevice.id})`,
-	);
 	console.log(`API Key ID (workflow 3): ${result.segmentationApiKey.id}`);
 	console.log(`API Key (plain, workflow 3): ${plainSegmentationApiKey}`);
-	console.log(
-		`Device (workflow 4, semantic segmentation): ${result.semanticSegmentationDevice.slug} (${result.semanticSegmentationDevice.id})`,
-	);
 	console.log(
 		`API Key ID (workflow 4): ${result.semanticSegmentationApiKey.id}`,
 	);
 	console.log(
 		`API Key (plain, workflow 4): ${plainSemanticSegmentationApiKey}`,
 	);
-	console.log(
-		`Device (workflow 5, OCR condition): ${result.ocrConditionDevice.slug} (${result.ocrConditionDevice.id})`,
-	);
 	console.log(`API Key ID (workflow 5): ${result.ocrConditionApiKey.id}`);
 	console.log(`API Key (plain, workflow 5): ${plainOCRConditionApiKey}`);
-	console.log(
-		`Device (workflow 6, OCR supervisor): ${result.ocrSupervisorDevice.slug} (${result.ocrSupervisorDevice.id})`,
-	);
 	console.log(`API Key ID (workflow 6): ${result.ocrSupervisorApiKey.id}`);
 	console.log(`API Key (plain, workflow 6): ${plainOCRSupervisorApiKey}`);
 	console.log(

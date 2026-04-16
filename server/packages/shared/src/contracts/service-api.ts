@@ -4,27 +4,27 @@ import { jsonValueSchema } from "./json";
 
 export const serviceDocumentScopeSchema = z
 	.object({
-		deviceIds: z.array(z.string().min(1)).optional(),
+		apiKeyIds: z.array(z.string().min(1)).optional(),
 		documentIds: z.array(z.string().min(1)).optional(),
-		deviceBound: z.boolean().optional(),
+		apiKeyBound: z.boolean().optional(),
 	})
 	.refine(
 		(value) =>
 			Boolean(
-				(value.deviceIds?.length ?? 0) > 0 ||
+				(value.apiKeyIds?.length ?? 0) > 0 ||
 					(value.documentIds?.length ?? 0) > 0 ||
-					typeof value.deviceBound === "boolean",
+					typeof value.apiKeyBound === "boolean",
 			),
 		{
-			message: "scope must include deviceIds, documentIds, or deviceBound",
+			message: "scope must include apiKeyIds, documentIds, or apiKeyBound",
 		},
 	)
 	.refine(
 		(value) =>
-			!((value.deviceIds?.length ?? 0) > 0 && value.deviceBound === false),
+			!((value.apiKeyIds?.length ?? 0) > 0 && value.apiKeyBound === false),
 		{
-			message: "deviceIds cannot be combined with deviceBound=false",
-			path: ["deviceIds"],
+			message: "apiKeyIds cannot be combined with apiKeyBound=false",
+			path: ["apiKeyIds"],
 		},
 	);
 
@@ -35,15 +35,15 @@ export const serviceDocumentListQuerySchema = z
 		limit: z.number().int().positive().max(100).optional(),
 		cursor: z.string().min(1).optional(),
 		documentIds: z.array(z.string().min(1)).optional(),
-		deviceIds: z.array(z.string().min(1)).optional(),
-		deviceBound: z.boolean().optional(),
+		apiKeyIds: z.array(z.string().min(1)).optional(),
+		apiKeyBound: z.boolean().optional(),
 	})
 	.refine(
 		(value) =>
-			!((value.deviceIds?.length ?? 0) > 0 && value.deviceBound === false),
+			!((value.apiKeyIds?.length ?? 0) > 0 && value.apiKeyBound === false),
 		{
-			message: "deviceIds cannot be combined with deviceBound=false",
-			path: ["deviceIds"],
+			message: "apiKeyIds cannot be combined with apiKeyBound=false",
+			path: ["apiKeyIds"],
 		},
 	);
 
@@ -155,7 +155,7 @@ export const serviceDocumentItemSchema = z.object({
 	createdAt: z.string().min(1),
 	description: z.string().nullable(),
 	visibility: z.enum(["private", "org", "public"]),
-	deviceId: z.string().nullable(),
+	apiKeyId: z.string().nullable(),
 	downloadUrl: z.string().url(),
 	publicUrl: z.string().nullable(),
 });

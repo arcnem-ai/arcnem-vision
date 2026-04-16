@@ -1,20 +1,14 @@
-export { assignWorkflowToDevice } from "./device-workflow-mutation";
 export {
 	createOrganization,
 	switchActiveOrganization,
 } from "./organization-management-mutations";
 export {
-	createDevice,
-	createDeviceAPIKey,
 	createProject,
 	createServiceAPIKey,
-	deleteDeviceAPIKey,
-	deleteServiceAPIKey,
-	setDeviceArchived,
+	createWorkflowAPIKey,
 	setProjectArchived,
-	updateDevice,
-	updateDeviceAPIKey,
 	updateServiceAPIKey,
+	updateWorkflowAPIKey,
 } from "./project-management-mutations";
 export {
 	createWorkflow,

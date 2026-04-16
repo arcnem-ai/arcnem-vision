@@ -22,9 +22,9 @@ type Document struct {
 	Visibility     string    `gorm:"column:visibility;type:text;not null" json:"visibility"`
 	OrganizationID string    `gorm:"column:organization_id;type:uuid;not null" json:"organization_id"`
 	ProjectID      string    `gorm:"column:project_id;type:uuid;not null" json:"project_id"`
-	DeviceID       *string   `gorm:"column:device_id;type:uuid" json:"device_id"`
 	CreatedAt      time.Time `gorm:"column:created_at;type:timestamp without time zone;not null;default:now()" json:"created_at"`
 	UpdatedAt      time.Time `gorm:"column:updated_at;type:timestamp without time zone;not null;default:now()" json:"updated_at"`
+	APIKeyID       *string   `gorm:"column:api_key_id;type:uuid" json:"api_key_id"`
 }
 
 // TableName Document's table name

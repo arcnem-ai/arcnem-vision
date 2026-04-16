@@ -71,3 +71,18 @@ export const requireServiceAPIKey = createMiddleware<HonoServerContext>(
 		await next();
 	},
 );
+
+export const requireWorkflowAPIKey = createMiddleware<HonoServerContext>(
+	async (c, next) => {
+		const apiKey = c.get("apiKey");
+		if (!apiKey) {
+			return c.json({ message: "Unauthorized" }, 401);
+		}
+
+		if (apiKey.kind !== "workflow") {
+			return c.json({ message: "Workflow API key required" }, 403);
+		}
+
+		await next();
+	},
+);

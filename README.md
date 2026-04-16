@@ -18,18 +18,18 @@
 
 ---
 
-Arcnem Vision is an open-source image ingestion and orchestration platform. Devices can upload images with org/project/device-scoped API keys, operators can upload images from the dashboard, and every document can be routed through a customizable agent graph stored in Postgres and executed by Go services.
+Arcnem Vision is an open-source image ingestion and orchestration platform. Workflow API keys can upload images with org/project-scoped credentials that bind directly to a default workflow, operators can upload images from the dashboard, and every document can be routed through a customizable agent graph stored in Postgres and executed by Go services.
 
-That core service is the product: a control plane for defining workflows, attaching them to devices, running ad-hoc analyses from the dashboard, persisting OCR/descriptions/embeddings/segmentations, and inspecting every run with step-level state transitions. The Flutter app is included as a demo client for capture and GenUI experiments, but it is not the center of the system.
+That core service is the product: a control plane for defining workflows, attaching them to workflow keys, running ad-hoc analyses from the dashboard, persisting OCR/descriptions/embeddings/segmentations, and inspecting every run with step-level state transitions. The Flutter app is included as a demo client for capture and GenUI experiments, but it is not the center of the system.
 
 ## Core Service
 
-- **Two ingestion paths**: device/API-key uploads for automated pipelines, plus dashboard uploads for ad-hoc operator review.
+- **Two ingestion paths**: workflow-key uploads for automated pipelines, plus dashboard uploads for ad-hoc operator review.
 - **Configurable workflows**: graphs live in the database and can be created, edited, templated, cloned, and assigned without redeploying code.
 - **Multiple analysis modes**: OCR, descriptions, image embeddings, description embeddings, prompt-based segmentation, semantic segmentation, similarity search, and grounded collection chat.
 - **Mixed orchestration styles**: combine LLM workers, MCP tool nodes, supervisor routing, and deterministic condition nodes in the same graph.
 - **Persistent run history**: track `agent_graph_runs` and `agent_graph_run_steps` with initial state, final state, per-step deltas, timing, and errors.
-- **Operator-first dashboard**: manage projects, devices, API keys, workflow templates, uploads, search, chat, and live run inspection from one UI.
+- **Operator-first dashboard**: manage projects, workflow keys, service keys, workflow templates, uploads, search, chat, and live run inspection from one UI.
 
 ## What You Can Customize
 
@@ -58,7 +58,7 @@ Behind those workflows, the MCP layer currently exposes document description, do
 | Layer | Tech | What it does |
 | --- | --- | --- |
 | **API** | Bun, Hono, better-auth, Inngest, Pino | Presigned upload flow, auth, orchestration triggers, realtime publishing |
-| **Dashboard** | React 19, TanStack Router, Tailwind, shadcn/ui | Projects/devices/API keys, workflow builder, docs view, chat, run inspection |
+| **Dashboard** | React 19, TanStack Router, Tailwind, shadcn/ui | Projects/API keys, workflow builder, docs view, chat, run inspection |
 | **Agents** | Go, Gin, LangGraph, LangChain, inngestgo | Loads graph snapshots from DB, executes worker/tool/supervisor/condition nodes |
 | **MCP** | Go, MCP go-sdk, replicate-go, GORM | OCR, descriptions, embeddings, segmentation, retrieval, grounded reads |
 | **Storage** | Postgres 18 + pgvector, S3-compatible storage, Redis | Documents, derived artifacts, vector indexes, sessions, realtime fan-out |
@@ -68,7 +68,7 @@ Behind those workflows, the MCP layer currently exposes document description, do
 
 ```text
 ┌──────────────────────┐          ┌──────────────────────────┐
-│ Device / Integration │──x-api-key upload flow────────────▶│
+│ Workflow Key Client  │──x-api-key upload flow────────────▶│
 └──────────────────────┘          │        Hono API          │
                                   │   presign / ack / auth   │
 ┌──────────────────────┐          │                          │
@@ -96,15 +96,15 @@ Behind those workflows, the MCP layer currently exposes document description, do
                                          └──────────────┘
 ```
 
-**Device flow**: a device or external integration calls `/api/uploads/presign`, uploads to S3, then calls `/api/uploads/ack`. The API verifies the object, creates the document, and emits `document/process.upload`. The agents service then loads the document's assigned workflow from the database and runs it.
+**Workflow-key flow**: a workflow-key client or external integration calls `/api/uploads/presign`, uploads to S3, then calls `/api/uploads/ack`. The API verifies the object, creates the document, and emits `document/process.upload`. The agents service then loads the document's bound workflow from the API key in the database and runs it.
 
-**Dashboard flow**: an operator uploads an image to a project from the Docs tab. The dashboard path creates the document without binding it to a device, and the operator can then queue any saved workflow against that document from the UI.
+**Dashboard flow**: an operator uploads an image to a project from the Docs tab. The dashboard path creates the document without binding it to an API key, and the operator can then queue any saved workflow against that document from the UI.
 
 **Execution flow**: the agents service builds the graph from DB rows, runs LangGraph nodes, calls MCP tools as needed, and persists run records, step deltas, errors, OCR results, descriptions, embeddings, and segmentations back into Postgres.
 
 ## Screenshots
 
-| Projects & Devices | Workflow Library |
+| Projects & API Keys | Workflow Library |
 |---|---|
 | ![Dashboard Projects](site/public/dashboard-projects.png) | ![Workflow Library](site/public/dashboard-workflows.png) |
 
@@ -158,7 +158,7 @@ In the Tilt UI, trigger **seed-database**.
 
 The seed creates:
 
-- a demo organization, project, devices, and API keys
+- a demo organization, project, workflow keys, service keys, and API keys
 - reusable workflow templates and editable workflows
 - sample documents for the document, OCR, quality-review, and segmentation paths
 - example OCR results, descriptions, embeddings, segmentations, and run history
@@ -169,15 +169,15 @@ Because `server/packages/api/.env.example` enables `API_DEBUG=true`, the dashboa
 ### 4. Explore the core service
 
 1. Open `http://localhost:3001`.
-2. In **Projects & Devices**, inspect seeded devices and their attached workflows.
+2. In **Projects & API Keys**, inspect seeded workflow keys, service keys, and their attached workflows.
 3. In **Workflow Library**, browse templates and open the canvas to see how graphs are composed.
 4. In **Docs**, inspect seeded documents or upload a new one from the dashboard.
 5. In **Runs**, expand a run to inspect initial state, per-step deltas, final state, and errors.
 6. Open `http://localhost:3000/api/openapi.json` to inspect the generated service API spec.
 
-### 5. Test automated device ingestion
+### 5. Test automated workflow-key ingestion
 
-Use a device API key to exercise the automated path:
+Use a workflow API key to exercise the automated path:
 
 ```bash
 # 1. Ask the API for a presigned upload URL
@@ -196,7 +196,7 @@ curl -X POST http://localhost:3000/api/uploads/ack \
   -d '{"objectKey":"uploads/.../photo.png"}'
 ```
 
-For device-bound uploads, step 3 verifies the object, creates the document, and enqueues `document/process.upload` for the device's assigned workflow.
+For workflow-key uploads, step 3 verifies the object, creates the document, and enqueues `document/process.upload` for the key's bound workflow.
 
 ## Requirements
 
@@ -232,7 +232,7 @@ arcnem-vision/
 | [site/](site/) | Docs site for onboarding, architecture, guides, and API examples |
 | [site/src/content/docs/architecture.md](site/src/content/docs/architecture.md) | Service architecture, ingestion paths, workflow model, persistence |
 | [site/src/content/docs/guides/dashboard-workflow-editor.md](site/src/content/docs/guides/dashboard-workflow-editor.md) | Dashboard operations, workflow canvas, docs tab, runs tab |
-| [site/src/content/docs/reference/api.md](site/src/content/docs/reference/api.md) | Device ingestion, dashboard uploads, run queueing, realtime feed |
+| [site/src/content/docs/reference/api.md](site/src/content/docs/reference/api.md) | Workflow-key ingestion, dashboard uploads, run queueing, realtime feed |
 | [docs/embeddings.md](docs/embeddings.md) | Embedding implementation details |
 | [docs/langgraphgo.md](docs/langgraphgo.md) | LangGraph orchestration patterns and graph execution notes |
 | [docs/langchaingo.md](docs/langchaingo.md) | LangChain and tool-integration notes |
@@ -268,7 +268,7 @@ the live test started and remove its isolated volumes.
 
 ## Service API
 
-The service API is the project-scoped orchestration surface for non-device clients.
+The service API is the project-scoped orchestration surface for service integrations and other non-dashboard clients.
 
 - `GET /api/service/workflows` lists available workflows for the API key's organization.
 - `POST /api/service/uploads/presign` declares upload intent, including visibility.

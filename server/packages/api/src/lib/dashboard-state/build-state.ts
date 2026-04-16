@@ -8,10 +8,10 @@ import { getDashboardSessionContext } from "../dashboard-auth";
 import { buildDashboardAuthPayload } from "./auth-payload";
 import { loadDashboardCatalog } from "./catalog";
 import {
-	loadDashboardDevices,
 	loadDashboardOrganization,
 	loadDashboardProjects,
 	loadDashboardServiceAPIKeys,
+	loadDashboardWorkflowAPIKeys,
 	loadDashboardWorkflows,
 	loadDashboardWorkflowTemplates,
 } from "./queries";
@@ -44,7 +44,7 @@ export async function buildDashboardState(
 			organizations: [],
 			organization: null,
 			projects: [],
-			devices: [],
+			workflowApiKeys: [],
 			serviceApiKeys: [],
 			workflows: [],
 			workflowTemplates: [],
@@ -59,7 +59,7 @@ export async function buildDashboardState(
 			organizations: organizationOptions,
 			organization: null,
 			projects: [],
-			devices: [],
+			workflowApiKeys: [],
 			serviceApiKeys: [],
 			workflows: [],
 			workflowTemplates: [],
@@ -76,7 +76,7 @@ export async function buildDashboardState(
 			organizations: organizationOptions,
 			organization: null,
 			projects: [],
-			devices: [],
+			workflowApiKeys: [],
 			serviceApiKeys: [],
 			workflows: [],
 			workflowTemplates: [],
@@ -85,26 +85,30 @@ export async function buildDashboardState(
 		};
 	}
 
-	const [projectRows, deviceRows, serviceKeyRows, workflowRows, templateRows] =
-		await Promise.all([
-			loadDashboardProjects(db, organizationId, includeArchived),
-			loadDashboardDevices(db, organizationId, includeArchived),
-			loadDashboardServiceAPIKeys(db, organizationId, includeArchived),
-			loadDashboardWorkflows(db, organizationId),
-			loadDashboardWorkflowTemplates(db, organizationId),
-		]);
+	const [
+		projectRows,
+		workflowKeyRows,
+		serviceKeyRows,
+		workflowRows,
+		templateRows,
+	] = await Promise.all([
+		loadDashboardProjects(db, organizationId, includeArchived),
+		loadDashboardWorkflowAPIKeys(db, organizationId, includeArchived),
+		loadDashboardServiceAPIKeys(db, organizationId, includeArchived),
+		loadDashboardWorkflows(db, organizationId),
+		loadDashboardWorkflowTemplates(db, organizationId),
+	]);
 
-	const deviceCountByProjectId = new Map<string, number>();
+	const workflowApiKeyCountByProjectId = new Map<string, number>();
 	const apiKeyCountByProjectId = new Map<string, number>();
-	for (const device of deviceRows) {
-		deviceCountByProjectId.set(
-			device.projectId,
-			(deviceCountByProjectId.get(device.projectId) ?? 0) + 1,
+	for (const apiKey of workflowKeyRows) {
+		workflowApiKeyCountByProjectId.set(
+			apiKey.projectId,
+			(workflowApiKeyCountByProjectId.get(apiKey.projectId) ?? 0) + 1,
 		);
 		apiKeyCountByProjectId.set(
-			device.projectId,
-			(apiKeyCountByProjectId.get(device.projectId) ?? 0) +
-				device.apikeys.length,
+			apiKey.projectId,
+			(apiKeyCountByProjectId.get(apiKey.projectId) ?? 0) + 1,
 		);
 	}
 	const serviceApiKeyCountByProjectId = new Map<string, number>();
@@ -119,11 +123,15 @@ export async function buildDashboardState(
 		);
 	}
 
-	const attachedDeviceCountByWorkflowId = new Map<string, number>();
-	for (const device of deviceRows) {
-		attachedDeviceCountByWorkflowId.set(
-			device.agentGraphId,
-			(attachedDeviceCountByWorkflowId.get(device.agentGraphId) ?? 0) + 1,
+	const attachedWorkflowKeyCountByWorkflowId = new Map<string, number>();
+	for (const apiKey of workflowKeyRows) {
+		if (!apiKey.agentGraphId) {
+			continue;
+		}
+
+		attachedWorkflowKeyCountByWorkflowId.set(
+			apiKey.agentGraphId,
+			(attachedWorkflowKeyCountByWorkflowId.get(apiKey.agentGraphId) ?? 0) + 1,
 		);
 	}
 
@@ -146,47 +154,32 @@ export async function buildDashboardState(
 		projects: projectRows.map((project) => ({
 			...project,
 			archivedAt: project.archivedAt?.toISOString() ?? null,
-			deviceCount: deviceCountByProjectId.get(project.id) ?? 0,
+			workflowApiKeyCount: workflowApiKeyCountByProjectId.get(project.id) ?? 0,
 			apiKeyCount: apiKeyCountByProjectId.get(project.id) ?? 0,
 			serviceApiKeyCount: serviceApiKeyCountByProjectId.get(project.id) ?? 0,
 		})),
-		devices: deviceRows.map((device) => {
-			const updatedAt = new Date(device.updatedAt);
-			const status: "connected" | "idle" =
-				Date.now() - updatedAt.valueOf() < 1000 * 60 * 60 * 24
-					? "connected"
-					: "idle";
-
-			return {
-				id: device.id,
-				name: device.name,
-				slug: device.slug,
-				projectId: device.projectId,
-				agentGraphId: device.agentGraphId,
-				workflowName: device.agentGraphs?.name ?? null,
-				archivedAt: device.archivedAt?.toISOString() ?? null,
-				updatedAt: updatedAt.toISOString(),
-				status,
-				apiKeyCount: device.apikeys.length,
-				apiKeys: device.apikeys.map((apiKey) => ({
-					id: apiKey.id,
-					name: apiKey.name,
-					start: apiKey.start,
-					prefix: apiKey.prefix,
-					enabled: apiKey.enabled,
-					createdAt: apiKey.createdAt.toISOString(),
-					updatedAt: apiKey.updatedAt.toISOString(),
-					lastRequest: apiKey.lastRequest?.toISOString() ?? null,
-					expiresAt: apiKey.expiresAt?.toISOString() ?? null,
-					requestCount: apiKey.requestCount,
-					rateLimitEnabled: apiKey.rateLimitEnabled,
-					rateLimitMax: apiKey.rateLimitMax,
-					rateLimitTimeWindow: apiKey.rateLimitTimeWindow,
-				})),
-			};
-		}),
+		workflowApiKeys: workflowKeyRows.map((apiKey) => ({
+			id: apiKey.id,
+			kind: "workflow" as const,
+			projectId: apiKey.projectId,
+			agentGraphId: apiKey.agentGraphId ?? "",
+			workflowName: apiKey.agentGraphs?.name ?? null,
+			name: apiKey.name,
+			start: apiKey.start,
+			prefix: apiKey.prefix,
+			enabled: apiKey.enabled,
+			createdAt: apiKey.createdAt.toISOString(),
+			updatedAt: apiKey.updatedAt.toISOString(),
+			lastRequest: apiKey.lastRequest?.toISOString() ?? null,
+			expiresAt: apiKey.expiresAt?.toISOString() ?? null,
+			requestCount: apiKey.requestCount,
+			rateLimitEnabled: apiKey.rateLimitEnabled,
+			rateLimitMax: apiKey.rateLimitMax,
+			rateLimitTimeWindow: apiKey.rateLimitTimeWindow,
+		})),
 		serviceApiKeys: serviceKeyRows.map((apiKey) => ({
 			id: apiKey.id,
+			kind: "service" as const,
 			projectId: apiKey.projectId,
 			name: apiKey.name,
 			start: apiKey.start,
@@ -217,8 +210,8 @@ export async function buildDashboardState(
 				description: workflow.description,
 				entryNode: workflow.entryNode,
 				edgeCount: workflow.agentGraphEdges.length,
-				attachedDeviceCount:
-					attachedDeviceCountByWorkflowId.get(workflow.id) ?? 0,
+				attachedWorkflowKeyCount:
+					attachedWorkflowKeyCountByWorkflowId.get(workflow.id) ?? 0,
 				template:
 					workflow.agentGraphTemplateId &&
 					workflow.agentGraphTemplateVersions &&

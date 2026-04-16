@@ -5,6 +5,7 @@ import { type APIDocumentRow, toAPIDocumentItem } from "@/lib/document-api";
 import {
 	requireAPIKey,
 	requireAPIKeyPermission,
+	requireWorkflowAPIKey,
 } from "@/middleware/requireAPIKey";
 import type { HonoServerContext } from "@/types/serverContext";
 
@@ -15,7 +16,7 @@ export const documentsRouter = new Hono<HonoServerContext>({
 });
 
 type DocumentAPIKeyContext = {
-	deviceId: string | null;
+	apiKeyId: string;
 	organizationId: string;
 };
 
@@ -35,7 +36,7 @@ async function findDocumentAPIKeyContext(
 	const verifiedAPIKeyId = requireVerifiedAPIKeyId(c);
 	const [keyContext] = await dbClient
 		.select({
-			deviceId: apikeys.deviceId,
+			apiKeyId: apikeys.id,
 			organizationId: apikeys.organizationId,
 		})
 		.from(apikeys)
@@ -48,13 +49,14 @@ async function findDocumentAPIKeyContext(
 documentsRouter.get(
 	"/documents",
 	requireAPIKey,
+	requireWorkflowAPIKey,
 	requireAPIKeyPermission("documents", "list"),
 	async (c) => {
 		const keyContext = await findDocumentAPIKeyContext(c);
 		const s3Client = c.get("s3Client");
 		const dbClient = c.get("dbClient");
 
-		if (!keyContext || !keyContext.deviceId) {
+		if (!keyContext) {
 			return c.json({ message: "Invalid API key context" }, 401);
 		}
 
@@ -62,7 +64,7 @@ documentsRouter.get(
 		const cursor = c.req.query("cursor");
 		const limit = Math.min(Math.max(Number(limitParam) || 20, 1), 100);
 
-		const conditions = [eq(documents.deviceId, keyContext.deviceId)];
+		const conditions = [eq(documents.apiKeyId, keyContext.apiKeyId)];
 		if (cursor) {
 			conditions.push(lt(documents.id, cursor));
 		}
@@ -76,7 +78,7 @@ documentsRouter.get(
 				createdAt: documents.createdAt,
 				description: documentDescriptions.text,
 				visibility: documents.visibility,
-				deviceId: documents.deviceId,
+				apiKeyId: documents.apiKeyId,
 			})
 			.from(documents)
 			.leftJoin(
@@ -100,6 +102,7 @@ documentsRouter.get(
 documentsRouter.get(
 	"/documents/:id",
 	requireAPIKey,
+	requireWorkflowAPIKey,
 	requireAPIKeyPermission("documents", "read"),
 	async (c) => {
 		const keyContext = await findDocumentAPIKeyContext(c);
@@ -115,7 +118,7 @@ documentsRouter.get(
 				sizeBytes: documents.sizeBytes,
 				createdAt: documents.createdAt,
 				description: documentDescriptions.text,
-				deviceId: documents.deviceId,
+				apiKeyId: documents.apiKeyId,
 				organizationId: documents.organizationId,
 				visibility: documents.visibility,
 			})
@@ -131,7 +134,7 @@ documentsRouter.get(
 			return c.json({ message: "Document not found" }, 404);
 		}
 
-		if (!keyContext || keyContext.deviceId !== row.deviceId) {
+		if (!keyContext || keyContext.apiKeyId !== row.apiKeyId) {
 			return c.json({ message: "Document not found" }, 404);
 		}
 
@@ -142,6 +145,7 @@ documentsRouter.get(
 documentsRouter.get(
 	"/documents/:id/similar",
 	requireAPIKey,
+	requireWorkflowAPIKey,
 	requireAPIKeyPermission("documents", "similar"),
 	async (c) => {
 		const keyContext = await findDocumentAPIKeyContext(c);
@@ -152,17 +156,17 @@ documentsRouter.get(
 		const limitParam = c.req.query("limit");
 		const limit = Math.min(Math.max(Number(limitParam) || 5, 1), 20);
 
-		if (!keyContext || !keyContext.deviceId) {
+		if (!keyContext) {
 			return c.json({ message: "Invalid API key context" }, 401);
 		}
 
 		const [sourceDoc] = await dbClient
-			.select({ id: documents.id, deviceId: documents.deviceId })
+			.select({ id: documents.id, apiKeyId: documents.apiKeyId })
 			.from(documents)
 			.where(eq(documents.id, documentId))
 			.limit(1);
 
-		if (!sourceDoc || sourceDoc.deviceId !== keyContext.deviceId) {
+		if (!sourceDoc || sourceDoc.apiKeyId !== keyContext.apiKeyId) {
 			return c.json({ message: "Document not found" }, 404);
 		}
 
@@ -175,7 +179,7 @@ documentsRouter.get(
 			d.created_at AS "createdAt",
 			dd.text AS description,
 			d.visibility AS visibility,
-			d.device_id AS "deviceId",
+			d.api_key_id AS "apiKeyId",
 			(dde2.embedding <=> dde1.embedding) AS distance
 		FROM document_description_embeddings dde1
 		JOIN document_descriptions dd1 ON dd1.id = dde1.document_description_id
@@ -202,7 +206,7 @@ documentsRouter.get(
 					createdAt: row.createdAt as Date | string,
 					description: (row.description as string | null) ?? null,
 					visibility: row.visibility as string,
-					deviceId: (row.deviceId as string | null) ?? null,
+					apiKeyId: (row.apiKeyId as string | null) ?? null,
 					distance: row.distance as number | string | null,
 				} satisfies APIDocumentRow,
 				s3Client,

@@ -645,9 +645,9 @@ export function WorkflowLibraryPanel({
 							Live agent workflows
 						</h3>
 						<p className="mt-1 max-w-3xl text-sm text-slate-600">
-							These are the working graphs attached to devices and daily runs.
-							Edit the workflow itself here, or create a reusable template from
-							it when the graph is ready to share.
+							These are the working graphs attached to workflow keys and daily
+							runs. Edit the workflow itself here, or create a reusable template
+							from it when the graph is ready to share.
 						</p>
 					</div>
 
@@ -684,7 +684,7 @@ export function WorkflowLibraryPanel({
 											</div>
 											<div className="flex items-center gap-2">
 												<Badge className="rounded-full border-transparent bg-slate-900 text-slate-100 hover:bg-slate-900">
-													{workflow.attachedDeviceCount} devices
+													{workflow.attachedWorkflowKeyCount} workflow keys
 												</Badge>
 												<Button
 													type="button"

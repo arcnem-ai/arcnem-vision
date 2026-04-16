@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func buildSearchSnippet(query string, description string, ocrText string, objectKey string, projectName string, deviceName *string) (string, string) {
+func buildSearchSnippet(query string, description string, ocrText string, objectKey string, projectName string, apiKeyName *string) (string, string) {
 	queryTerms := splitTerms(query)
 	if snippet := excerptAroundTerms(description, queryTerms, 220); snippet != "" {
 		return snippet, "description"
@@ -17,8 +17,8 @@ func buildSearchSnippet(query string, description string, ocrText string, object
 	}
 
 	metadataFields := []string{projectName, objectKey}
-	if deviceName != nil {
-		metadataFields = append(metadataFields, *deviceName)
+	if apiKeyName != nil {
+		metadataFields = append(metadataFields, *apiKeyName)
 	}
 	for _, field := range metadataFields {
 		if snippet := excerptAroundTerms(field, queryTerms, 160); snippet != "" {

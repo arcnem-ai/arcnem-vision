@@ -7,7 +7,7 @@ export type DocumentRow = {
 	description: string | null;
 	distance: number | string | null;
 	projectId: string;
-	deviceId: string | null;
+	apiKeyId: string | null;
 };
 
 export type DocumentSegmentationRow = DocumentRow & {
@@ -35,7 +35,7 @@ export type DashboardDocumentItem = {
 	description: string | null;
 	distance: number | null;
 	projectId: string;
-	deviceId: string | null;
+	apiKeyId: string | null;
 	thumbnailUrl: string;
 };
 
@@ -63,20 +63,20 @@ export type DashboardDocumentSearchMatch = {
 	sizeBytes: number;
 	createdAt: string;
 	projectId: string;
-	deviceId: string | null;
+	apiKeyId: string | null;
 	snippet: string;
 };
 
 export type DashboardDocumentSearchFilters = {
 	projectId?: string;
-	deviceId?: string;
+	apiKeyId?: string;
 	dashboardUploadsOnly?: boolean;
 };
 
 export type DashboardDocumentPageFilters = {
 	organizationId: string;
 	projectId?: string;
-	deviceId?: string;
+	apiKeyId?: string;
 	dashboardUploadsOnly?: boolean;
 	cursor?: string;
 	limit: number;
@@ -114,7 +114,7 @@ export type DashboardIssuedUpload = {
 	objectKey: string;
 	organizationId: string;
 	projectId: string;
-	deviceId: string | null;
+	apiKeyId: string | null;
 	visibility: string;
 };
 

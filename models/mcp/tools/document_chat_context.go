@@ -56,8 +56,8 @@ func loadDocumentContextRows(
 			d.object_key,
 			d.project_id,
 			p.name AS project_name,
-			d.device_id,
-			dev.name AS device_name,
+			d.api_key_id,
+			ak.name AS api_key_name,
 			COALESCE(latest_description.text, '') AS description_text,
 			COALESCE(latest_ocr.text, '') AS ocr_text,
 			latest_ocr.created_at AS ocr_created_at,
@@ -65,7 +65,7 @@ func loadDocumentContextRows(
 			d.created_at
 		FROM documents d
 		INNER JOIN projects p ON p.id = d.project_id
-		LEFT JOIN devices dev ON dev.id = d.device_id
+		LEFT JOIN apikeys ak ON ak.id = d.api_key_id
 		LEFT JOIN LATERAL (
 			SELECT dd.text
 			FROM document_descriptions dd
@@ -124,8 +124,8 @@ func buildDocumentContextItems(
 			DocumentID:           row.DocumentID,
 			ProjectID:            row.ProjectID,
 			ProjectName:          row.ProjectName,
-			DeviceID:             row.DeviceID,
-			DeviceName:           row.DeviceName,
+			APIKeyID:             row.APIKeyID,
+			APIKeyName:           row.APIKeyName,
 			Label:                label,
 			Description:          description,
 			OCRExcerpts:          ocrExcerpts,
@@ -134,8 +134,8 @@ func buildDocumentContextItems(
 				DocumentID:  row.DocumentID,
 				ProjectID:   row.ProjectID,
 				ProjectName: row.ProjectName,
-				DeviceID:    row.DeviceID,
-				DeviceName:  row.DeviceName,
+				APIKeyID:    row.APIKeyID,
+				APIKeyName:  row.APIKeyName,
 				Label:       label,
 				Excerpt:     citationExcerpt,
 				MatchReason: "document context",

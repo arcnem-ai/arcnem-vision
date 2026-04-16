@@ -43,9 +43,9 @@ function CitationCard({ citation }: { citation: DocumentChatCitation }) {
 				<Badge variant="secondary" className="rounded-full text-[11px]">
 					{citation.projectName}
 				</Badge>
-				{citation.deviceName ? (
+				{citation.apiKeyName ? (
 					<Badge variant="outline" className="rounded-full text-[11px]">
-						{citation.deviceName}
+						{citation.apiKeyName}
 					</Badge>
 				) : null}
 			</div>

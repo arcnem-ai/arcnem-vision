@@ -33,7 +33,7 @@ func queryDocumentAndAgentGraphRow(
 	}
 	if tx.RowsAffected == 0 {
 		return row, fmt.Errorf(
-			"document %s not found or has no related device",
+			"document %s not found or has no related workflow key",
 			documentID,
 		)
 	}

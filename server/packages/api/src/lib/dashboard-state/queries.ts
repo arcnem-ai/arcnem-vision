@@ -36,52 +36,49 @@ export async function loadDashboardProjects(
 	});
 }
 
-export async function loadDashboardDevices(
+export async function loadDashboardWorkflowAPIKeys(
 	db: PGDB,
 	organizationId: string,
 	includeArchived: boolean,
 ) {
-	return db.query.devices.findMany({
-		where: (row) =>
-			includeArchived
-				? eq(row.organizationId, organizationId)
-				: and(eq(row.organizationId, organizationId), isNull(row.archivedAt)),
-		columns: {
-			id: true,
-			name: true,
-			slug: true,
-			projectId: true,
-			agentGraphId: true,
-			archivedAt: true,
-			updatedAt: true,
-		},
-		with: {
-			agentGraphs: {
-				columns: {
-					name: true,
+	return db.query.apikeys
+		.findMany({
+			where: (row, { and, eq }) =>
+				and(eq(row.organizationId, organizationId), eq(row.kind, "workflow")),
+			columns: {
+				id: true,
+				projectId: true,
+				agentGraphId: true,
+				name: true,
+				start: true,
+				prefix: true,
+				enabled: true,
+				createdAt: true,
+				updatedAt: true,
+				lastRequest: true,
+				expiresAt: true,
+				requestCount: true,
+				rateLimitEnabled: true,
+				rateLimitMax: true,
+				rateLimitTimeWindow: true,
+			},
+			with: {
+				agentGraphs: {
+					columns: {
+						name: true,
+					},
+				},
+				projects: {
+					columns: {
+						archivedAt: true,
+					},
 				},
 			},
-			apikeys: {
-				columns: {
-					id: true,
-					name: true,
-					start: true,
-					prefix: true,
-					enabled: true,
-					createdAt: true,
-					updatedAt: true,
-					lastRequest: true,
-					expiresAt: true,
-					requestCount: true,
-					rateLimitEnabled: true,
-					rateLimitMax: true,
-					rateLimitTimeWindow: true,
-				},
-				orderBy: (row, { desc, asc }) => [desc(row.createdAt), asc(row.id)],
-			},
-		},
-		orderBy: (row, { asc }) => [asc(row.name)],
-	});
+			orderBy: (row, { desc, asc }) => [desc(row.createdAt), asc(row.id)],
+		})
+		.then((rows) =>
+			rows.filter((row) => includeArchived || row.projects?.archivedAt == null),
+		);
 }
 
 export async function loadDashboardServiceAPIKeys(

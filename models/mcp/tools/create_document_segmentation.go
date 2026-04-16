@@ -188,7 +188,7 @@ func RegisterCreateDocumentSegmentation(server *mcp.Server) error {
 					Visibility:     sourceDocument.Visibility,
 					OrganizationID: sourceDocument.OrganizationID,
 					ProjectID:      sourceDocument.ProjectID,
-					DeviceID:       sourceDocument.DeviceID,
+					APIKeyID:       sourceDocument.APIKeyID,
 				}
 				if err := db.Create(&derivedDocument).Error; err != nil {
 					return nil, CreateDocumentSegmentationOutput{}, fmt.Errorf("failed to create segmented document: %w", err)

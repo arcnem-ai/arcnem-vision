@@ -13,7 +13,7 @@ type documentAndAgentGraphQuerySpec struct {
 
 func buildDocumentAndAgentGraphQuerySpec(documentID uuid.UUID, agentGraphID *uuid.UUID) documentAndAgentGraphQuerySpec {
 	spec := documentAndAgentGraphQuerySpec{
-		graphJoin: "LEFT JOIN agent_graphs ag ON ag.id = dev.agent_graph_id",
+		graphJoin: "LEFT JOIN apikeys ak ON ak.id = d.api_key_id LEFT JOIN agent_graphs ag ON ag.id = ak.agent_graph_id",
 		args:      []any{documentID},
 	}
 
@@ -48,7 +48,6 @@ func loadDocumentAndAgentGraphQuery(graphJoin string) string {
 			COALESCE(nodes.nodes, '[]'::jsonb) AS agent_graph_nodes,
 			COALESCE(edges.edges, '[]'::jsonb) AS agent_graph_edges
 		FROM documents d
-		LEFT JOIN devices dev ON dev.id = d.device_id
 		%s
 		LEFT JOIN LATERAL (
 			SELECT jsonb_agg(

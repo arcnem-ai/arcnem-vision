@@ -182,7 +182,7 @@ export function registerDashboardDocumentDetailRoutes(
 					d.created_at AS "createdAt",
 					dd_latest.text AS description,
 					d.project_id AS "projectId",
-					d.device_id AS "deviceId"
+					d.api_key_id AS "apiKeyId"
 				FROM document_segmentations ds
 				INNER JOIN documents d
 					ON d.id = ds.segmented_document_id

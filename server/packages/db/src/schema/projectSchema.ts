@@ -12,7 +12,7 @@ import {
 	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
-import { devices, organizations, projects } from "./authSchema";
+import { apikeys, organizations, projects } from "./authSchema";
 
 const variableVector = customType<{ data: number[]; driverData: string }>({
 	dataType() {
@@ -46,7 +46,7 @@ export const documents = pgTable(
 		projectId: uuid("project_id")
 			.notNull()
 			.references(() => projects.id, { onDelete: "cascade" }),
-		deviceId: uuid("device_id").references(() => devices.id),
+		apiKeyId: uuid("api_key_id").references(() => apikeys.id),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at")
 			.defaultNow()
@@ -64,10 +64,10 @@ export const documents = pgTable(
 			table.id,
 		),
 		index("documents_project_id_idx").on(table.projectId),
-		index("documents_device_id_idx").on(table.deviceId),
-		index("documents_device_id_id_idx").on(table.deviceId, table.id),
-		index("documents_device_created_at_idx").on(
-			table.deviceId,
+		index("documents_api_key_id_idx").on(table.apiKeyId),
+		index("documents_api_key_id_id_idx").on(table.apiKeyId, table.id),
+		index("documents_api_key_created_at_idx").on(
+			table.apiKeyId,
 			table.createdAt,
 		),
 		check("documents_size_bytes_positive", sql`${table.sizeBytes} > 0`),
@@ -90,7 +90,7 @@ export const presignedUploads = pgTable(
 		projectId: uuid("project_id")
 			.notNull()
 			.references(() => projects.id, { onDelete: "cascade" }),
-		deviceId: uuid("device_id").references(() => devices.id),
+		apiKeyId: uuid("api_key_id").references(() => apikeys.id),
 		visibility: text("visibility").notNull().default("org"),
 		status: text().notNull().default("issued"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -107,8 +107,8 @@ export const presignedUploads = pgTable(
 			table.status,
 			table.createdAt,
 		),
-		index("presigned_uploads_device_status_idx").on(
-			table.deviceId,
+		index("presigned_uploads_api_key_status_idx").on(
+			table.apiKeyId,
 			table.status,
 		),
 		check(

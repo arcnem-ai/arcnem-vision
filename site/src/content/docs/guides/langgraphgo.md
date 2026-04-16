@@ -290,7 +290,7 @@ Project conventions on top of langgraphgo:
 | **Interrupts** | Human approval needed | Low-confidence classifications |
 | **ReAct agent** | Open-ended tool use | "Find similar images and explain why" |
 | **Supervisor** | Multi-agent coordination | OCR review supervisor routing to billing vs operations specialists |
-| **Schema-driven (DB)** | Per-device configurable workflows | Different graphs per device |
+| **Schema-driven (DB)** | Per-key configurable workflows | Different graphs per workflow key |
 
 ---
 

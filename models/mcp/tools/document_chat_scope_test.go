@@ -18,7 +18,7 @@ func TestBuildDocumentScopeFiltersIncludesDashboardUploadsOnly(t *testing.T) {
 	if !strings.Contains(filters, "d.project_id IN ?") {
 		t.Fatalf("expected project clause, got %q", filters)
 	}
-	if !strings.Contains(filters, "d.device_id IS NULL") {
+	if !strings.Contains(filters, "d.api_key_id IS NULL") {
 		t.Fatalf("expected dashboard upload clause, got %q", filters)
 	}
 	if len(args) != 2 {

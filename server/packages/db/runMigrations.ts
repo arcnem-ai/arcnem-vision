@@ -64,13 +64,23 @@ const SCHEMA_RECOVERY_CHECKS = [
 		) AS ok`,
 	},
 	{
-		name: "devices.archived_at column",
+		name: "documents.api_key_id column",
 		sql: `SELECT EXISTS (
 			SELECT 1
 			FROM information_schema.columns
 			WHERE table_schema = 'public'
-				AND table_name = 'devices'
-				AND column_name = 'archived_at'
+				AND table_name = 'documents'
+				AND column_name = 'api_key_id'
+		) AS ok`,
+	},
+	{
+		name: "apikeys.agent_graph_id column",
+		sql: `SELECT EXISTS (
+			SELECT 1
+			FROM information_schema.columns
+			WHERE table_schema = 'public'
+				AND table_name = 'apikeys'
+				AND column_name = 'agent_graph_id'
 		) AS ok`,
 	},
 	{

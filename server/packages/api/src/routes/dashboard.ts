@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import type { HonoServerContext } from "@/types/serverContext";
 import { dashboardChatRouter } from "./dashboardChat";
-import { dashboardDevicesRouter } from "./dashboardDevices";
 import { dashboardOrganizationsRouter } from "./dashboardOrganizations";
 import { dashboardProjectsRouter } from "./dashboardProjects";
 import { dashboardRealtimeRouter } from "./dashboardRealtime";
@@ -18,7 +17,6 @@ export const dashboardRouter = new Hono<HonoServerContext>({
 	dashboardRunsRouter,
 	dashboardOrganizationsRouter,
 	dashboardProjectsRouter,
-	dashboardDevicesRouter,
 	dashboardWorkflowsRouter,
 	dashboardChatRouter,
 	dashboardRealtimeRouter,

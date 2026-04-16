@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
-	deviceApiKeySchema,
 	serviceApiKeySchema,
+	workflowApiKeySchema,
 	workflowEdgeSchema,
 	workflowModelOptionSchema,
 	workflowNodeSampleSchema,
@@ -44,26 +44,12 @@ export const dashboardDataSchema = z.object({
 			name: z.string().min(1),
 			slug: z.string().min(1),
 			archivedAt: z.string().nullable(),
-			deviceCount: z.number().int().nonnegative(),
+			workflowApiKeyCount: z.number().int().nonnegative(),
 			apiKeyCount: z.number().int().nonnegative(),
 			serviceApiKeyCount: z.number().int().nonnegative(),
 		}),
 	),
-	devices: z.array(
-		z.object({
-			id: z.string().min(1),
-			name: z.string().min(1),
-			slug: z.string().min(1),
-			projectId: z.string().min(1),
-			agentGraphId: z.string().min(1),
-			workflowName: z.string().nullable(),
-			archivedAt: z.string().nullable(),
-			updatedAt: z.string().min(1),
-			status: z.enum(["connected", "idle"]),
-			apiKeyCount: z.number().int().nonnegative(),
-			apiKeys: z.array(deviceApiKeySchema),
-		}),
-	),
+	workflowApiKeys: z.array(workflowApiKeySchema),
 	serviceApiKeys: z.array(serviceApiKeySchema),
 	workflows: z.array(
 		z.object({
@@ -72,7 +58,7 @@ export const dashboardDataSchema = z.object({
 			description: z.string().nullable(),
 			entryNode: z.string().min(1),
 			edgeCount: z.number().int().nonnegative(),
-			attachedDeviceCount: z.number().int().nonnegative(),
+			attachedWorkflowKeyCount: z.number().int().nonnegative(),
 			template: z
 				.object({
 					id: z.string().min(1),

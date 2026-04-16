@@ -11,8 +11,8 @@ type documentSearchRow struct {
 	SizeBytes       int64     `gorm:"column:size_bytes"`
 	ProjectID       string    `gorm:"column:project_id"`
 	ProjectName     string    `gorm:"column:project_name"`
-	DeviceID        *string   `gorm:"column:device_id"`
-	DeviceName      *string   `gorm:"column:device_name"`
+	APIKeyID        *string   `gorm:"column:api_key_id"`
+	APIKeyName      *string   `gorm:"column:api_key_name"`
 	DescriptionText string    `gorm:"column:description_text"`
 	OCRText         string    `gorm:"column:ocr_text"`
 	Score           float64   `gorm:"column:score"`
@@ -24,8 +24,8 @@ type documentContextRow struct {
 	ObjectKey       string     `gorm:"column:object_key"`
 	ProjectID       string     `gorm:"column:project_id"`
 	ProjectName     string     `gorm:"column:project_name"`
-	DeviceID        *string    `gorm:"column:device_id"`
-	DeviceName      *string    `gorm:"column:device_name"`
+	APIKeyID        *string    `gorm:"column:api_key_id"`
+	APIKeyName      *string    `gorm:"column:api_key_name"`
 	DescriptionText string     `gorm:"column:description_text"`
 	OCRText         string     `gorm:"column:ocr_text"`
 	OCRCreatedAt    *time.Time `gorm:"column:ocr_created_at"`

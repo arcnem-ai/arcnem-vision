@@ -42,19 +42,19 @@ export function parseServiceDocumentListQuery(input: {
 	limit?: string;
 	cursor?: string;
 	documentIds?: string;
-	deviceIds?: string;
-	deviceBound?: string;
+	apiKeyIds?: string;
+	apiKeyBound?: string;
 }) {
 	const trimmedLimit = input.limit?.trim();
 	const hasLimit = Boolean(trimmedLimit && trimmedLimit.length > 0);
 	const rawLimit = hasLimit
 		? Number.parseInt(trimmedLimit ?? "", 10)
 		: undefined;
-	const parsedDeviceBound = parseBoolean(input.deviceBound);
-	if (input.deviceBound !== undefined && parsedDeviceBound === undefined) {
+	const parsedAPIKeyBound = parseBoolean(input.apiKeyBound);
+	if (input.apiKeyBound !== undefined && parsedAPIKeyBound === undefined) {
 		return {
 			ok: false as const,
-			message: "deviceBound must be true or false",
+			message: "apiKeyBound must be true or false",
 		};
 	}
 
@@ -62,8 +62,8 @@ export function parseServiceDocumentListQuery(input: {
 		limit: hasLimit ? rawLimit : undefined,
 		cursor: input.cursor?.trim() || undefined,
 		documentIds: parseCSVList(input.documentIds),
-		deviceIds: parseCSVList(input.deviceIds),
-		deviceBound: parsedDeviceBound,
+		apiKeyIds: parseCSVList(input.apiKeyIds),
+		apiKeyBound: parsedAPIKeyBound,
 	});
 
 	if (!parsed.success) {

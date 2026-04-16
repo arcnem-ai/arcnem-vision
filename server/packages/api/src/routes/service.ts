@@ -102,7 +102,7 @@ async function getServiceUploadTarget(c: HonoContext<HonoServerContext>) {
 
 	return {
 		...uploadTarget,
-		deviceId: null,
+		apiKeyId: apiKey.id,
 		objectKeySource: "service-api",
 	};
 }
@@ -112,9 +112,9 @@ async function resolveScopedDocumentIds(
 	input: {
 		documentIds?: string[];
 		scope?: {
-			deviceIds?: string[];
+			apiKeyIds?: string[];
 			documentIds?: string[];
-			deviceBound?: boolean;
+			apiKeyBound?: boolean;
 		};
 	},
 ) {
@@ -135,16 +135,16 @@ async function resolveScopedDocumentIds(
 		conditions.push(inArray(documents.id, requestedDocumentIds));
 	}
 
-	if ((input.scope?.deviceIds?.length ?? 0) > 0) {
-		conditions.push(inArray(documents.deviceId, input.scope?.deviceIds ?? []));
+	if ((input.scope?.apiKeyIds?.length ?? 0) > 0) {
+		conditions.push(inArray(documents.apiKeyId, input.scope?.apiKeyIds ?? []));
 	}
 
-	if (input.scope?.deviceBound === true) {
-		conditions.push(isNotNull(documents.deviceId));
+	if (input.scope?.apiKeyBound === true) {
+		conditions.push(isNotNull(documents.apiKeyId));
 	}
 
-	if (input.scope?.deviceBound === false) {
-		conditions.push(isNull(documents.deviceId));
+	if (input.scope?.apiKeyBound === false) {
+		conditions.push(isNull(documents.apiKeyId));
 	}
 
 	const rows = await dbClient
@@ -330,7 +330,7 @@ serviceRouter.post(
 					objectKey: presignedUploads.objectKey,
 					organizationId: presignedUploads.organizationId,
 					projectId: presignedUploads.projectId,
-					deviceId: presignedUploads.deviceId,
+					apiKeyId: presignedUploads.apiKeyId,
 					visibility: presignedUploads.visibility,
 				})
 				.from(presignedUploads)
@@ -338,7 +338,7 @@ serviceRouter.post(
 					and(
 						eq(presignedUploads.organizationId, apiKey.organizationId),
 						eq(presignedUploads.projectId, apiKey.projectId),
-						isNull(presignedUploads.deviceId),
+						eq(presignedUploads.apiKeyId, apiKey.id),
 						eq(presignedUploads.objectKey, objectKey),
 						eq(presignedUploads.status, "issued"),
 					),
@@ -704,10 +704,10 @@ serviceRouter.get(
 				},
 			},
 			{
-				name: "deviceIds",
+				name: "apiKeyIds",
 				in: "query",
 				required: false,
-				description: "Comma-separated device ids.",
+				description: "Comma-separated API key ids.",
 				style: "form",
 				explode: false,
 				schema: {
@@ -716,11 +716,11 @@ serviceRouter.get(
 				},
 			},
 			{
-				name: "deviceBound",
+				name: "apiKeyBound",
 				in: "query",
 				required: false,
 				description:
-					"True for only device-bound documents, false for only unattached documents.",
+					"True for only API-key-bound documents, false for only unattached documents.",
 				schema: { type: "boolean" },
 			},
 		],
@@ -762,8 +762,8 @@ serviceRouter.get(
 			limit: c.req.query("limit"),
 			cursor: c.req.query("cursor"),
 			documentIds: c.req.query("documentIds"),
-			deviceIds: c.req.query("deviceIds"),
-			deviceBound: c.req.query("deviceBound"),
+			apiKeyIds: c.req.query("apiKeyIds"),
+			apiKeyBound: c.req.query("apiKeyBound"),
 		});
 		if (!filters.ok) {
 			return c.json({ message: filters.message }, 400);
@@ -781,16 +781,16 @@ serviceRouter.get(
 		if ((filters.data.documentIds?.length ?? 0) > 0) {
 			conditions.push(inArray(documents.id, filters.data.documentIds ?? []));
 		}
-		if ((filters.data.deviceIds?.length ?? 0) > 0) {
+		if ((filters.data.apiKeyIds?.length ?? 0) > 0) {
 			conditions.push(
-				inArray(documents.deviceId, filters.data.deviceIds ?? []),
+				inArray(documents.apiKeyId, filters.data.apiKeyIds ?? []),
 			);
 		}
-		if (filters.data.deviceBound === true) {
-			conditions.push(isNotNull(documents.deviceId));
+		if (filters.data.apiKeyBound === true) {
+			conditions.push(isNotNull(documents.apiKeyId));
 		}
-		if (filters.data.deviceBound === false) {
-			conditions.push(isNull(documents.deviceId));
+		if (filters.data.apiKeyBound === false) {
+			conditions.push(isNull(documents.apiKeyId));
 		}
 
 		const rows = await dbClient
@@ -802,7 +802,7 @@ serviceRouter.get(
 				createdAt: documents.createdAt,
 				description: documentDescriptions.text,
 				visibility: documents.visibility,
-				deviceId: documents.deviceId,
+				apiKeyId: documents.apiKeyId,
 			})
 			.from(documents)
 			.leftJoin(
@@ -879,7 +879,7 @@ serviceRouter.get(
 				createdAt: documents.createdAt,
 				description: documentDescriptions.text,
 				visibility: documents.visibility,
-				deviceId: documents.deviceId,
+				apiKeyId: documents.apiKeyId,
 				organizationId: documents.organizationId,
 				projectId: documents.projectId,
 			})

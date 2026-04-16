@@ -23,15 +23,15 @@ func runRecentDocumentBrowse(
 			d.size_bytes,
 			d.project_id,
 			p.name AS project_name,
-			d.device_id,
-			dev.name AS device_name,
+			d.api_key_id,
+			ak.name AS api_key_name,
 			COALESCE(latest_description.text, '') AS description_text,
 			COALESCE(latest_ocr.text, '') AS ocr_text,
 			EXTRACT(EPOCH FROM d.created_at)::float8 AS score,
 			d.created_at
 		FROM documents d
 		INNER JOIN projects p ON p.id = d.project_id
-		LEFT JOIN devices dev ON dev.id = d.device_id
+		LEFT JOIN apikeys ak ON ak.id = d.api_key_id
 		LEFT JOIN LATERAL (
 			SELECT dd.text
 			FROM document_descriptions dd
@@ -78,7 +78,7 @@ func runLexicalDocumentSearch(
 		COALESCE(latest_ocr.text, '') || ' ' ||
 		COALESCE(d.object_key, '') || ' ' ||
 		COALESCE(p.name, '') || ' ' ||
-		COALESCE(dev.name, '')
+		COALESCE(ak.name, '')
 	`
 
 	query := fmt.Sprintf(`
@@ -89,8 +89,8 @@ func runLexicalDocumentSearch(
 			d.size_bytes,
 			d.project_id,
 			p.name AS project_name,
-			d.device_id,
-			dev.name AS device_name,
+			d.api_key_id,
+			ak.name AS api_key_name,
 			COALESCE(latest_description.text, '') AS description_text,
 			COALESCE(latest_ocr.text, '') AS ocr_text,
 			GREATEST(
@@ -106,7 +106,7 @@ func runLexicalDocumentSearch(
 			d.created_at
 		FROM documents d
 		INNER JOIN projects p ON p.id = d.project_id
-		LEFT JOIN devices dev ON dev.id = d.device_id
+		LEFT JOIN apikeys ak ON ak.id = d.api_key_id
 		LEFT JOIN LATERAL (
 			SELECT dd.id, dd.text
 			FROM document_descriptions dd
@@ -162,15 +162,15 @@ func runDescriptionSemanticSearch(
 			d.size_bytes,
 			d.project_id,
 			p.name AS project_name,
-			d.device_id,
-			dev.name AS device_name,
+			d.api_key_id,
+			ak.name AS api_key_name,
 			COALESCE(latest_description.text, '') AS description_text,
 			COALESCE(latest_ocr.text, '') AS ocr_text,
 			GREATEST(0.0, 1 - (dde.embedding <=> ?::vector)) AS score,
 			d.created_at
 		FROM documents d
 		INNER JOIN projects p ON p.id = d.project_id
-		LEFT JOIN devices dev ON dev.id = d.device_id
+		LEFT JOIN apikeys ak ON ak.id = d.api_key_id
 		LEFT JOIN LATERAL (
 			SELECT dd.id, dd.text
 			FROM document_descriptions dd

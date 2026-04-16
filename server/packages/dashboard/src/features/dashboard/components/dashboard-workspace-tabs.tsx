@@ -7,7 +7,7 @@ import type { DocumentsResponse } from "@/features/documents/types";
 import { RunsPanel } from "@/features/runs/components/runs-panel";
 import type { RunsResponse } from "@/features/runs/types";
 import { DashboardEmptyOrgCard } from "./dashboard-empty-org-card";
-import { ProjectDevicePanel } from "./project-device-panel";
+import { ProjectAPIKeysPanel } from "./project-api-keys-panel";
 import { WorkflowLibraryPanel } from "./workflow-library-panel";
 
 export function DashboardWorkspaceTabs({
@@ -31,7 +31,7 @@ export function DashboardWorkspaceTabs({
 					className="gap-1.5 rounded-lg text-xs sm:text-sm"
 				>
 					<MonitorSmartphone className="size-3.5" />
-					<span className="hidden sm:inline">Projects &</span> Devices
+					<span className="hidden sm:inline">Projects &</span> API Keys
 				</TabsTrigger>
 				<TabsTrigger
 					value="workflow-view"
@@ -59,7 +59,10 @@ export function DashboardWorkspaceTabs({
 			</TabsList>
 
 			<TabsContent value="project-view" className="mt-4">
-				<ProjectDevicePanel dashboard={dashboard} showArchived={showArchived} />
+				<ProjectAPIKeysPanel
+					dashboard={dashboard}
+					showArchived={showArchived}
+				/>
 			</TabsContent>
 
 			<TabsContent value="workflow-view" className="mt-4">
@@ -83,7 +86,8 @@ export function DashboardWorkspaceTabs({
 						organizationId={dashboard.organization.id}
 						organizationName={dashboard.organization.name}
 						projects={dashboard.projects}
-						devices={dashboard.devices}
+						workflowApiKeys={dashboard.workflowApiKeys}
+						serviceApiKeys={dashboard.serviceApiKeys}
 						workflows={dashboard.workflows}
 					/>
 				) : (

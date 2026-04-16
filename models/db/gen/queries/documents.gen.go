@@ -37,9 +37,9 @@ func newDocument(db *gorm.DB, opts ...gen.DOOption) document {
 	_document.Visibility = field.NewString(tableName, "visibility")
 	_document.OrganizationID = field.NewString(tableName, "organization_id")
 	_document.ProjectID = field.NewString(tableName, "project_id")
-	_document.DeviceID = field.NewString(tableName, "device_id")
 	_document.CreatedAt = field.NewTime(tableName, "created_at")
 	_document.UpdatedAt = field.NewTime(tableName, "updated_at")
+	_document.APIKeyID = field.NewString(tableName, "api_key_id")
 
 	_document.fillFieldMap()
 
@@ -60,9 +60,9 @@ type document struct {
 	Visibility     field.String
 	OrganizationID field.String
 	ProjectID      field.String
-	DeviceID       field.String
 	CreatedAt      field.Time
 	UpdatedAt      field.Time
+	APIKeyID       field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -89,9 +89,9 @@ func (d *document) updateTableName(table string) *document {
 	d.Visibility = field.NewString(table, "visibility")
 	d.OrganizationID = field.NewString(table, "organization_id")
 	d.ProjectID = field.NewString(table, "project_id")
-	d.DeviceID = field.NewString(table, "device_id")
 	d.CreatedAt = field.NewTime(table, "created_at")
 	d.UpdatedAt = field.NewTime(table, "updated_at")
+	d.APIKeyID = field.NewString(table, "api_key_id")
 
 	d.fillFieldMap()
 
@@ -127,9 +127,9 @@ func (d *document) fillFieldMap() {
 	d.fieldMap["visibility"] = d.Visibility
 	d.fieldMap["organization_id"] = d.OrganizationID
 	d.fieldMap["project_id"] = d.ProjectID
-	d.fieldMap["device_id"] = d.DeviceID
 	d.fieldMap["created_at"] = d.CreatedAt
 	d.fieldMap["updated_at"] = d.UpdatedAt
+	d.fieldMap["api_key_id"] = d.APIKeyID
 }
 
 func (d document) clone(db *gorm.DB) document {

@@ -10,10 +10,11 @@ import {
 import {
 	requireAPIKey,
 	requireAPIKeyPermission,
+	requireWorkflowAPIKey,
 } from "@/middleware/requireAPIKey";
 import type { HonoServerContext } from "@/types/serverContext";
 
-const { apikeys, devices, organizations, projects } = schema;
+const { apikeys, organizations, projects } = schema;
 
 export const uploadRouter = new Hono<HonoServerContext>({
 	strict: false,
@@ -22,6 +23,7 @@ export const uploadRouter = new Hono<HonoServerContext>({
 uploadRouter.post(
 	"/uploads/presign",
 	requireAPIKey,
+	requireWorkflowAPIKey,
 	requireAPIKeyPermission("uploads", "presign"),
 	async (c) => {
 		try {
@@ -36,8 +38,8 @@ uploadRouter.post(
 					organizationSlug: organizations.slug,
 					projectId: projects.id,
 					projectSlug: projects.slug,
-					deviceId: devices.id,
-					objectKeySource: devices.slug,
+					apiKeyId: apikeys.id,
+					objectKeySource: apikeys.id,
 				})
 				.from(apikeys)
 				.innerJoin(organizations, eq(apikeys.organizationId, organizations.id))
@@ -46,14 +48,6 @@ uploadRouter.post(
 					and(
 						eq(apikeys.projectId, projects.id),
 						eq(projects.organizationId, organizations.id),
-					),
-				)
-				.innerJoin(
-					devices,
-					and(
-						eq(apikeys.deviceId, devices.id),
-						eq(devices.projectId, projects.id),
-						eq(devices.organizationId, organizations.id),
 					),
 				)
 				.where(eq(apikeys.id, verifiedKey.id))

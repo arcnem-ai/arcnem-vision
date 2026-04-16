@@ -20,7 +20,6 @@ type Apikey struct {
 	UserID              string     `gorm:"column:user_id;type:uuid;not null" json:"user_id"`
 	OrganizationID      string     `gorm:"column:organization_id;type:uuid;not null" json:"organization_id"`
 	ProjectID           string     `gorm:"column:project_id;type:uuid;not null" json:"project_id"`
-	DeviceID            *string    `gorm:"column:device_id;type:uuid" json:"device_id"`
 	RefillInterval      *int32     `gorm:"column:refill_interval;type:integer" json:"refill_interval"`
 	RefillAmount        *int32     `gorm:"column:refill_amount;type:integer" json:"refill_amount"`
 	LastRefillAt        *time.Time `gorm:"column:last_refill_at;type:timestamp without time zone" json:"last_refill_at"`
@@ -36,7 +35,8 @@ type Apikey struct {
 	UpdatedAt           time.Time  `gorm:"column:updated_at;type:timestamp without time zone;not null;default:now()" json:"updated_at"`
 	Permissions         *string    `gorm:"column:permissions;type:text" json:"permissions"`
 	Metadata            *string    `gorm:"column:metadata;type:text" json:"metadata"`
-	Kind                string     `gorm:"column:kind;type:text;not null;default:device" json:"kind"`
+	Kind                string     `gorm:"column:kind;type:text;not null;default:workflow" json:"kind"`
+	AgentGraphID        *string    `gorm:"column:agent_graph_id;type:uuid" json:"agent_graph_id"`
 }
 
 // TableName Apikey's table name

@@ -3,6 +3,6 @@ export type UploadTarget = {
 	organizationSlug: string;
 	projectId: string;
 	projectSlug: string;
-	deviceId: string | null;
+	apiKeyId: string | null;
 	objectKeySource: string;
 };

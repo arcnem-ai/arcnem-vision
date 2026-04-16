@@ -11,12 +11,13 @@ export function DashboardHeader() {
 					</Badge>
 				</div>
 				<h1 className="font-display text-balance text-2xl leading-tight sm:text-3xl lg:text-4xl">
-					Launch projects, register devices, issue API keys, and steer workflows
+					Launch projects, issue workflow and service keys, and steer workflows
 					from one approachable control room.
 				</h1>
 				<p className="max-w-2xl text-sm text-slate-600 sm:text-base">
-					Spin up a project, add the hardware inside it, then hand each device
-					the workflow and credentials it needs to send data safely.
+					Spin up a project, bind ingestion keys to workflows, and keep your
+					service credentials in the same place without carrying a separate
+					identity layer.
 				</p>
 			</div>
 		</section>

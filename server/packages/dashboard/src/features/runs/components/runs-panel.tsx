@@ -208,6 +208,10 @@ export function RunsPanel({
 	});
 
 	useEffect(() => {
+		void refreshRecentRuns();
+	}, []);
+
+	useEffect(() => {
 		if (!lastEvent || lastEvent.scope !== DASHBOARD_REALTIME_SCOPE.runs) {
 			return;
 		}

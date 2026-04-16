@@ -3,7 +3,7 @@ title: Arcnem Vision
 description: Teach machines to see. Let agents decide what to do about it.
 template: splash
 hero:
-  tagline: Arcnem Vision is an image-ingestion and analysis platform built around a server-side workflow engine. Images arrive through device API keys or the dashboard, workflows are loaded from database state, MCP tools perform the analysis, and the dashboard exposes the resulting documents, artifacts, and run traces.
+  tagline: Arcnem Vision is an image-ingestion and analysis platform built around a server-side workflow engine. Images arrive through workflow API keys or the dashboard, workflows are loaded from database state, MCP tools perform the analysis, and the dashboard exposes the resulting documents, artifacts, and run traces.
   image:
     file: ../../assets/logo.svg
   actions:
@@ -22,7 +22,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 <CardGrid stagger>
   <Card title="Two ingestion paths" icon="random">
-    Support automated device/API-key uploads and operator-driven dashboard uploads on the same platform.
+    Support automated workflow/API-key uploads and operator-driven dashboard uploads on the same platform.
   </Card>
   <Card title="Database-driven workflows" icon="setting">
     Define workflows as data, not code. Mix worker, tool, supervisor, and condition nodes without redeploying.
@@ -34,7 +34,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
     Store source images plus descriptions, OCR, embeddings, segmentations, and derived images for later search and reuse.
   </Card>
   <Card title="Dashboard control plane" icon="pencil">
-    Manage projects, devices, API keys, workflows, uploads, search, chat, and runs from one operating surface.
+    Manage projects, workflow keys, service keys, workflows, uploads, search, chat, and runs from one operating surface.
   </Card>
   <Card title="Run trace visibility" icon="bars">
     Inspect initial state, per-step deltas, final state, timing, and errors for every workflow execution.
@@ -49,7 +49,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 | Layer | Tech | What it does |
 |---|---|---|
 | **API** | Bun, Hono, better-auth, Inngest, Pino | Presigned uploads, auth, workflow triggers, structured logging |
-| **Dashboard** | React 19, TanStack Router, Tailwind, shadcn/ui | Workflow builder, project/device/API key management, search, chat, operator UI |
+| **Dashboard** | React 19, TanStack Router, Tailwind, shadcn/ui | Workflow builder, project/API key management, search, chat, operator UI |
 | **Agents** | Go, Gin, LangGraph, LangChain, inngestgo | Graph loading, workflow execution, step-level run tracking |
 | **MCP** | Go, MCP go-sdk, replicate-go, GORM | OCR, descriptions, embeddings, segmentation, similarity search, retrieval tools |
 | **Storage** | Postgres 18 + pgvector, S3-compatible, Redis | Documents, derived artifacts, vector search, sessions, realtime fanout |

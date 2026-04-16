@@ -12,7 +12,7 @@ export type APIDocumentRow = {
 	createdAt: Date | string;
 	description: string | null;
 	visibility: string;
-	deviceId?: string | null;
+	apiKeyId?: string | null;
 	distance?: number | string | null;
 };
 
@@ -41,7 +41,7 @@ export function toAPIDocumentItem(row: APIDocumentRow, s3Client: S3Client) {
 			row.visibility === "private" || row.visibility === "public"
 				? row.visibility
 				: "org",
-		deviceId: row.deviceId ?? null,
+		apiKeyId: row.apiKeyId ?? null,
 		distance: row.distance == null ? null : Number(row.distance),
 		downloadUrl,
 		thumbnailUrl: downloadUrl,

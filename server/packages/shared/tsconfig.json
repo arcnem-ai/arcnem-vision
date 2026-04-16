@@ -1,5 +1,9 @@
 {
 	"compilerOptions": {
+		"target": "ES2022",
+		"skipLibCheck": true,
+		"module": "esnext",
+		"moduleResolution": "bundler",
 		"strict": true,
 		"paths": {
 			"@/*": ["./src/*"]

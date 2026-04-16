@@ -118,7 +118,7 @@ app.get(
 				title: "Arcnem Vision Service API",
 				version: "1.0.0",
 				description:
-					"Project-scoped image ingestion and workflow orchestration API for non-device clients.",
+					"Project-scoped image ingestion and workflow orchestration API for service integrations.",
 			},
 			tags: [
 				{

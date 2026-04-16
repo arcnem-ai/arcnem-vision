@@ -3,13 +3,13 @@ title: Architecture
 description: How ingestion, workflow execution, MCP-backed analysis, and run tracking fit together.
 ---
 
-Arcnem Vision is built around a server-side workflow engine for image analysis. Images enter through device API keys or the dashboard, workflows are loaded from database state, agents call MCP tools to analyze the image, and the dashboard exposes the resulting documents, artifacts, and run traces.
+Arcnem Vision is built around a server-side workflow engine for image analysis. Images enter through workflow API keys or the dashboard, workflows are loaded from database state, agents call MCP tools to analyze the image, and the dashboard exposes the resulting documents, artifacts, and run traces.
 
 ## System Diagram
 
 ```text
 ┌──────────────────────┐          ┌──────────────────────────┐
-│ Device / Integration │──x-api-key upload flow────────────▶│
+│ Workflow Key Client  │──x-api-key upload flow────────────▶│
 └──────────────────────┘          │        Hono API          │
                                   │   presign / ack / auth   │
 ┌──────────────────────┐          │                          │
@@ -39,22 +39,22 @@ Arcnem Vision is built around a server-side workflow engine for image analysis. 
 
 ## Two Ingestion Paths
 
-### Device / API-key ingestion
+### Workflow / API-key ingestion
 
-Device API keys are scoped to an organization, project, and device. A device or external integration:
+Workflow API keys are scoped to an organization and project, and each one binds directly to a default workflow. A client or external integration:
 
 1. calls `/api/uploads/presign`
 2. uploads directly to S3-compatible storage
 3. calls `/api/uploads/ack`
 
-That acknowledgement verifies the uploaded object, creates the document record, and emits `document/process.upload`. The agents service then loads the device's assigned workflow and executes it.
+That acknowledgement verifies the uploaded object, creates the document record, and emits `document/process.upload`. The agents service then loads the workflow key's bound workflow and executes it.
 
 ### Dashboard ingestion
 
 The dashboard provides a separate operator path:
 
 1. upload an image into a selected project
-2. create a document record without attaching it to a device
+2. create a document record without attaching it to an API key
 3. queue any saved workflow against that document
 
 This is useful for one-off review, experimentation, reruns, and comparing workflows against the same image.
@@ -148,9 +148,9 @@ Because the chat layer reads from stored artifacts rather than ephemeral agent s
 
 The dashboard is the main operating surface for the platform:
 
-- create projects and devices
+- create projects and API keys
 - issue or rotate API keys
-- assign workflows to devices
+- bind workflows to workflow keys
 - build workflows and templates
 - upload ad-hoc documents
 - inspect OCR and segmentation outputs

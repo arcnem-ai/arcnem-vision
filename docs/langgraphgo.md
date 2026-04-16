@@ -904,7 +904,7 @@ func BuildGraph(snapshot *Snapshot, mcpClient *clients.MCPClient) (*graph.StateR
 
 ```text
 Inngest event "document/process.upload"
-    → load document + device + agent graph snapshot from DB
+    → load document + bound API key + agent graph snapshot from DB
     → BuildGraph(snapshot, mcpClient)
     → compile and execute
 ```
@@ -966,7 +966,7 @@ That means the dashboard can express both:
 | **ReAct agent** | Open-ended tool use | "Find similar images and explain why" |
 | **Supervisor** | Multi-agent coordination | OCR review supervisor choosing billing vs operations specialists |
 | **Subgraphs** | Reusable sub-workflows | Embedding pipeline reused across agents |
-| **Schema-driven (DB)** | Per-device configurable workflows | Different processing graphs per device |
+| **Schema-driven (DB)** | Per-key configurable workflows | Different processing graphs per workflow key |
 | **RetryPolicy** | Unreliable external APIs | LLM calls, S3 operations |
 | **CircuitBreaker** | Frequently failing services | External API health protection |
 

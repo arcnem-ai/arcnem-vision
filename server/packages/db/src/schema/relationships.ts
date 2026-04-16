@@ -13,7 +13,6 @@ import {
 import {
 	accounts,
 	apikeys,
-	devices,
 	invitations,
 	members,
 	organizations,
@@ -70,9 +69,9 @@ export const apikeysRelations = relations(apikeys, ({ one }) => ({
 		fields: [apikeys.projectId],
 		references: [projects.id],
 	}),
-	devices: one(devices, {
-		fields: [apikeys.deviceId],
-		references: [devices.id],
+	agentGraphs: one(agentGraphs, {
+		fields: [apikeys.agentGraphId],
+		references: [agentGraphs.id],
 	}),
 }));
 
@@ -80,7 +79,7 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
 	members: many(members),
 	invitations: many(invitations),
 	projects: many(projects),
-	devices: many(devices),
+	apikeys: many(apikeys),
 	documents: many(documents),
 	presignedUploads: many(presignedUploads),
 	agentGraphTemplates: many(agentGraphTemplates),
@@ -114,25 +113,6 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
 		fields: [projects.organizationId],
 		references: [organizations.id],
 	}),
-	devices: many(devices),
-	apikeys: many(apikeys),
-	documents: many(documents),
-	presignedUploads: many(presignedUploads),
-}));
-
-export const devicesRelations = relations(devices, ({ one, many }) => ({
-	organizations: one(organizations, {
-		fields: [devices.organizationId],
-		references: [organizations.id],
-	}),
-	projects: one(projects, {
-		fields: [devices.projectId],
-		references: [projects.id],
-	}),
-	agentGraphs: one(agentGraphs, {
-		fields: [devices.agentGraphId],
-		references: [agentGraphs.id],
-	}),
 	apikeys: many(apikeys),
 	documents: many(documents),
 	presignedUploads: many(presignedUploads),
@@ -147,9 +127,9 @@ export const documentsRelations = relations(documents, ({ one, many }) => ({
 		fields: [documents.projectId],
 		references: [projects.id],
 	}),
-	devices: one(devices, {
-		fields: [documents.deviceId],
-		references: [devices.id],
+	apikeys: one(apikeys, {
+		fields: [documents.apiKeyId],
+		references: [apikeys.id],
 	}),
 	documentEmbeddings: many(documentEmbeddings),
 	documentDescriptions: many(documentDescriptions),
@@ -173,9 +153,9 @@ export const presignedUploadsRelations = relations(
 			fields: [presignedUploads.projectId],
 			references: [projects.id],
 		}),
-		devices: one(devices, {
-			fields: [presignedUploads.deviceId],
-			references: [devices.id],
+		apikeys: one(apikeys, {
+			fields: [presignedUploads.apiKeyId],
+			references: [apikeys.id],
 		}),
 	}),
 );
@@ -319,7 +299,7 @@ export const agentGraphsRelations = relations(agentGraphs, ({ one, many }) => ({
 	agentGraphNodes: many(agentGraphNodes),
 	agentGraphEdges: many(agentGraphEdges),
 	agentGraphRuns: many(agentGraphRuns),
-	devices: many(devices),
+	apikeys: many(apikeys),
 }));
 
 export const agentGraphNodesRelations = relations(

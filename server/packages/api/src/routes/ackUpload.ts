@@ -11,6 +11,7 @@ import {
 import {
 	requireAPIKey,
 	requireAPIKeyPermission,
+	requireWorkflowAPIKey,
 } from "@/middleware/requireAPIKey";
 import type { HonoServerContext } from "@/types/serverContext";
 
@@ -23,6 +24,7 @@ export const ackUploadRouter = new Hono<HonoServerContext>({
 ackUploadRouter.post(
 	"/uploads/ack",
 	requireAPIKey,
+	requireWorkflowAPIKey,
 	requireAPIKeyPermission("uploads", "ack"),
 	async (c) => {
 		try {
@@ -41,7 +43,7 @@ ackUploadRouter.post(
 					objectKey: presignedUploads.objectKey,
 					organizationId: presignedUploads.organizationId,
 					projectId: presignedUploads.projectId,
-					deviceId: presignedUploads.deviceId,
+					apiKeyId: presignedUploads.apiKeyId,
 					visibility: presignedUploads.visibility,
 				})
 				.from(presignedUploads)
@@ -50,7 +52,7 @@ ackUploadRouter.post(
 					and(
 						eq(apikeys.organizationId, presignedUploads.organizationId),
 						eq(apikeys.projectId, presignedUploads.projectId),
-						eq(apikeys.deviceId, presignedUploads.deviceId),
+						eq(apikeys.id, presignedUploads.apiKeyId),
 					),
 				)
 				.where(
@@ -84,6 +86,7 @@ ackUploadRouter.post(
 					queueProcessing: {
 						enabled: true,
 						inngestClient,
+						agentGraphId: verifiedKey.agentGraphId ?? undefined,
 					},
 				}),
 			);

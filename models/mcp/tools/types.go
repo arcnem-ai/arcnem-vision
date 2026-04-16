@@ -83,7 +83,7 @@ type SimilarMatch struct {
 type ChatDocumentScope struct {
 	OrganizationID       string   `json:"organization_id"`
 	ProjectIDs           []string `json:"project_ids,omitempty"`
-	DeviceIDs            []string `json:"device_ids,omitempty"`
+	APIKeyIDs            []string `json:"api_key_ids,omitempty"`
 	DocumentIDs          []string `json:"document_ids,omitempty"`
 	DashboardUploadsOnly bool     `json:"dashboard_uploads_only,omitempty"`
 }
@@ -103,8 +103,8 @@ type DocumentChatCitation struct {
 	DocumentID  string  `json:"documentId"`
 	ProjectID   string  `json:"projectId"`
 	ProjectName string  `json:"projectName"`
-	DeviceID    *string `json:"deviceId,omitempty"`
-	DeviceName  *string `json:"deviceName,omitempty"`
+	APIKeyID    *string `json:"apiKeyId,omitempty"`
+	APIKeyName  *string `json:"apiKeyName,omitempty"`
 	Label       string  `json:"label"`
 	Excerpt     string  `json:"excerpt"`
 	MatchReason string  `json:"matchReason"`
@@ -118,8 +118,8 @@ type DocumentSearchMatch struct {
 	CreatedAt   string               `json:"createdAt"`
 	ProjectID   string               `json:"projectId"`
 	ProjectName string               `json:"projectName"`
-	DeviceID    *string              `json:"deviceId,omitempty"`
-	DeviceName  *string              `json:"deviceName,omitempty"`
+	APIKeyID    *string              `json:"apiKeyId,omitempty"`
+	APIKeyName  *string              `json:"apiKeyName,omitempty"`
 	Label       string               `json:"label"`
 	Snippet     string               `json:"snippet"`
 	MatchReason string               `json:"matchReason"`
@@ -154,8 +154,8 @@ type DocumentContextItem struct {
 	DocumentID           string                        `json:"documentId"`
 	ProjectID            string                        `json:"projectId"`
 	ProjectName          string                        `json:"projectName"`
-	DeviceID             *string                       `json:"deviceId,omitempty"`
-	DeviceName           *string                       `json:"deviceName,omitempty"`
+	APIKeyID             *string                       `json:"apiKeyId,omitempty"`
+	APIKeyName           *string                       `json:"apiKeyName,omitempty"`
 	Label                string                        `json:"label"`
 	Description          string                        `json:"description,omitempty"`
 	OCRExcerpts          []DocumentOCRExcerpt          `json:"ocrExcerpts,omitempty"`

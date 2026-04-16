@@ -19,7 +19,7 @@ export type PendingUpload = {
 	objectKey: string;
 	organizationId: string;
 	projectId: string;
-	deviceId: string | null;
+	apiKeyId: string | null;
 	visibility: DocumentVisibility;
 };
 

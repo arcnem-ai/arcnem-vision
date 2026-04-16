@@ -35,7 +35,6 @@ func newApikey(db *gorm.DB, opts ...gen.DOOption) apikey {
 	_apikey.UserID = field.NewString(tableName, "user_id")
 	_apikey.OrganizationID = field.NewString(tableName, "organization_id")
 	_apikey.ProjectID = field.NewString(tableName, "project_id")
-	_apikey.DeviceID = field.NewString(tableName, "device_id")
 	_apikey.RefillInterval = field.NewInt32(tableName, "refill_interval")
 	_apikey.RefillAmount = field.NewInt32(tableName, "refill_amount")
 	_apikey.LastRefillAt = field.NewTime(tableName, "last_refill_at")
@@ -52,6 +51,7 @@ func newApikey(db *gorm.DB, opts ...gen.DOOption) apikey {
 	_apikey.Permissions = field.NewString(tableName, "permissions")
 	_apikey.Metadata = field.NewString(tableName, "metadata")
 	_apikey.Kind = field.NewString(tableName, "kind")
+	_apikey.AgentGraphID = field.NewString(tableName, "agent_graph_id")
 
 	_apikey.fillFieldMap()
 
@@ -70,7 +70,6 @@ type apikey struct {
 	UserID              field.String
 	OrganizationID      field.String
 	ProjectID           field.String
-	DeviceID            field.String
 	RefillInterval      field.Int32
 	RefillAmount        field.Int32
 	LastRefillAt        field.Time
@@ -87,6 +86,7 @@ type apikey struct {
 	Permissions         field.String
 	Metadata            field.String
 	Kind                field.String
+	AgentGraphID        field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -111,7 +111,6 @@ func (a *apikey) updateTableName(table string) *apikey {
 	a.UserID = field.NewString(table, "user_id")
 	a.OrganizationID = field.NewString(table, "organization_id")
 	a.ProjectID = field.NewString(table, "project_id")
-	a.DeviceID = field.NewString(table, "device_id")
 	a.RefillInterval = field.NewInt32(table, "refill_interval")
 	a.RefillAmount = field.NewInt32(table, "refill_amount")
 	a.LastRefillAt = field.NewTime(table, "last_refill_at")
@@ -128,6 +127,7 @@ func (a *apikey) updateTableName(table string) *apikey {
 	a.Permissions = field.NewString(table, "permissions")
 	a.Metadata = field.NewString(table, "metadata")
 	a.Kind = field.NewString(table, "kind")
+	a.AgentGraphID = field.NewString(table, "agent_graph_id")
 
 	a.fillFieldMap()
 
@@ -161,7 +161,6 @@ func (a *apikey) fillFieldMap() {
 	a.fieldMap["user_id"] = a.UserID
 	a.fieldMap["organization_id"] = a.OrganizationID
 	a.fieldMap["project_id"] = a.ProjectID
-	a.fieldMap["device_id"] = a.DeviceID
 	a.fieldMap["refill_interval"] = a.RefillInterval
 	a.fieldMap["refill_amount"] = a.RefillAmount
 	a.fieldMap["last_refill_at"] = a.LastRefillAt
@@ -178,6 +177,7 @@ func (a *apikey) fillFieldMap() {
 	a.fieldMap["permissions"] = a.Permissions
 	a.fieldMap["metadata"] = a.Metadata
 	a.fieldMap["kind"] = a.Kind
+	a.fieldMap["agent_graph_id"] = a.AgentGraphID
 }
 
 func (a apikey) clone(db *gorm.DB) apikey {

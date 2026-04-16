@@ -30,13 +30,13 @@ func newPresignedUpload(db *gorm.DB, opts ...gen.DOOption) presignedUpload {
 	_presignedUpload.ID = field.NewString(tableName, "id")
 	_presignedUpload.Bucket = field.NewString(tableName, "bucket")
 	_presignedUpload.ObjectKey = field.NewString(tableName, "object_key")
-	_presignedUpload.DeviceID = field.NewString(tableName, "device_id")
 	_presignedUpload.Status = field.NewString(tableName, "status")
 	_presignedUpload.CreatedAt = field.NewTime(tableName, "created_at")
 	_presignedUpload.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_presignedUpload.OrganizationID = field.NewString(tableName, "organization_id")
 	_presignedUpload.ProjectID = field.NewString(tableName, "project_id")
 	_presignedUpload.Visibility = field.NewString(tableName, "visibility")
+	_presignedUpload.APIKeyID = field.NewString(tableName, "api_key_id")
 
 	_presignedUpload.fillFieldMap()
 
@@ -50,13 +50,13 @@ type presignedUpload struct {
 	ID             field.String
 	Bucket         field.String
 	ObjectKey      field.String
-	DeviceID       field.String
 	Status         field.String
 	CreatedAt      field.Time
 	UpdatedAt      field.Time
 	OrganizationID field.String
 	ProjectID      field.String
 	Visibility     field.String
+	APIKeyID       field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -76,13 +76,13 @@ func (p *presignedUpload) updateTableName(table string) *presignedUpload {
 	p.ID = field.NewString(table, "id")
 	p.Bucket = field.NewString(table, "bucket")
 	p.ObjectKey = field.NewString(table, "object_key")
-	p.DeviceID = field.NewString(table, "device_id")
 	p.Status = field.NewString(table, "status")
 	p.CreatedAt = field.NewTime(table, "created_at")
 	p.UpdatedAt = field.NewTime(table, "updated_at")
 	p.OrganizationID = field.NewString(table, "organization_id")
 	p.ProjectID = field.NewString(table, "project_id")
 	p.Visibility = field.NewString(table, "visibility")
+	p.APIKeyID = field.NewString(table, "api_key_id")
 
 	p.fillFieldMap()
 
@@ -115,13 +115,13 @@ func (p *presignedUpload) fillFieldMap() {
 	p.fieldMap["id"] = p.ID
 	p.fieldMap["bucket"] = p.Bucket
 	p.fieldMap["object_key"] = p.ObjectKey
-	p.fieldMap["device_id"] = p.DeviceID
 	p.fieldMap["status"] = p.Status
 	p.fieldMap["created_at"] = p.CreatedAt
 	p.fieldMap["updated_at"] = p.UpdatedAt
 	p.fieldMap["organization_id"] = p.OrganizationID
 	p.fieldMap["project_id"] = p.ProjectID
 	p.fieldMap["visibility"] = p.Visibility
+	p.fieldMap["api_key_id"] = p.APIKeyID
 }
 
 func (p presignedUpload) clone(db *gorm.DB) presignedUpload {

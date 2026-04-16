@@ -49,7 +49,7 @@ export const issuePresignedUpload = async ({
 			objectKey,
 			organizationId: target.organizationId,
 			projectId: target.projectId,
-			deviceId: target.deviceId,
+			apiKeyId: target.apiKeyId,
 			visibility: documentVisibility,
 			status: "issued",
 		})

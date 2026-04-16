@@ -1,6 +1,6 @@
 ---
 title: Getting Started
-description: Run the core services locally and exercise image workflows from the dashboard or device API keys.
+description: Run the core services locally and exercise image workflows from the dashboard or workflow API keys.
 ---
 
 :::tip[Start with the core service]
@@ -58,7 +58,7 @@ In the Tilt UI, trigger **seed-database**.
 
 The seed creates:
 
-- a demo organization, project, devices, and device API keys
+- a demo organization, project, workflow keys, service keys, and API keys
 - editable workflows and reusable workflow templates
 - sample images for the description, OCR, quality-review, and segmentation paths
 - stored OCR results, descriptions, embeddings, segmentations, and example run history
@@ -69,16 +69,16 @@ Because `server/packages/api/.env.example` enables `API_DEBUG=true`, the dashboa
 ## 4. Walk the core product
 
 1. Open the dashboard at `http://localhost:3001`.
-2. In **Projects & Devices**, inspect seeded devices and their attached workflows.
+2. In **Projects & API Keys**, inspect seeded workflow keys, service keys, and their attached workflows.
 3. In **Workflow Library**, browse templates and open a graph in the canvas.
 4. In **Docs**, inspect seeded documents or upload a new one from the dashboard.
 5. In **Runs**, open a run and inspect its initial state, per-step deltas, final state, timing, and errors.
 
 ## 5. Exercise the two ingestion paths
 
-### Device / API-key path
+### Workflow / API-key path
 
-Use a device API key to run the automated flow:
+Use a workflow API key to run the automated flow:
 
 ```bash
 curl -X POST http://localhost:3000/api/uploads/presign \
@@ -87,7 +87,7 @@ curl -X POST http://localhost:3000/api/uploads/presign \
   -d '{"contentType":"image/png","size":12345}'
 ```
 
-Then upload to the returned S3 URL and call `/api/uploads/ack`. That acknowledgement verifies the object, creates the document, and queues `document/process.upload` for the device's assigned workflow.
+Then upload to the returned S3 URL and call `/api/uploads/ack`. That acknowledgement verifies the object, creates the document, and queues `document/process.upload` for the workflow key's bound workflow.
 
 ### Dashboard path
 
@@ -98,7 +98,7 @@ In the **Docs** tab:
 3. Open the saved document.
 4. Queue any saved workflow against it.
 
-This path is useful for ad-hoc analysis, reruns, and operator-driven evaluation because the document is not tied to a device workflow by default.
+This path is useful for ad-hoc analysis, reruns, and operator-driven evaluation because the document is not tied to a workflow key by default.
 
 ## Health checks
 

@@ -129,8 +129,8 @@ export const apikeys = pgTable(
 		projectId: uuid("project_id")
 			.notNull()
 			.references(() => projects.id, { onDelete: "cascade" }),
-		kind: text("kind").notNull().default("device"),
-		deviceId: uuid(`device_id`).references(() => devices.id),
+		kind: text("kind").notNull().default("workflow"),
+		agentGraphId: uuid("agent_graph_id").references(() => agentGraphs.id),
 		refillInterval: integer("refill_interval"),
 		refillAmount: integer("refill_amount"),
 		lastRefillAt: timestamp("last_refill_at"),
@@ -155,7 +155,7 @@ export const apikeys = pgTable(
 	(table) => [
 		uniqueIndex("apikeys_key_uidx").on(table.key),
 		index("apikeys_userId_idx").on(table.userId),
-		index("apikeys_deviceId_idx").on(table.deviceId),
+		index("apikeys_agentGraphId_idx").on(table.agentGraphId),
 		index("apikeys_organizationId_idx").on(table.organizationId),
 		index("apikeys_projectId_idx").on(table.projectId),
 		check(
@@ -262,39 +262,6 @@ export const projects = pgTable(
 		),
 		index("projects_organizationId_idx").on(table.organizationId),
 		index("projects_organizationId_archivedAt_idx").on(
-			table.organizationId,
-			table.archivedAt,
-		),
-	],
-);
-
-export const devices = pgTable(
-	"devices",
-	{
-		id: uuid("id").primaryKey().default(sql`uuidv7()`),
-		name: text("name").notNull(),
-		slug: text("slug").notNull(),
-		organizationId: uuid("organization_id")
-			.notNull()
-			.references(() => organizations.id, { onDelete: "cascade" }),
-		projectId: uuid("project_id")
-			.notNull()
-			.references(() => projects.id, { onDelete: "cascade" }),
-		agentGraphId: uuid("agent_graph_id")
-			.notNull()
-			.references(() => agentGraphs.id),
-		archivedAt: timestamp("archived_at"),
-		createdAt: timestamp("created_at").defaultNow().notNull(),
-		updatedAt: timestamp("updated_at")
-			.defaultNow()
-			.$onUpdate(() => /* @__PURE__ */ new Date())
-			.notNull(),
-	},
-	(table) => [
-		uniqueIndex("devices_projectId_slug_uidx").on(table.projectId, table.slug),
-		index("devices_organizationId_idx").on(table.organizationId),
-		index("devices_projectId_idx").on(table.projectId),
-		index("devices_organizationId_archivedAt_idx").on(
 			table.organizationId,
 			table.archivedAt,
 		),

@@ -28,7 +28,6 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		AgentGraphTemplate:           newAgentGraphTemplate(db, opts...),
 		AgentGraphTemplateVersion:    newAgentGraphTemplateVersion(db, opts...),
 		Apikey:                       newApikey(db, opts...),
-		Device:                       newDevice(db, opts...),
 		Document:                     newDocument(db, opts...),
 		DocumentDescription:          newDocumentDescription(db, opts...),
 		DocumentDescriptionEmbedding: newDocumentDescriptionEmbedding(db, opts...),
@@ -61,7 +60,6 @@ type Query struct {
 	AgentGraphTemplate           agentGraphTemplate
 	AgentGraphTemplateVersion    agentGraphTemplateVersion
 	Apikey                       apikey
-	Device                       device
 	Document                     document
 	DocumentDescription          documentDescription
 	DocumentDescriptionEmbedding documentDescriptionEmbedding
@@ -95,7 +93,6 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		AgentGraphTemplate:           q.AgentGraphTemplate.clone(db),
 		AgentGraphTemplateVersion:    q.AgentGraphTemplateVersion.clone(db),
 		Apikey:                       q.Apikey.clone(db),
-		Device:                       q.Device.clone(db),
 		Document:                     q.Document.clone(db),
 		DocumentDescription:          q.DocumentDescription.clone(db),
 		DocumentDescriptionEmbedding: q.DocumentDescriptionEmbedding.clone(db),
@@ -136,7 +133,6 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		AgentGraphTemplate:           q.AgentGraphTemplate.replaceDB(db),
 		AgentGraphTemplateVersion:    q.AgentGraphTemplateVersion.replaceDB(db),
 		Apikey:                       q.Apikey.replaceDB(db),
-		Device:                       q.Device.replaceDB(db),
 		Document:                     q.Document.replaceDB(db),
 		DocumentDescription:          q.DocumentDescription.replaceDB(db),
 		DocumentDescriptionEmbedding: q.DocumentDescriptionEmbedding.replaceDB(db),
@@ -167,7 +163,6 @@ type queryCtx struct {
 	AgentGraphTemplate           *agentGraphTemplateDo
 	AgentGraphTemplateVersion    *agentGraphTemplateVersionDo
 	Apikey                       *apikeyDo
-	Device                       *deviceDo
 	Document                     *documentDo
 	DocumentDescription          *documentDescriptionDo
 	DocumentDescriptionEmbedding *documentDescriptionEmbeddingDo
@@ -198,7 +193,6 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		AgentGraphTemplate:           q.AgentGraphTemplate.WithContext(ctx),
 		AgentGraphTemplateVersion:    q.AgentGraphTemplateVersion.WithContext(ctx),
 		Apikey:                       q.Apikey.WithContext(ctx),
-		Device:                       q.Device.WithContext(ctx),
 		Document:                     q.Document.WithContext(ctx),
 		DocumentDescription:          q.DocumentDescription.WithContext(ctx),
 		DocumentDescriptionEmbedding: q.DocumentDescriptionEmbedding.WithContext(ctx),

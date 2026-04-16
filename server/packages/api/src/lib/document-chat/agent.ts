@@ -42,7 +42,7 @@ function toMcpScope(scope: ChatScope) {
 	return {
 		organization_id: scope.organizationId,
 		project_ids: scope.projectIds,
-		device_ids: scope.deviceIds,
+		api_key_ids: scope.apiKeyIds,
 		document_ids: scope.documentIds,
 	};
 }
@@ -143,7 +143,7 @@ const collectionSearcherSubagent: SubAgent = {
 		"After browsing or searching, use read_document_context on the best candidate documents before finalizing your result.",
 		"When calling search_documents_in_scope, always include a numeric limit. Use 5 unless the user clearly asks for broader or narrower coverage.",
 		"When calling browse_documents_in_scope, always include a numeric limit. Use 5 unless the user clearly asks for broader or narrower coverage.",
-		"In your structured response, always include deviceName. Use null when a device name is unavailable.",
+		"In your structured response, always include apiKeyName. Use null when an API key name is unavailable.",
 		"Return concise evidence, not polished end-user prose.",
 		"Keep the result compact and focus on the strongest 3 to 6 documents.",
 	].join("\n"),

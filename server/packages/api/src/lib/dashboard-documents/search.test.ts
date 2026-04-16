@@ -13,14 +13,14 @@ describe("buildDashboardDocumentSearchScope", () => {
 		});
 	});
 
-	test("includes device filters in MCP scope", () => {
+	test("includes api key filters in MCP scope", () => {
 		expect(
 			buildDashboardDocumentSearchScope("org-1", {
-				deviceId: "device-1",
+				apiKeyId: "key-1",
 			}),
 		).toEqual({
 			organization_id: "org-1",
-			device_ids: ["device-1"],
+			api_key_ids: ["key-1"],
 		});
 	});
 
