@@ -1,4 +1,1 @@
-export {
-	buildWorkflowTemplateAccessCondition,
-	isWorkflowTemplateAccessible,
-} from "@arcnem-vision/shared";
+export { isWorkflowTemplateAccessible } from "@arcnem-vision/shared";

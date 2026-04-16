@@ -1,6 +1,6 @@
 import type { PGDB } from "@arcnem-vision/db/server";
-import { buildWorkflowTemplateAccessCondition } from "@arcnem-vision/shared";
 import { and, eq, isNull } from "drizzle-orm";
+import { buildWorkflowTemplateAccessCondition } from "@/lib/workflow-template-access";
 
 export async function loadDashboardOrganization(
 	db: PGDB,

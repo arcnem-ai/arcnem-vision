@@ -1,7 +1,6 @@
 import { schema } from "@arcnem-vision/db";
 import {
 	buildWorkflowNameFromTemplate,
-	buildWorkflowTemplateAccessCondition,
 	createWorkflowFromTemplateInputSchema,
 	createWorkflowInputSchema,
 	createWorkflowTemplateSnapshot,
@@ -18,6 +17,7 @@ import {
 	buildNodeConfig,
 	insertWorkflowGraphFromSnapshot,
 } from "@/lib/workflow-graph-persistence";
+import { buildWorkflowTemplateAccessCondition } from "@/lib/workflow-template-access";
 import type { HonoServerContext } from "@/types/serverContext";
 
 export const dashboardWorkflowRecordsRouter = new Hono<HonoServerContext>({
