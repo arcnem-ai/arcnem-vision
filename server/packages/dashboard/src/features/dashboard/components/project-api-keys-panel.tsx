@@ -19,6 +19,15 @@ import {
 	useRef,
 	useState,
 } from "react";
+import {
+	AlertDialog,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,6 +74,8 @@ type ServiceKeyDraft = {
 	name: string;
 	enabled: boolean;
 };
+
+type RevealedKeyKind = "workflow" | "service";
 
 function relativeTime(iso: string | null): string {
 	if (!iso) return "never used";
@@ -134,65 +145,170 @@ function StatusNotice({ message }: { message: StatusMessage }) {
 	);
 }
 
-function GeneratedKeyCard({
+function formatRevealedKeyLabel(
+	label: string | null,
+	kind: RevealedKeyKind,
+): string {
+	if (label && label.trim().length > 0) {
+		return label.trim();
+	}
+
+	return kind === "workflow" ? "New workflow key" : "New service key";
+}
+
+function GeneratedKeyDetails({
 	revealedKey,
-	label,
 	copiedKeyId,
 	onCopy,
 }: {
 	revealedKey: GeneratedAPIKey;
-	label: string | null;
 	copiedKeyId: string | null;
 	onCopy: (key: GeneratedAPIKey) => Promise<void>;
 }) {
+	return (
+		<div className="space-y-3">
+			<div className="rounded-2xl border border-emerald-200 bg-white/95 p-4 shadow-sm">
+				<div className="flex flex-wrap items-start justify-between gap-3">
+					<div className="space-y-1">
+						<p className="text-xs font-medium uppercase tracking-[0.16em] text-emerald-700/80">
+							Secret
+						</p>
+						<p className="text-xs text-slate-500">
+							Store it now. The dashboard only returns the full value once.
+						</p>
+					</div>
+					<Button
+						type="button"
+						variant="outline"
+						onClick={() => void onCopy(revealedKey)}
+						className="rounded-full border-emerald-300 bg-white"
+					>
+						<Copy className="mr-2 size-4" />
+						{copiedKeyId === revealedKey.id ? "Copied" : "Copy secret"}
+					</Button>
+				</div>
+				<code className="mt-3 block overflow-x-auto rounded-2xl bg-slate-950 px-3 py-3 text-sm text-slate-50">
+					{revealedKey.value}
+				</code>
+			</div>
+			<div className="flex flex-wrap gap-2">
+				<Badge variant="outline" className="rounded-full bg-white/80">
+					Label: {revealedKey.name ?? "Untitled"}
+				</Badge>
+				<Badge variant="outline" className="rounded-full bg-white/80">
+					Public id:{" "}
+					{formatKeyLabel(
+						revealedKey.start,
+						revealedKey.prefix,
+						revealedKey.id,
+					)}
+				</Badge>
+			</div>
+		</div>
+	);
+}
+
+function GeneratedKeyCard({
+	kind,
+	revealedKey,
+	label,
+	copiedKeyId,
+	onCopy,
+	onDismiss,
+	copyFeedback,
+}: {
+	kind: RevealedKeyKind;
+	revealedKey: GeneratedAPIKey;
+	label: string | null;
+	copiedKeyId: string | null;
+	onCopy: (key: GeneratedAPIKey) => Promise<void>;
+	onDismiss: () => void;
+	copyFeedback: StatusMessage | null;
+}) {
+	const keyLabel = formatRevealedKeyLabel(label, kind);
+
 	return (
 		<Card className="border-emerald-200/80 bg-emerald-50/80 shadow-sm">
 			<CardHeader className="gap-2">
 				<div className="flex items-center gap-2">
 					<KeyRound className="size-4 text-emerald-700" />
 					<CardTitle className="text-base text-emerald-950">
-						New API key ready
+						{kind === "workflow" ? "Workflow key ready" : "Service key ready"}
 					</CardTitle>
 				</div>
 				<CardDescription className="text-emerald-900/75">
-					{label
-						? `${label} has been created. Copy the secret now because it will not be shown again.`
-						: "Copy the secret now because it will not be shown again."}
+					{keyLabel} is ready. Copy and store the secret before leaving this
+					screen.
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-3">
-				<div className="rounded-2xl border border-emerald-200 bg-white/90 p-3">
-					<p className="text-xs font-medium uppercase tracking-[0.16em] text-emerald-700/80">
-						Secret
-					</p>
-					<code className="mt-2 block overflow-x-auto text-sm text-slate-900">
-						{revealedKey.value}
-					</code>
-				</div>
-				<div className="flex flex-wrap gap-2">
-					<Badge variant="outline" className="rounded-full bg-white/80">
-						Label: {revealedKey.name ?? "Untitled"}
-					</Badge>
-					<Badge variant="outline" className="rounded-full bg-white/80">
-						Public id:{" "}
-						{formatKeyLabel(
-							revealedKey.start,
-							revealedKey.prefix,
-							revealedKey.id,
-						)}
-					</Badge>
-				</div>
+				{copyFeedback ? <StatusNotice message={copyFeedback} /> : null}
+				<GeneratedKeyDetails
+					revealedKey={revealedKey}
+					copiedKeyId={copiedKeyId}
+					onCopy={onCopy}
+				/>
 				<Button
 					type="button"
-					variant="outline"
-					onClick={() => void onCopy(revealedKey)}
-					className="rounded-full border-emerald-300 bg-white"
+					variant="ghost"
+					onClick={onDismiss}
+					className="rounded-full text-slate-600"
 				>
-					<Copy className="mr-2 size-4" />
-					{copiedKeyId === revealedKey.id ? "Copied" : "Copy secret"}
+					Hide secret
 				</Button>
 			</CardContent>
 		</Card>
+	);
+}
+
+function GeneratedKeyDialog({
+	open,
+	onOpenChange,
+	kind,
+	revealedKey,
+	label,
+	copiedKeyId,
+	onCopy,
+	copyFeedback,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	kind: RevealedKeyKind;
+	revealedKey: GeneratedAPIKey;
+	label: string | null;
+	copiedKeyId: string | null;
+	onCopy: (key: GeneratedAPIKey) => Promise<void>;
+	copyFeedback: StatusMessage | null;
+}) {
+	const keyLabel = formatRevealedKeyLabel(label, kind);
+
+	return (
+		<AlertDialog open={open} onOpenChange={onOpenChange}>
+			<AlertDialogContent className="max-w-2xl">
+				<AlertDialogHeader>
+					<AlertDialogTitle>
+						{kind === "workflow"
+							? "Workflow key created"
+							: "Service key created"}
+					</AlertDialogTitle>
+					<AlertDialogDescription>
+						{keyLabel} is ready. Copy and store the secret now because the
+						dashboard will only return the full value once.
+					</AlertDialogDescription>
+				</AlertDialogHeader>
+				<div className="space-y-4">
+					{copyFeedback ? <StatusNotice message={copyFeedback} /> : null}
+					<GeneratedKeyDetails
+						revealedKey={revealedKey}
+						copiedKeyId={copiedKeyId}
+						onCopy={onCopy}
+					/>
+				</div>
+				<AlertDialogFooter>
+					<AlertDialogCancel className="rounded-full">Done</AlertDialogCancel>
+				</AlertDialogFooter>
+			</AlertDialogContent>
+		</AlertDialog>
 	);
 }
 
@@ -264,7 +380,15 @@ export function ProjectAPIKeysPanel({
 	const [panelMessage, setPanelMessage] = useState<StatusMessage | null>(null);
 	const [revealedKey, setRevealedKey] = useState<GeneratedAPIKey | null>(null);
 	const [revealedKeyLabel, setRevealedKeyLabel] = useState<string | null>(null);
+	const [revealedKeyKind, setRevealedKeyKind] =
+		useState<RevealedKeyKind | null>(null);
+	const [revealedKeyProjectId, setRevealedKeyProjectId] = useState<
+		string | null
+	>(null);
+	const [isRevealDialogOpen, setIsRevealDialogOpen] = useState(false);
+	const [pendingAPIKeyRefresh, setPendingAPIKeyRefresh] = useState(false);
 	const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+	const [copyFeedback, setCopyFeedback] = useState<StatusMessage | null>(null);
 	const apiKeyRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
 		null,
 	);
@@ -281,6 +405,41 @@ export function ProjectAPIKeysPanel({
 	const [settingProjectArchiveId, setSettingProjectArchiveId] = useState<
 		string | null
 	>(null);
+
+	const refresh = async () => {
+		await router.invalidate();
+	};
+
+	const clearRevealedKey = useEffectEvent(() => {
+		const shouldRefresh = pendingAPIKeyRefresh;
+
+		setRevealedKey(null);
+		setRevealedKeyLabel(null);
+		setRevealedKeyKind(null);
+		setRevealedKeyProjectId(null);
+		setIsRevealDialogOpen(false);
+		setPendingAPIKeyRefresh(false);
+		setCopiedKeyId(null);
+		setCopyFeedback(null);
+
+		if (shouldRefresh) {
+			void refresh();
+		}
+	});
+
+	const showRevealedKey = (
+		apiKey: GeneratedAPIKey,
+		kind: RevealedKeyKind,
+		projectId: string,
+	) => {
+		setRevealedKey(apiKey);
+		setRevealedKeyLabel(apiKey.name);
+		setRevealedKeyKind(kind);
+		setRevealedKeyProjectId(projectId);
+		setIsRevealDialogOpen(true);
+		setCopiedKeyId(null);
+		setCopyFeedback(null);
+	};
 
 	useEffect(() => {
 		setSelectedProjectId((current) =>
@@ -327,6 +486,9 @@ export function ProjectAPIKeysPanel({
 		if (!revealedKey) {
 			return;
 		}
+		if (pendingAPIKeyRefresh) {
+			return;
+		}
 
 		const stillVisible =
 			dashboard.workflowApiKeys.some(
@@ -334,10 +496,14 @@ export function ProjectAPIKeysPanel({
 			) ||
 			dashboard.serviceApiKeys.some((apiKey) => apiKey.id === revealedKey.id);
 		if (!stillVisible) {
-			setRevealedKey(null);
-			setRevealedKeyLabel(null);
+			clearRevealedKey();
 		}
-	}, [dashboard.serviceApiKeys, dashboard.workflowApiKeys, revealedKey]);
+	}, [
+		dashboard.serviceApiKeys,
+		dashboard.workflowApiKeys,
+		pendingAPIKeyRefresh,
+		revealedKey,
+	]);
 
 	const selectedProject =
 		dashboard.projects.find((project) => project.id === selectedProjectId) ??
@@ -369,22 +535,27 @@ export function ProjectAPIKeysPanel({
 		try {
 			await navigator.clipboard.writeText(apiKey.value);
 			setCopiedKeyId(apiKey.id);
+			setCopyFeedback({
+				tone: "success",
+				text: "Secret copied to clipboard.",
+			});
 			window.setTimeout(() => {
 				setCopiedKeyId((current) => (current === apiKey.id ? null : current));
 			}, 2_000);
 		} catch {
-			setPanelMessage({
+			setCopyFeedback({
 				tone: "error",
-				text: "Unable to copy the API key secret from this browser.",
+				text: "Clipboard access is blocked here. Copy the secret manually before closing this view.",
 			});
 		}
 	};
 
-	const refresh = async () => {
-		await router.invalidate();
-	};
-
 	const refreshAPIKeyStats = useEffectEvent(() => {
+		if (revealedKey) {
+			setPendingAPIKeyRefresh(true);
+			return;
+		}
+
 		if (apiKeyRefreshTimeoutRef.current) {
 			return;
 		}
@@ -516,13 +687,12 @@ export function ProjectAPIKeysPanel({
 				},
 			});
 			setNewWorkflowKeyName("");
-			setRevealedKey(createdKey);
-			setRevealedKeyLabel(selectedProject.name);
+			showRevealedKey(createdKey, "workflow", selectedProject.id);
+			setPendingAPIKeyRefresh(true);
 			setPanelMessage({
 				tone: "success",
 				text: `Workflow key ${createdKey.name ?? "Untitled"} created for ${selectedProject.name}.`,
 			});
-			await refresh();
 		} catch (error) {
 			setPanelMessage({
 				tone: "error",
@@ -571,13 +741,12 @@ export function ProjectAPIKeysPanel({
 				},
 			});
 			setNewServiceKeyName("");
-			setRevealedKey(createdKey);
-			setRevealedKeyLabel(selectedProject.name);
+			showRevealedKey(createdKey, "service", selectedProject.id);
+			setPendingAPIKeyRefresh(true);
 			setPanelMessage({
 				tone: "success",
 				text: `Service key ${createdKey.name ?? "Untitled"} created for ${selectedProject.name}.`,
 			});
-			await refresh();
 		} catch (error) {
 			setPanelMessage({
 				tone: "error",
@@ -671,12 +840,16 @@ export function ProjectAPIKeysPanel({
 	return (
 		<div className="space-y-4">
 			{panelMessage ? <StatusNotice message={panelMessage} /> : null}
-			{revealedKey ? (
-				<GeneratedKeyCard
+			{revealedKey && revealedKeyKind ? (
+				<GeneratedKeyDialog
+					open={isRevealDialogOpen}
+					onOpenChange={setIsRevealDialogOpen}
+					kind={revealedKeyKind}
 					revealedKey={revealedKey}
 					label={revealedKeyLabel}
 					copiedKeyId={copiedKeyId}
 					onCopy={copySecret}
+					copyFeedback={copyFeedback}
 				/>
 			) : null}
 
@@ -879,6 +1052,19 @@ export function ProjectAPIKeysPanel({
 									and auto-run their bound workflow on upload acknowledge.
 								</p>
 							</form>
+							{revealedKey &&
+							revealedKeyKind === "workflow" &&
+							revealedKeyProjectId === selectedProjectId ? (
+								<GeneratedKeyCard
+									kind="workflow"
+									revealedKey={revealedKey}
+									label={revealedKeyLabel}
+									copiedKeyId={copiedKeyId}
+									onCopy={copySecret}
+									onDismiss={clearRevealedKey}
+									copyFeedback={copyFeedback}
+								/>
+							) : null}
 
 							{workflowKeysForProject.length === 0 ? (
 								<div className="rounded-2xl border border-dashed border-slate-300/80 bg-slate-50/70 px-4 py-6 text-sm text-slate-500">
@@ -1054,6 +1240,19 @@ export function ProjectAPIKeysPanel({
 									workflow execution across documents in the project.
 								</p>
 							</form>
+							{revealedKey &&
+							revealedKeyKind === "service" &&
+							revealedKeyProjectId === selectedProjectId ? (
+								<GeneratedKeyCard
+									kind="service"
+									revealedKey={revealedKey}
+									label={revealedKeyLabel}
+									copiedKeyId={copiedKeyId}
+									onCopy={copySecret}
+									onDismiss={clearRevealedKey}
+									copyFeedback={copyFeedback}
+								/>
+							) : null}
 
 							{serviceKeysForProject.length === 0 ? (
 								<div className="rounded-2xl border border-dashed border-slate-300/80 bg-slate-50/70 px-4 py-6 text-sm text-slate-500">
