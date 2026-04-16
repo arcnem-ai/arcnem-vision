@@ -19,6 +19,7 @@ FROM base AS builder
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages/db/node_modules ./packages/db/node_modules
+COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=deps /app/packages/dashboard/node_modules ./packages/dashboard/node_modules
 COPY package.json bun.lock ./
 COPY packages/shared ./packages/shared
@@ -44,6 +45,7 @@ ENV NODE_ENV=production
 
 COPY --from=builder --chown=app:app /app/node_modules ./node_modules
 COPY --from=builder --chown=app:app /app/packages/db/node_modules ./packages/db/node_modules
+COPY --from=builder --chown=app:app /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=builder --chown=app:app /app/packages/dashboard/node_modules ./packages/dashboard/node_modules
 COPY --chown=app:app package.json bun.lock ./
 COPY --chown=app:app packages/dashboard/package.json ./packages/dashboard/
