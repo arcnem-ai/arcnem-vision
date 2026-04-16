@@ -56,7 +56,7 @@ export function DashboardRealtimeProvider({
 		}
 
 		setConnectionState("connecting");
-		const eventSource = new EventSource("/api/dashboard/realtime");
+		const eventSource = new EventSource("/api/realtime/dashboard");
 
 		eventSource.onopen = () => {
 			setConnectionState("open");

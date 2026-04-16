@@ -4,9 +4,10 @@ import { isAPIDebugModeEnabled } from "@/env/isAPIDebugModeEnabled";
 import {
 	type APIKeyPermissionDomain,
 	apiKeyHasPermission,
-	findAPIKeyForDebugMode,
-	verifyAPIKey,
+	verifyAndConsumeAPIKey,
+	verifyAndConsumeAPIKeyForDebugMode,
 } from "@/lib/api-keys";
+import { publishAPIKeyUsedRealtimeEvent } from "@/lib/dashboard-realtime";
 import type { HonoServerContext } from "@/types/serverContext";
 
 const isDebugMode = isAPIDebugModeEnabled();
@@ -18,22 +19,45 @@ export const requireAPIKey = createMiddleware<HonoServerContext>(
 
 		if (isDebugMode) {
 			const dbClient = c.get("dbClient");
-			const debugApiKey = await findAPIKeyForDebugMode(dbClient, apiKey);
+			const debugApiKey = await verifyAndConsumeAPIKeyForDebugMode(
+				dbClient,
+				apiKey,
+			);
 
 			if (!debugApiKey) {
 				return c.json({ message: "Unauthorized" }, 401);
 			}
 
 			c.set("apiKey", debugApiKey);
+			publishAPIKeyUsedRealtimeEvent({
+				apiKeyId: debugApiKey.id,
+				organizationId: debugApiKey.organizationId,
+			});
 			await next();
 			return;
 		}
 
-		const verifiedKey = await verifyAPIKey(c.get("dbClient"), apiKey);
-		if (!verifiedKey) {
-			return c.json({ message: "Unauthorized" }, 401);
+		const verifiedKey = await verifyAndConsumeAPIKey(c.get("dbClient"), apiKey);
+		if (!verifiedKey.ok) {
+			if (verifiedKey.retryAfterSeconds) {
+				c.header("Retry-After", String(verifiedKey.retryAfterSeconds));
+			}
+
+			return c.json(
+				verifiedKey.retryAfterSeconds
+					? {
+							message: verifiedKey.message,
+							retryAfterSeconds: verifiedKey.retryAfterSeconds,
+						}
+					: { message: verifiedKey.message },
+				verifiedKey.status,
+			);
 		}
-		c.set("apiKey", verifiedKey);
+		c.set("apiKey", verifiedKey.apiKey);
+		publishAPIKeyUsedRealtimeEvent({
+			apiKeyId: verifiedKey.apiKey.id,
+			organizationId: verifiedKey.apiKey.organizationId,
+		});
 
 		await next();
 	},

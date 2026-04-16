@@ -1,5 +1,6 @@
 "use client";
 
+import { DASHBOARD_REALTIME_SCOPE } from "@arcnem-vision/shared";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -10,7 +11,14 @@ import {
 	Shield,
 	Workflow,
 } from "lucide-react";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import {
+	type FormEvent,
+	useEffect,
+	useEffectEvent,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,6 +52,7 @@ import type {
 	StatusMessage,
 	WorkflowAPIKey,
 } from "@/features/dashboard/types";
+import { useDashboardRealtime } from "@/features/realtime/dashboard-realtime-provider";
 import { cn } from "@/lib/utils";
 
 type WorkflowKeyDraft = {
@@ -229,6 +238,7 @@ export function ProjectAPIKeysPanel({
 	showArchived: boolean;
 }) {
 	const router = useRouter();
+	const { lastEvent } = useDashboardRealtime();
 	const createProjectFn = useServerFn(createProject);
 	const createWorkflowAPIKeyFn = useServerFn(createWorkflowAPIKey);
 	const updateWorkflowAPIKeyFn = useServerFn(updateWorkflowAPIKey);
@@ -255,6 +265,9 @@ export function ProjectAPIKeysPanel({
 	const [revealedKey, setRevealedKey] = useState<GeneratedAPIKey | null>(null);
 	const [revealedKeyLabel, setRevealedKeyLabel] = useState<string | null>(null);
 	const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+	const apiKeyRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+		null,
+	);
 
 	const [creatingProject, setCreatingProject] = useState(false);
 	const [creatingWorkflowKey, setCreatingWorkflowKey] = useState(false);
@@ -370,6 +383,33 @@ export function ProjectAPIKeysPanel({
 	const refresh = async () => {
 		await router.invalidate();
 	};
+
+	const refreshAPIKeyStats = useEffectEvent(() => {
+		if (apiKeyRefreshTimeoutRef.current) {
+			return;
+		}
+
+		apiKeyRefreshTimeoutRef.current = setTimeout(() => {
+			apiKeyRefreshTimeoutRef.current = null;
+			void refresh();
+		}, 1_000);
+	});
+
+	useEffect(() => {
+		return () => {
+			if (apiKeyRefreshTimeoutRef.current) {
+				clearTimeout(apiKeyRefreshTimeoutRef.current);
+			}
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!lastEvent || lastEvent.scope !== DASHBOARD_REALTIME_SCOPE.apiKeys) {
+			return;
+		}
+
+		refreshAPIKeyStats();
+	}, [lastEvent]);
 
 	const handleCreateProject = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();

@@ -1,4 +1,6 @@
 import {
+	createDashboardRealtimeEvent,
+	DASHBOARD_REALTIME_REASON,
 	type DashboardRealtimeEventInput,
 	getDashboardRealtimeChannel,
 	serializeDashboardRealtimeEvent,
@@ -16,4 +18,17 @@ export async function publishDashboardRealtimeEvent(
 	} catch (error) {
 		console.error("Failed to publish dashboard realtime event", error);
 	}
+}
+
+export function publishAPIKeyUsedRealtimeEvent(input: {
+	apiKeyId: string;
+	organizationId: string;
+}): void {
+	void publishDashboardRealtimeEvent(
+		createDashboardRealtimeEvent({
+			reason: DASHBOARD_REALTIME_REASON.apiKeyUsed,
+			organizationId: input.organizationId,
+			apiKeyId: input.apiKeyId,
+		}),
+	);
 }

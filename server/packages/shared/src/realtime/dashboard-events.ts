@@ -1,6 +1,7 @@
 export const DASHBOARD_REALTIME_EVENT_VERSION = 1 as const;
 
 export const DASHBOARD_REALTIME_SCOPE = {
+	apiKeys: "api-keys",
 	documents: "documents",
 	runs: "runs",
 } as const;
@@ -9,6 +10,7 @@ export type DashboardRealtimeScope =
 	(typeof DASHBOARD_REALTIME_SCOPE)[keyof typeof DASHBOARD_REALTIME_SCOPE];
 
 export const DASHBOARD_REALTIME_REASON = {
+	apiKeyUsed: "api-key-used",
 	documentCreated: "document-created",
 	descriptionUpserted: "description-upserted",
 	ocrCreated: "ocr-created",
@@ -25,6 +27,7 @@ const DASHBOARD_REALTIME_REASON_SCOPE: Record<
 	DashboardRealtimeReason,
 	DashboardRealtimeScope
 > = {
+	[DASHBOARD_REALTIME_REASON.apiKeyUsed]: DASHBOARD_REALTIME_SCOPE.apiKeys,
 	[DASHBOARD_REALTIME_REASON.documentCreated]:
 		DASHBOARD_REALTIME_SCOPE.documents,
 	[DASHBOARD_REALTIME_REASON.descriptionUpserted]:
@@ -44,6 +47,7 @@ export type DashboardRealtimeEvent = {
 	organizationId: string;
 	occurredAt: string;
 	documentId?: string;
+	apiKeyId?: string;
 	sourceDocumentId?: string;
 	segmentedDocumentId?: string;
 	runId?: string;
@@ -85,6 +89,7 @@ export function createDashboardRealtimeEvent(
 		organizationId: input.organizationId,
 		occurredAt: input.occurredAt ?? new Date().toISOString(),
 		documentId: input.documentId,
+		apiKeyId: input.apiKeyId,
 		sourceDocumentId: input.sourceDocumentId,
 		segmentedDocumentId: input.segmentedDocumentId,
 		runId: input.runId,
@@ -140,6 +145,7 @@ export function parseDashboardRealtimeEvent(
 		organizationId: candidate.organizationId,
 		occurredAt: candidate.occurredAt,
 		documentId: readOptionalString(candidate.documentId),
+		apiKeyId: readOptionalString(candidate.apiKeyId),
 		sourceDocumentId: readOptionalString(candidate.sourceDocumentId),
 		segmentedDocumentId: readOptionalString(candidate.segmentedDocumentId),
 		runId: readOptionalString(candidate.runId),

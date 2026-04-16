@@ -3,8 +3,12 @@ import { Hono } from "hono";
 import { setSignedCookie } from "hono/cookie";
 import { getAPIEnvVar } from "@/env/getAPIEnvVar";
 import { isAPIDebugModeEnabled } from "@/env/isAPIDebugModeEnabled";
-import { verifyAPIKey } from "@/lib/api-keys";
+import {
+	verifyAndConsumeAPIKey,
+	verifyAndConsumeAPIKeyForDebugMode,
+} from "@/lib/api-keys";
 import { auth } from "@/lib/auth";
+import { publishAPIKeyUsedRealtimeEvent } from "@/lib/dashboard-realtime";
 import type { HonoServerContext } from "@/types/serverContext";
 
 export const authRouter = new Hono<HonoServerContext>({
@@ -79,6 +83,22 @@ authRouter.post("/auth/api-key/verify", async (c) => {
 	}
 
 	if (isDebugMode) {
+		const debugApiKey = await verifyAndConsumeAPIKeyForDebugMode(
+			c.get("dbClient"),
+			key,
+		);
+		if (debugApiKey) {
+			publishAPIKeyUsedRealtimeEvent({
+				apiKeyId: debugApiKey.id,
+				organizationId: debugApiKey.organizationId,
+			});
+
+			return c.json({
+				valid: true,
+				key: debugApiKey,
+			});
+		}
+
 		return c.json({
 			valid: true,
 			key: {
@@ -87,21 +107,34 @@ authRouter.post("/auth/api-key/verify", async (c) => {
 		});
 	}
 
-	const verifiedKey = await verifyAPIKey(c.get("dbClient"), key);
-	if (!verifiedKey) {
+	const verifiedKey = await verifyAndConsumeAPIKey(c.get("dbClient"), key);
+	if (!verifiedKey.ok) {
+		if (verifiedKey.retryAfterSeconds) {
+			c.header("Retry-After", String(verifiedKey.retryAfterSeconds));
+		}
+
 		return c.json(
 			{
 				valid: false,
-				error: { message: "Unauthorized", code: "INVALID_API_KEY" },
+				error: {
+					message: verifiedKey.message,
+					code: verifiedKey.status === 429 ? "RATE_LIMITED" : "INVALID_API_KEY",
+				},
 				key: null,
+				retryAfterSeconds: verifiedKey.retryAfterSeconds ?? null,
 			},
-			401,
+			verifiedKey.status,
 		);
 	}
 
+	publishAPIKeyUsedRealtimeEvent({
+		apiKeyId: verifiedKey.apiKey.id,
+		organizationId: verifiedKey.apiKey.organizationId,
+	});
+
 	return c.json({
 		valid: true,
-		key: verifiedKey,
+		key: verifiedKey.apiKey,
 	});
 });
 
