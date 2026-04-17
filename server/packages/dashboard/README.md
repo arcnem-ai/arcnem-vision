@@ -5,7 +5,7 @@ React dashboard for managing projects, workflow keys, service keys, workflows, u
 ## What this package does
 
 - **Projects & API Keys tab**: create projects, issue workflow keys bound to default workflows, and manage service keys for broader orchestration.
-- **Workflow Library tab**: create/edit graph workflows with a visual canvas, browse reusable templates, and start a new workflow from any template.
+- **Workflow Library tab**: create/edit graph workflows with a visual canvas, browse reusable templates, generate draft graphs from a natural-language brief, and start a new workflow from any template.
 - **Docs tab**: browse uploads, run semantic search, ask grounded questions across the current collection, upload directly from the dashboard, inspect related OCR and segmented outputs, and queue workflows against any document.
 - **Runs tab**: inspect execution history and per-step state changes with realtime refresh.
 
@@ -32,10 +32,11 @@ Dev server runs on `http://localhost:3001`.
 
 - `API_URL`: the server-side API base URL used by dashboard loaders, mutations, and the auth/chat/realtime proxies
 
-Dashboard chat, realtime, and auth all proxy through the API server now. Keep `server/packages/api/.env` configured for `OPENAI_API_KEY`, `OPENAI_MODEL`, `MCP_SERVER_URL`, `REDIS_URL`, and `API_DEBUG`.
+Dashboard chat, realtime, auth, and AI workflow draft generation all proxy through the API server now. Keep `server/packages/api/.env` configured for `OPENAI_API_KEY`, `OPENAI_MODEL`, `MCP_SERVER_URL`, `REDIS_URL`, and `API_DEBUG`.
 
 ## Workflow editor notes
 
+- Operators can click **Generate With AI** to describe a workflow and open an unsaved draft seeded from the live model and tool catalog.
 - The Workflow Library exposes a searchable template picker. Operators can search by workflow name, node role, or tool, then clone a template into a new workflow canvas.
 - Started workflows keep their source template provenance on `agent_graph_template_id` and `agent_graph_template_version_id`.
 - Node types: `worker`, `supervisor`, `condition`, `tool`

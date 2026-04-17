@@ -1,6 +1,6 @@
 ---
 title: クイックスタート
-description: コアサービスをローカルで起動し、ダッシュボードまたはデバイスAPIキー経由で画像ワークフローを試す方法。
+description: コアサービスをローカルで起動し、ダッシュボードまたはワークフローAPIキー経由で画像ワークフローを試す方法。
 ---
 
 :::tip[まずはコアサービスから触るのがおすすめです]
@@ -39,7 +39,7 @@ cp client/.env.example              client/.env
 外部サービスで必要なキーは次の2つです。
 
 - **[OpenAI APIキー](https://platform.openai.com/api-keys)** → `models/agents/.env` の `OPENAI_API_KEY`
-- **同じOpenAIキーを使う場合（推奨）** → ダッシュボードのコレクションチャット用に `server/packages/api/.env` の `OPENAI_API_KEY`
+- **同じOpenAIキーを使う場合（推奨）** → ダッシュボードのコレクションチャットとAIワークフロー下書き生成用に `server/packages/api/.env` の `OPENAI_API_KEY`
 - **[Replicate APIトークン](https://replicate.com/account/api-tokens)** → `models/mcp/.env` の `REPLICATE_API_TOKEN`
 
 それ以外はローカル開発向けにほぼ初期設定済みです。Postgres、Redis、MinIO は `docker-compose.yaml` から起動されます。
@@ -58,7 +58,7 @@ Tilt UI で **seed-database** を実行します。
 
 シードでは次のものが用意されます。
 
-- デモ用の組織、プロジェクト、デバイス、APIキー
+- デモ用の組織、プロジェクト、ワークフローキー、サービスキー、APIキー
 - 編集可能なワークフローと再利用できるテンプレート
 - 説明文生成、OCR、品質判定、セグメンテーション向けのサンプル画像
 - OCR結果、説明文、埋め込み、セグメンテーション、実行履歴のサンプル
@@ -71,16 +71,16 @@ Flutter 側でもシード済み API キーを使いたい場合は、`client/.e
 ## 4. まず見るべきコア体験
 
 1. `http://localhost:3001` を開きます。
-2. **Projects & Devices** で、シード済みデバイスと割り当て済みワークフローを確認します。
-3. **Workflow Library** で、テンプレート一覧やグラフの中身を見ます。
+2. **Projects & API Keys** で、シード済みワークフローキー、サービスキー、割り当て済みワークフローを確認します。
+3. **Workflow Library** で、テンプレート一覧を見たり、**Generate With AI** から下書きを作ったり、グラフの中身を確認します。
 4. **Docs** で、シード済みドキュメントを見るか、新しい画像をダッシュボードから追加します。
 5. **Runs** で、初期状態、各ステップの差分、最終状態、エラーを確認します。
 
 ## 5. 2つの取り込み経路を試す
 
-### デバイス / APIキー経路
+### ワークフローAPIキー経路
 
-デバイスAPIキーを使うと、自動処理の流れを確認できます。
+ワークフローAPIキーを使うと、自動処理の流れを確認できます。
 
 ```bash
 curl -X POST http://localhost:3000/api/uploads/presign \
@@ -89,7 +89,7 @@ curl -X POST http://localhost:3000/api/uploads/presign \
   -d '{"contentType":"image/png","size":12345}'
 ```
 
-続いて返ってきた S3 URL に画像をアップロードし、最後に `/api/uploads/ack` を呼びます。`ack` でオブジェクト検証とドキュメント作成が行われ、そのデバイスに割り当てられたワークフローが `document/process.upload` としてキューに入ります。
+続いて返ってきた S3 URL に画像をアップロードし、最後に `/api/uploads/ack` を呼びます。`ack` でオブジェクト検証とドキュメント作成が行われ、そのワークフローキーに割り当てられたワークフローが `document/process.upload` としてキューに入ります。
 
 ### ダッシュボード経路
 
@@ -100,7 +100,7 @@ curl -X POST http://localhost:3000/api/uploads/presign \
 3. 保存されたドキュメントを開きます。
 4. 任意の保存済みワークフローを選んで実行します。
 
-この経路は、スポット確認、比較検証、再実行に向いています。デバイスにひもづく自動処理とは切り離されているため、既存運用を崩さずに同じ画像へ別のワークフローを試せます。
+この経路は、スポット確認、比較検証、再実行に向いています。ワークフローキーにひもづく自動処理とは切り離されているため、既存運用を崩さずに同じ画像へ別のワークフローを試せます。
 
 ## ヘルスチェック
 

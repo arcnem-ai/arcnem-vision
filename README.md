@@ -39,6 +39,7 @@ That core service is the product: a control plane for defining workflows, attach
 - **Condition nodes**: branch on extracted state with `contains` or `equals` rules.
 - **State reducers**: configure append vs overwrite behavior per state key.
 - **Template library**: save reusable workflow versions, then start editable copies from them in the dashboard.
+- **AI workflow drafting**: describe a pipeline in plain language and start from an unsaved graph generated from the live model and tool catalog.
 
 ## Analysis Modes
 
@@ -104,17 +105,17 @@ Behind those workflows, the MCP layer currently exposes document description, do
 
 ## Screenshots
 
-| Projects & API Keys | Workflow Library |
+| Projects & API Keys | Graph Editor & Inspector |
 |---|---|
-| ![Dashboard Projects](site/public/dashboard-projects.png) | ![Workflow Library](site/public/dashboard-workflows.png) |
+| ![Dashboard Projects](site/public/dashboard-projects.png) | ![Workflow Canvas Editor and Inspector](site/public/dashboard-workflow-editor.png) |
 
 | Docs Search & Chat | Run Details |
 |---|---|
 | ![Docs Search and Chat](site/public/dashboard-docs-chat.png) | ![Agent Run Details](site/public/dashboard-run-detail.png) |
 
-| Selected Document & Derived Outputs | Optional Demo Client |
+| Image Detail Workspace | AI Workflow Drafting |
 |---|---|
-| ![Selected Document and Segmentation](site/public/dashboard-docs-segmentation-detail.png) | ![Flutter Client](site/public/flutter-client.png) |
+| ![Selected Document and Run Workflow Panel](site/public/dashboard-docs-segmentation-detail.png) | ![AI Workflow Draft Generation](site/public/dashboard-workflow-ai-draft.png) |
 
 ## Quickstart
 
@@ -139,7 +140,7 @@ cp client/.env.example              client/.env
 Add your provider keys:
 
 - **[OpenAI API key](https://platform.openai.com/api-keys)** → `OPENAI_API_KEY` in `models/agents/.env`
-- **Same OpenAI key (recommended)** → `OPENAI_API_KEY` in `server/packages/api/.env` for dashboard collection chat
+- **Same OpenAI key (recommended)** → `OPENAI_API_KEY` in `server/packages/api/.env` for dashboard collection chat and AI workflow draft generation
 - **[Replicate API token](https://replicate.com/account/api-tokens)** → `REPLICATE_API_TOKEN` in `models/mcp/.env`
 
 Everything else is wired for local development. Postgres, Redis, and MinIO come from `docker-compose.yaml`.
@@ -170,7 +171,7 @@ Because `server/packages/api/.env.example` enables `API_DEBUG=true`, the dashboa
 
 1. Open `http://localhost:3001`.
 2. In **Projects & API Keys**, inspect seeded workflow keys, service keys, and their attached workflows.
-3. In **Workflow Library**, browse templates and open the canvas to see how graphs are composed.
+3. In **Workflow Library**, browse templates, click **Generate With AI** from a short brief, or open the canvas to see how graphs are composed.
 4. In **Docs**, inspect seeded documents or upload a new one from the dashboard.
 5. In **Runs**, expand a run to inspect initial state, per-step deltas, final state, and errors.
 6. Open `http://localhost:3000/api/openapi.json` to inspect the generated service API spec.

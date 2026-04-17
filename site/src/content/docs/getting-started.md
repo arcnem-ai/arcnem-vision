@@ -39,7 +39,7 @@ cp client/.env.example              client/.env
 Add your provider keys:
 
 - **[OpenAI API key](https://platform.openai.com/api-keys)** → `OPENAI_API_KEY` in `models/agents/.env`
-- **Same OpenAI key (recommended)** → `OPENAI_API_KEY` in `server/packages/api/.env` for dashboard collection chat
+- **Same OpenAI key (recommended)** → `OPENAI_API_KEY` in `server/packages/api/.env` for dashboard collection chat and AI workflow draft generation
 - **[Replicate API token](https://replicate.com/account/api-tokens)** → `REPLICATE_API_TOKEN` in `models/mcp/.env`
 
 Everything else is already configured for local development. Postgres, Redis, and MinIO come from `docker-compose.yaml`.
@@ -70,7 +70,7 @@ Because `server/packages/api/.env.example` enables `API_DEBUG=true`, the dashboa
 
 1. Open the dashboard at `http://localhost:3001`.
 2. In **Projects & API Keys**, inspect seeded workflow keys, service keys, and their attached workflows.
-3. In **Workflow Library**, browse templates and open a graph in the canvas.
+3. In **Workflow Library**, browse templates, click **Generate With AI**, or open a graph in the canvas.
 4. In **Docs**, inspect seeded documents or upload a new one from the dashboard.
 5. In **Runs**, open a run and inspect its initial state, per-step deltas, final state, timing, and errors.
 

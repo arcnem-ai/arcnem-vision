@@ -3,7 +3,7 @@ title: Arcnem Vision
 description: 機械に「見る」を教え、エージェントに「どうするか」を任せる。
 template: splash
 hero:
-  tagline: Arcnem Visionは、画像を受け取り、設定可能なAIワークフローを走らせ、結果と実行履歴まで運用画面で扱える画像解析基盤です。デバイス/APIキー経由の自動取り込みにも、ダッシュボードからの単発投入にも対応し、ワークフロー定義はデータベースから差し替えられます。
+  tagline: Arcnem Visionは、画像を受け取り、設定可能なAIワークフローを走らせ、結果と実行履歴まで運用画面で扱える画像解析基盤です。ワークフローAPIキー経由の自動取り込みにも、ダッシュボードからの単発投入にも対応し、ワークフロー定義はデータベースから差し替えられます。
   image:
     file: ../../../assets/logo.svg
   actions:
@@ -22,10 +22,10 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 <CardGrid stagger>
   <Card title="2つの取り込み経路" icon="random">
-    デバイス/APIキー経由の自動処理と、ダッシュボードからの単発アップロードの両方に対応。同じ基盤の上で継続運用とスポット検証を使い分けられます。
+    ワークフローAPIキー経由の自動処理と、ダッシュボードからの単発アップロードの両方に対応。同じ基盤の上で継続運用とスポット検証を使い分けられます。
   </Card>
   <Card title="データベース駆動のワークフロー" icon="setting">
-    ワークフローはコードではなくデータとして管理。worker、tool、supervisor、condition を組み合わせた処理グラフを、再デプロイなしで差し替えられます。
+    ワークフローはコードではなくデータとして管理。空のキャンバス、再利用テンプレート、AI下書きのどこからでも開始でき、再デプロイなしで差し替えられます。
   </Card>
   <Card title="MCPを軸にした解析レイヤー" icon="open-book">
     OCR、説明文生成、画像埋め込み、説明文埋め込み、セグメンテーション、類似検索、根拠付き取得を MCP ツールとして公開。ワークフローからもダッシュボードからも活用できます。
@@ -34,7 +34,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
     元画像だけでなく、説明文、OCR結果、埋め込み、セグメンテーション、派生画像まで保存。あとから検索、確認、再利用できる解析コーパスが育ちます。
   </Card>
   <Card title="ダッシュボードが運用の中枢" icon="pencil">
-    プロジェクト、デバイス、APIキー、ワークフロー、アップロード、検索、チャット、実行状況の確認までを1つの画面に集約。Flutterを開かなくても、コア体験はここで完結します。
+    プロジェクト、ワークフローキー、サービスキー、ワークフロー、AI下書き生成、アップロード、検索、チャット、実行状況の確認までを1つの画面に集約。Flutterを開かなくても、コア体験はここで完結します。
   </Card>
   <Card title="状態遷移まで追える実行トレース" icon="bars">
     初期状態、各ステップの差分、最終状態、所要時間、エラーを実行ごとに保存。運用担当者が「どこで何が起きたか」を後から追跡できます。
@@ -49,7 +49,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 | レイヤー | 技術 | 役割 |
 |---|---|---|
 | **API** | Bun, Hono, better-auth, Inngest, Pino | 署名付きアップロード、認証、実行トリガー、構造化ログ |
-| **ダッシュボード** | React 19, TanStack Router, Tailwind, shadcn/ui | ワークフロービルダー、プロジェクト/デバイス/APIキー管理、検索、チャット、運用UI |
+| **ダッシュボード** | React 19, TanStack Router, Tailwind, shadcn/ui | ワークフロービルダー、プロジェクト/ワークフローキー/サービスキー管理、AI下書き生成、検索、チャット、運用UI |
 | **エージェント** | Go, Gin, LangGraph, LangChain, inngestgo | グラフ読み込み、エージェント実行、ステップ単位の実行追跡 |
 | **MCP** | Go, MCP go-sdk, replicate-go, GORM | OCR、説明文生成、埋め込み、セグメンテーション、類似検索、取得系ツール |
 | **ストレージ** | Postgres 18 + pgvector, S3互換, Redis | ドキュメント保存、派生データ、ベクター検索、セッション、リアルタイム配信 |

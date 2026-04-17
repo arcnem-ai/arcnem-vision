@@ -3,14 +3,14 @@ title: Dashboard Operations
 description: Use the dashboard as the control plane for projects, API keys, workflows, uploads, retrieval, and live runs.
 ---
 
-The dashboard (`server/packages/dashboard`) is the control plane for Arcnem Vision. If you never open the Flutter app, you still get the core platform experience here: create workflow keys and service keys, attach workflows, upload images, inspect OCR and segmentation artifacts, search the corpus, and review step-by-step runs without redeploying code.
+The dashboard (`server/packages/dashboard`) is the control plane for Arcnem Vision. If you never open the Flutter app, you still get the core platform experience here: create workflow keys and service keys, attach workflows, generate first-pass drafts with AI, upload images, inspect OCR and segmentation artifacts, search the corpus, and review step-by-step runs without redeploying code.
 
 ![Dashboard — projects and API keys](/dashboard-projects.png)
 
 ## Tabs at a glance
 
 - **Projects & API Keys**: create projects, issue workflow keys with default workflows, and manage service keys for broader orchestration.
-- **Workflow Library**: create/edit graph workflows, browse reusable templates, and start new graphs from the template picker.
+- **Workflow Library**: create/edit graph workflows, browse reusable templates, generate draft graphs from a natural-language brief, and start new graphs from the template picker.
 - **Docs**: browse seeded or live uploads, run semantic search, ask grounded questions across the collection, upload directly from the dashboard, inspect related OCR and segmentation outputs, and queue workflows against any document.
 - **Runs**: monitor execution history with live updates as runs start, advance, and finish.
 
@@ -31,7 +31,22 @@ Notes:
 
 ![Workflow Library with document and segmentation workflows](/dashboard-workflows.png)
 
-Open **Workflow Library** to create a blank workflow, start from a reusable template, or edit an existing graph.
+Open **Workflow Library** to create a blank workflow, generate a first draft with AI, start from a reusable template, or edit an existing graph.
+
+![AI workflow draft generation dialog with a natural-language brief](/dashboard-workflow-ai-draft.png)
+
+### Generating a draft with AI
+
+1. Click **Generate With AI** from the Workflow Library hero.
+2. Describe the workflow steps, routing rules, and the output you want saved.
+3. Submit the brief.
+4. The API matches your live model and tool catalog, then opens an unsaved draft graph in the editor.
+5. Review the generated nodes, edges, and mappings before saving the workflow.
+
+- The generated graph is intentionally unsaved until you confirm it in the canvas.
+- Draft generation fails instead of opening a broken graph when required tool inputs or routing cannot be satisfied.
+
+![Workflow canvas editor with the inspector pane open](/dashboard-workflow-editor.png)
 
 ![Template picker for starting a new graph from a workflow template](/dashboard-template-picker.png)
 
