@@ -71,9 +71,11 @@ export function DashboardWorkspaceTabs({
 					workflows={dashboard.workflows}
 					startingTemplateId={library.startingTemplateId}
 					savingTemplateFromWorkflowId={library.savingTemplateFromWorkflowId}
+					generatingWorkflowDraft={library.generatingWorkflowDraft}
 					onOpenCreate={library.onOpenCreate}
 					onOpenEdit={library.onOpenEdit}
 					onOpenEditTemplate={library.onOpenEditTemplate}
+					onGenerateDraft={library.onGenerateDraft}
 					onCreateTemplateFromWorkflow={library.onCreateTemplateFromWorkflow}
 					onStartFromTemplate={library.onStartFromTemplate}
 				/>

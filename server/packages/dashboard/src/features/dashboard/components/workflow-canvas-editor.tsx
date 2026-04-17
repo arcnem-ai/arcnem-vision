@@ -15,6 +15,7 @@ import type {
 export function WorkflowCanvasEditor({
 	isOpen,
 	mode,
+	draftSeed,
 	workflow,
 	template,
 	modelCatalog,
@@ -30,6 +31,7 @@ export function WorkflowCanvasEditor({
 }: {
 	isOpen: boolean;
 	mode: "workflow-create" | "workflow-edit" | "template-edit";
+	draftSeed: WorkflowDraft | null;
 	workflow: DashboardData["workflows"][number] | null;
 	template: DashboardData["workflowTemplates"][number] | null;
 	modelCatalog: DashboardData["modelCatalog"];
@@ -83,6 +85,7 @@ export function WorkflowCanvasEditor({
 	} = useWorkflowCanvasEditorState({
 		isOpen,
 		mode,
+		draftSeed,
 		graph: activeGraph,
 		modelCatalog,
 		toolCatalog,

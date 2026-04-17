@@ -2,6 +2,8 @@ import {
 	createWorkflowFromTemplateInputSchema,
 	createWorkflowInputSchema,
 	createWorkflowTemplateFromWorkflowInputSchema,
+	generatedWorkflowDraftResponseSchema,
+	generateWorkflowDraftInputSchema,
 	idResponseSchema,
 	updateWorkflowInputSchema,
 	updateWorkflowTemplateInputSchema,
@@ -23,6 +25,22 @@ export const createWorkflow = createServerFn({ method: "POST" })
 				fallbackErrorMessage: "Failed to create workflow.",
 			},
 			idResponseSchema,
+		),
+	);
+
+export const generateWorkflowDraft = createServerFn({ method: "POST" })
+	.inputValidator((input: unknown) =>
+		generateWorkflowDraftInputSchema.parse(input),
+	)
+	.handler(async ({ data }) =>
+		fetchDashboardAPI(
+			"/dashboard/workflows/generate-draft",
+			{
+				method: "POST",
+				body: data,
+				fallbackErrorMessage: "Failed to generate workflow draft.",
+			},
+			generatedWorkflowDraftResponseSchema,
 		),
 	);
 

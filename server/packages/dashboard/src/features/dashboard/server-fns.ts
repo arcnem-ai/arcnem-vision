@@ -7,6 +7,7 @@ export {
 	createWorkflowAPIKey,
 	createWorkflowFromTemplate,
 	createWorkflowTemplateFromWorkflow,
+	generateWorkflowDraft,
 	setProjectArchived,
 	switchActiveOrganization,
 	updateServiceAPIKey,

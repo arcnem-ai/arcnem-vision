@@ -78,6 +78,7 @@ export function DashboardPage({
 				<WorkflowCanvasEditor
 					isOpen={controller.showWorkspace && controller.canvas.isOpen}
 					mode={controller.canvas.mode}
+					draftSeed={controller.canvas.draftSeed}
 					workflow={controller.canvas.workflow}
 					template={controller.canvas.template}
 					modelCatalog={dashboard.modelCatalog}

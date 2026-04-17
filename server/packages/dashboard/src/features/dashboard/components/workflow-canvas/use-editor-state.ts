@@ -91,6 +91,7 @@ function syncConditionEdges(
 export function useWorkflowCanvasEditorState({
 	isOpen,
 	mode,
+	draftSeed,
 	graph,
 	modelCatalog,
 	toolCatalog,
@@ -101,6 +102,7 @@ export function useWorkflowCanvasEditorState({
 }: {
 	isOpen: boolean;
 	mode: "workflow-create" | "workflow-edit" | "template-edit";
+	draftSeed: WorkflowDraft | null;
 	graph:
 		| DashboardData["workflows"][number]
 		| DashboardData["workflowTemplates"][number]
@@ -236,7 +238,7 @@ export function useWorkflowCanvasEditorState({
 
 	useEffect(() => {
 		if (!isOpen) return;
-		const initial = initialDraftFromGraph(graph);
+		const initial = initialDraftFromGraph(graph, draftSeed);
 		const hydratedNodes = initial.nodes.map((node) => hydrateNode(node));
 		setName(initial.name);
 		setDescription(initial.description);
@@ -253,7 +255,7 @@ export function useWorkflowCanvasEditorState({
 		setViewport({ scale: 1, offsetX: 40, offsetY: 40 });
 		setEdgeDraft(null);
 		setEdgeHoverNodeKey(null);
-	}, [graph, hydrateNode, isOpen, mode]);
+	}, [draftSeed, graph, hydrateNode, isOpen, mode]);
 
 	const toWorldCoords = useCallback(
 		(clientX: number, clientY: number) => {

@@ -123,6 +123,16 @@ export function validateCanvasGraph({
 			if (new Set(members).size !== members.length) {
 				return `Supervisor ${normalized} has duplicate members in config.members.`;
 			}
+			const finishTarget =
+				typeof config.finish_target === "string"
+					? config.finish_target.trim()
+					: "";
+			if (finishTarget === "END") {
+				return `Supervisor ${normalized} finish_target must reference a node or be left empty to end directly.`;
+			}
+			if (finishTarget && !KEY_PATTERN.test(finishTarget)) {
+				return `Supervisor ${normalized} has an invalid finish_target.`;
+			}
 		}
 
 		if (node.nodeType === "condition") {
@@ -228,6 +238,13 @@ export function validateCanvasGraph({
 					return `Supervisor ${node.nodeKey} member ${member} must be a worker.`;
 				}
 			}
+			const finishTarget =
+				typeof config.finish_target === "string"
+					? config.finish_target.trim()
+					: "";
+			if (finishTarget && !seenNodeKeys.has(finishTarget)) {
+				return `Supervisor ${node.nodeKey} references unknown finish_target ${finishTarget}.`;
+			}
 		}
 
 		if (node.nodeType === "condition") {
@@ -262,6 +279,23 @@ export function validateCanvasGraph({
 	}
 
 	for (const node of nodes) {
+		if (node.nodeType === "supervisor") {
+			const config = isRecord(node.config) ? node.config : {};
+			const finishTarget =
+				typeof config.finish_target === "string"
+					? config.finish_target.trim()
+					: "";
+			if (finishTarget) {
+				const hasExplicitFinishEdge = edges.some(
+					(edge) =>
+						edge.fromNode === node.nodeKey && edge.toNode === finishTarget,
+				);
+				if (!hasExplicitFinishEdge) {
+					return `Supervisor ${node.nodeKey} is missing an edge to finish_target ${finishTarget}.`;
+				}
+			}
+		}
+
 		if (node.nodeType !== "condition") continue;
 		const config = isRecord(node.config) ? node.config : {};
 		const expectedTargets = new Set([

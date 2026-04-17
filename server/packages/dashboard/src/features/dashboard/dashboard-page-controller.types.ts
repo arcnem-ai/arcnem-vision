@@ -6,7 +6,7 @@ import type {
 } from "@/features/dashboard/types";
 
 export type CanvasTarget =
-	| { kind: "workflow-create" }
+	| { kind: "workflow-create"; draftSeed: WorkflowDraft | null }
 	| { kind: "workflow"; id: string }
 	| { kind: "template"; id: string }
 	| null;
@@ -22,9 +22,11 @@ export type TemplateDraftSeed = Pick<
 export type DashboardWorkflowLibraryController = {
 	startingTemplateId: string | null;
 	savingTemplateFromWorkflowId: string | null;
+	generatingWorkflowDraft: boolean;
 	onOpenCreate: () => void;
 	onOpenEdit: (workflow: WorkflowSummary) => void;
 	onOpenEditTemplate: (template: WorkflowTemplateSummary) => void;
+	onGenerateDraft: (workflowDescription: string) => Promise<void>;
 	onCreateTemplateFromWorkflow: (
 		workflow: WorkflowSummary,
 		templateDraft: TemplateDraftSeed,
@@ -35,6 +37,7 @@ export type DashboardWorkflowLibraryController = {
 export type DashboardWorkflowCanvasController = {
 	isOpen: boolean;
 	mode: "workflow-create" | "workflow-edit" | "template-edit";
+	draftSeed: WorkflowDraft | null;
 	workflow: WorkflowSummary | null;
 	template: WorkflowTemplateSummary | null;
 	saveMessage: StatusMessage | null;

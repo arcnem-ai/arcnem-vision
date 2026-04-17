@@ -4,6 +4,7 @@ import {
 	createWorkflowFromTemplateInputSchema,
 	createWorkflowInputSchema,
 	createWorkflowTemplateSnapshot,
+	generateWorkflowDraftInputSchema,
 	normalizeGraphData,
 	normalizeWorkflowFields,
 	parseWorkflowTemplateSnapshot,
@@ -12,7 +13,9 @@ import {
 import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { requireDashboardOrganizationContext } from "@/lib/dashboard-auth";
+import { loadDashboardCatalog } from "@/lib/dashboard-state/catalog";
 import { readValidatedBody } from "@/lib/request-validation";
+import { generateWorkflowDraftFromDescription } from "@/lib/workflow-draft-generator";
 import {
 	buildNodeConfig,
 	insertWorkflowGraphFromSnapshot,
@@ -23,6 +26,35 @@ import type { HonoServerContext } from "@/types/serverContext";
 export const dashboardWorkflowRecordsRouter = new Hono<HonoServerContext>({
 	strict: false,
 });
+
+dashboardWorkflowRecordsRouter.post(
+	"/dashboard/workflows/generate-draft",
+	async (c) => {
+		const access = await requireDashboardOrganizationContext(c);
+		if (!access.ok) return access.response;
+		const parsed = await readValidatedBody(c, generateWorkflowDraftInputSchema);
+		if (!parsed.ok) return parsed.response;
+
+		try {
+			const draft = await generateWorkflowDraftFromDescription({
+				workflowDescription: parsed.data.workflowDescription,
+				catalog: await loadDashboardCatalog(c.get("dbClient")),
+			});
+
+			return c.json({ draft });
+		} catch (error) {
+			return c.json(
+				{
+					message:
+						error instanceof Error
+							? error.message
+							: "Failed to generate workflow draft.",
+				},
+				400,
+			);
+		}
+	},
+);
 
 dashboardWorkflowRecordsRouter.post("/dashboard/workflows", async (c) => {
 	const access = await requireDashboardOrganizationContext(c);

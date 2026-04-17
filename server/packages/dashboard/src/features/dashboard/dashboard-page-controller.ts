@@ -5,6 +5,7 @@ import {
 	createWorkflow,
 	createWorkflowFromTemplate,
 	createWorkflowTemplateFromWorkflow,
+	generateWorkflowDraft,
 	updateWorkflow,
 	updateWorkflowTemplate,
 } from "@/features/dashboard/server-fns";
@@ -30,10 +31,12 @@ export function useDashboardPageController(dashboard: DashboardData) {
 	const createWorkflowTemplateFromWorkflowFn = useServerFn(
 		createWorkflowTemplateFromWorkflow,
 	);
+	const generateWorkflowDraftFn = useServerFn(generateWorkflowDraft);
 	const updateWorkflowFn = useServerFn(updateWorkflow);
 	const updateWorkflowTemplateFn = useServerFn(updateWorkflowTemplate);
 
 	const [creatingWorkflow, setCreatingWorkflow] = useState(false);
+	const [generatingWorkflowDraft, setGeneratingWorkflowDraft] = useState(false);
 	const [startingTemplateId, setStartingTemplateId] = useState<string | null>(
 		null,
 	);
@@ -216,6 +219,25 @@ export function useDashboardPageController(dashboard: DashboardData) {
 		}
 	};
 
+	const generateDraftFromDescription = async (workflowDescription: string) => {
+		setGeneratingWorkflowDraft(true);
+		setEditorMessage(null);
+		try {
+			const response = await generateWorkflowDraftFn({
+				data: {
+					workflowDescription,
+				},
+			});
+			setCanvasTarget({
+				kind: "workflow-create",
+				draftSeed: response.draft,
+			});
+			setPendingCanvasTarget(null);
+		} finally {
+			setGeneratingWorkflowDraft(false);
+		}
+	};
+
 	const activeCanvasWorkflow =
 		canvasTarget?.kind === "workflow"
 			? (dashboard.workflows.find(
@@ -228,6 +250,8 @@ export function useDashboardPageController(dashboard: DashboardData) {
 					(template) => template.id === canvasTarget.id,
 				) ?? null)
 			: null;
+	const activeCreateDraftSeed =
+		canvasTarget?.kind === "workflow-create" ? canvasTarget.draftSeed : null;
 	const hasOrganizations = dashboard.organizations.length > 0;
 
 	return {
@@ -239,6 +263,7 @@ export function useDashboardPageController(dashboard: DashboardData) {
 					: canvasTarget?.kind === "workflow"
 						? "workflow-edit"
 						: "workflow-create",
+			draftSeed: activeCreateDraftSeed,
 			workflow: activeCanvasWorkflow,
 			template: activeCanvasTemplate,
 			saveMessage: editorMessage,
@@ -255,9 +280,11 @@ export function useDashboardPageController(dashboard: DashboardData) {
 		library: {
 			startingTemplateId,
 			savingTemplateFromWorkflowId,
+			generatingWorkflowDraft,
 			onOpenCreate: () => {
 				setCanvasTarget({
 					kind: "workflow-create",
+					draftSeed: null,
 				});
 				setPendingCanvasTarget(null);
 				setEditorMessage(null);
@@ -278,6 +305,7 @@ export function useDashboardPageController(dashboard: DashboardData) {
 				setPendingCanvasTarget(null);
 				setEditorMessage(null);
 			},
+			onGenerateDraft: generateDraftFromDescription,
 			onCreateTemplateFromWorkflow: createTemplateFromWorkflow,
 			onStartFromTemplate: startWorkflowFromTemplate,
 		} satisfies DashboardWorkflowLibraryController,

@@ -87,14 +87,14 @@ export function normalizeGraphData(input: {
 				typeof config.operator === "string"
 					? config.operator.trim().toLowerCase()
 					: "";
-			if (!["equals", "contains", "exists"].includes(operator)) {
+			if (!["equals", "contains"].includes(operator)) {
 				throw new Error(
-					`Condition node "${nodeKey}" must use operator equals, contains, or exists.`,
+					`Condition node "${nodeKey}" must use operator equals or contains.`,
 				);
 			}
 			if (
-				operator !== "exists" &&
-				(typeof config.value !== "string" || config.value.trim().length === 0)
+				typeof config.value !== "string" ||
+				config.value.trim().length === 0
 			) {
 				throw new Error(
 					`Condition node "${nodeKey}" must set a non-empty value for operator ${operator}.`,
@@ -111,6 +111,11 @@ export function normalizeGraphData(input: {
 				nodeKey,
 				"false_target",
 			);
+			if (config.true_target === config.false_target) {
+				throw new Error(
+					`Condition node "${nodeKey}" must branch to two different targets.`,
+				);
+			}
 			config.source_key = sourceKey;
 			config.operator = operator;
 		}
@@ -137,6 +142,25 @@ export function normalizeGraphData(input: {
 				throw new Error(
 					`Supervisor node "${nodeKey}" members must use valid node keys.`,
 				);
+			}
+			if (config.finish_target != null) {
+				if (typeof config.finish_target !== "string") {
+					throw new Error(
+						`Supervisor node "${nodeKey}" finish_target must be a string.`,
+					);
+				}
+				const finishTarget = config.finish_target.trim();
+				if (finishTarget === "END") {
+					throw new Error(
+						`Supervisor node "${nodeKey}" should omit finish_target to end directly.`,
+					);
+				}
+				if (finishTarget && !NODE_KEY_PATTERN.test(finishTarget)) {
+					throw new Error(
+						`Supervisor node "${nodeKey}" has invalid finish_target "${finishTarget}".`,
+					);
+				}
+				config.finish_target = finishTarget;
 			}
 			config.members = normalizedMembers;
 		}
@@ -179,6 +203,18 @@ export function normalizeGraphData(input: {
 			if (memberNode.nodeType !== "worker") {
 				throw new Error(
 					`Supervisor node "${node.nodeKey}" can only route to worker nodes.`,
+				);
+			}
+		}
+		const finishTarget =
+			typeof node.config.finish_target === "string"
+				? node.config.finish_target
+				: "";
+		if (finishTarget) {
+			const finishTargetNode = nodeByKey.get(finishTarget);
+			if (!finishTargetNode) {
+				throw new Error(
+					`Supervisor node "${node.nodeKey}" references missing finish_target "${finishTarget}".`,
 				);
 			}
 		}
@@ -249,6 +285,11 @@ export function normalizeGraphData(input: {
 			supervisorMemberKeys.add(member);
 			appendAdjacency(adjacency, node.nodeKey, member);
 		}
+		const finishTarget =
+			typeof node.config.finish_target === "string"
+				? node.config.finish_target
+				: "";
+		appendAdjacency(adjacency, node.nodeKey, finishTarget || "END");
 	}
 
 	const reachable = new Set<string>();

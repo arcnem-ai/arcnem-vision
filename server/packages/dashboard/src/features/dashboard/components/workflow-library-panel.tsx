@@ -31,6 +31,7 @@ import type {
 	WorkflowTemplateVisibility,
 } from "@/features/dashboard/types";
 import { NodeCharacter } from "./node-character";
+import { WorkflowDraftGenerationDialog } from "./workflow-draft-generation-dialog";
 
 type WorkflowTemplate = DashboardData["workflowTemplates"][number];
 type WorkflowSummary = DashboardData["workflows"][number];
@@ -532,9 +533,11 @@ export function WorkflowLibraryPanel({
 	workflows,
 	startingTemplateId,
 	savingTemplateFromWorkflowId,
+	generatingWorkflowDraft,
 	onOpenCreate,
 	onOpenEdit,
 	onOpenEditTemplate,
+	onGenerateDraft,
 	onCreateTemplateFromWorkflow,
 	onStartFromTemplate,
 }: {
@@ -542,11 +545,13 @@ export function WorkflowLibraryPanel({
 	workflows: DashboardData["workflows"];
 	startingTemplateId: string | null;
 	savingTemplateFromWorkflowId: string | null;
+	generatingWorkflowDraft: boolean;
 	onOpenCreate: () => void;
 	onOpenEdit: (workflow: DashboardData["workflows"][number]) => void;
 	onOpenEditTemplate: (
 		workflowTemplate: DashboardData["workflowTemplates"][number],
 	) => void;
+	onGenerateDraft: (workflowDescription: string) => Promise<void>;
 	onCreateTemplateFromWorkflow: (
 		workflow: DashboardData["workflows"][number],
 		templateDraft: Pick<
@@ -557,6 +562,7 @@ export function WorkflowLibraryPanel({
 	onStartFromTemplate: (workflowTemplate: WorkflowTemplate) => Promise<void>;
 }) {
 	const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
+	const [isDraftGenerationOpen, setIsDraftGenerationOpen] = useState(false);
 	const [templateDraftWorkflowId, setTemplateDraftWorkflowId] = useState<
 		string | null
 	>(null);
@@ -604,6 +610,14 @@ export function WorkflowLibraryPanel({
 							>
 								<PlusCircle className="mr-1.5 size-4" />
 								New Workflow
+							</Button>
+							<Button
+								type="button"
+								onClick={() => setIsDraftGenerationOpen(true)}
+								className="rounded-full border border-sky-200 bg-sky-50 px-6 text-sky-900 shadow-[0_12px_30px_rgba(14,165,233,0.14)] hover:bg-sky-100"
+							>
+								<Sparkles className="mr-1.5 size-4" />
+								Generate With AI
 							</Button>
 							{workflowTemplates.length > 0 ? (
 								<Button
@@ -903,6 +917,12 @@ export function WorkflowLibraryPanel({
 				savingTemplateFromWorkflowId={savingTemplateFromWorkflowId}
 				onClose={() => setTemplateDraftWorkflowId(null)}
 				onCreateTemplate={onCreateTemplateFromWorkflow}
+			/>
+			<WorkflowDraftGenerationDialog
+				isOpen={isDraftGenerationOpen}
+				isGenerating={generatingWorkflowDraft}
+				onClose={() => setIsDraftGenerationOpen(false)}
+				onGenerateDraft={onGenerateDraft}
 			/>
 		</>
 	);

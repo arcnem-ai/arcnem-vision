@@ -123,6 +123,128 @@ describe("validateCanvasGraph", () => {
 		expect(message).toBeNull();
 	});
 
+	test("rejects supervisor finish_target set to END", () => {
+		const message = validateCanvasGraph({
+			entryNode: "supervisor",
+			nodes: [
+				{
+					localId: "1",
+					id: "node-1",
+					nodeKey: "supervisor",
+					nodeType: "supervisor",
+					x: 0,
+					y: 0,
+					inputKey: null,
+					outputKey: null,
+					modelId: "00000000-0000-4000-8000-000000000001",
+					modelLabel: "openai / gpt-4.1-mini",
+					toolIds: [],
+					tools: [],
+					toolNames: [],
+					config: {
+						members: ["worker_a"],
+						finish_target: "END",
+					},
+				},
+				{
+					localId: "2",
+					id: "node-2",
+					nodeKey: "worker_a",
+					nodeType: "worker",
+					x: 240,
+					y: 0,
+					inputKey: null,
+					outputKey: null,
+					modelId: "00000000-0000-4000-8000-000000000001",
+					modelLabel: "openai / gpt-4.1-mini",
+					toolIds: [],
+					tools: [],
+					toolNames: [],
+					config: {},
+				},
+			],
+			edges: [],
+			modelCatalog: baseModelCatalog,
+			toolCatalog: [],
+		});
+
+		expect(message).toMatch(/finish_target/i);
+	});
+
+	test("requires an explicit edge to a supervisor finish_target", () => {
+		const message = validateCanvasGraph({
+			entryNode: "supervisor",
+			nodes: [
+				{
+					localId: "1",
+					id: "node-1",
+					nodeKey: "supervisor",
+					nodeType: "supervisor",
+					x: 0,
+					y: 0,
+					inputKey: null,
+					outputKey: null,
+					modelId: "00000000-0000-4000-8000-000000000001",
+					modelLabel: "openai / gpt-4.1-mini",
+					toolIds: [],
+					tools: [],
+					toolNames: [],
+					config: {
+						members: ["worker_a"],
+						finish_target: "save_summary",
+					},
+				},
+				{
+					localId: "2",
+					id: "node-2",
+					nodeKey: "worker_a",
+					nodeType: "worker",
+					x: 240,
+					y: 0,
+					inputKey: null,
+					outputKey: null,
+					modelId: "00000000-0000-4000-8000-000000000001",
+					modelLabel: "openai / gpt-4.1-mini",
+					toolIds: [],
+					tools: [],
+					toolNames: [],
+					config: {},
+				},
+				{
+					localId: "3",
+					id: "node-3",
+					nodeKey: "save_summary",
+					nodeType: "tool",
+					x: 480,
+					y: 0,
+					inputKey: null,
+					outputKey: null,
+					modelId: null,
+					modelLabel: null,
+					toolIds: ["00000000-0000-4000-8000-000000000002"],
+					tools: [],
+					toolNames: [],
+					config: {},
+				},
+			],
+			edges: [{ fromNode: "worker_a", toNode: "END" }],
+			modelCatalog: baseModelCatalog,
+			toolCatalog: [
+				{
+					id: "00000000-0000-4000-8000-000000000002",
+					name: "create_document_description",
+					description: "Save description",
+					inputSchema: {},
+					outputSchema: {},
+					inputFields: [],
+					outputFields: [],
+				},
+			],
+		});
+
+		expect(message).toMatch(/missing an edge to finish_target/i);
+	});
+
 	test("rejects duplicate supervisor members", () => {
 		const message = validateCanvasGraph({
 			entryNode: "supervisor",

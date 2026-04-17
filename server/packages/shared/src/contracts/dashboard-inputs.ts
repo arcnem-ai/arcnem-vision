@@ -94,6 +94,10 @@ export const updateWorkflowInputSchema = workflowDraftSchema.extend({
 	workflowId: z.string().min(1),
 });
 
+export const generateWorkflowDraftInputSchema = z.object({
+	workflowDescription: z.string().min(10).max(4000),
+});
+
 export const createWorkflowFromTemplateInputSchema = z.object({
 	templateId: z.string().min(1),
 });

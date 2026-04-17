@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { generatedApiKeySchema } from "./dashboard-inputs";
+import { generatedApiKeySchema, workflowDraftSchema } from "./dashboard-inputs";
 
 export const idResponseSchema = z.object({
 	id: z.string().min(1),
@@ -53,4 +53,8 @@ export const workflowTemplateUpdatedResponseSchema = z.object({
 export const workflowFromTemplateResponseSchema = z.object({
 	id: z.string().min(1),
 	name: z.string().min(1),
+});
+
+export const generatedWorkflowDraftResponseSchema = z.object({
+	draft: workflowDraftSchema,
 });

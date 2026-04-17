@@ -7,6 +7,7 @@ export async function loadDashboardCatalog(db: PGDB) {
 			id: true,
 			provider: true,
 			name: true,
+			version: true,
 			type: true,
 		},
 		orderBy: (row, { asc }) => [asc(row.provider), asc(row.name)],
@@ -36,11 +37,18 @@ export async function loadDashboardCatalog(db: PGDB) {
 	const toolOptionById = new Map(
 		toolCatalog.map((tool) => [tool.id, tool] as const),
 	);
+	const executionModelCatalog = modelRows.map((model) => ({
+		provider: model.provider,
+		name: model.name,
+		version: model.version ?? "",
+		type: model.type,
+	}));
 
 	return {
 		modelCatalog,
 		modelLabelById,
 		toolCatalog,
 		toolOptionById,
+		executionModelCatalog,
 	};
 }

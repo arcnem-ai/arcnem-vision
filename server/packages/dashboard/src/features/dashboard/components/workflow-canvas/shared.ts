@@ -48,13 +48,51 @@ export function getNodeTypeTone(nodeType: string) {
 	}
 }
 
-export function initialDraftFromGraph(graph: EditableCanvasGraph | null): {
+function buildEditorNode(
+	node: WorkflowDraft["nodes"][number],
+	overrides?: Pick<EditorNode, "tools" | "toolNames" | "modelLabel">,
+): EditorNode {
+	return {
+		localId: node.id ?? makeLocalId(),
+		id: node.id,
+		nodeKey: node.nodeKey,
+		nodeType: node.nodeType,
+		x: node.x,
+		y: node.y,
+		inputKey: node.inputKey ?? null,
+		outputKey: node.outputKey ?? null,
+		modelId: node.modelId ?? null,
+		toolIds: node.toolIds ?? [],
+		config: node.config ?? {},
+		tools: overrides?.tools ?? [],
+		toolNames: overrides?.toolNames ?? [],
+		modelLabel: overrides?.modelLabel ?? null,
+	};
+}
+
+export function initialDraftFromGraph(
+	graph: EditableCanvasGraph | null,
+	draftSeed: WorkflowDraft | null = null,
+): {
 	name: string;
 	description: string;
 	entryNode: string;
 	nodes: EditorNode[];
 	edges: WorkflowDraft["edges"];
 } {
+	if (draftSeed) {
+		return {
+			name: draftSeed.name,
+			description: draftSeed.description ?? "",
+			entryNode: draftSeed.entryNode,
+			nodes: draftSeed.nodes.map((node) => buildEditorNode(node)),
+			edges: draftSeed.edges.map((edge) => ({
+				fromNode: edge.fromNode,
+				toNode: edge.toNode,
+			})),
+		};
+	}
+
 	if (!graph) {
 		const rootId = makeLocalId();
 		return {
@@ -90,22 +128,13 @@ export function initialDraftFromGraph(graph: EditableCanvasGraph | null): {
 		name: graph.name,
 		description: graph.description ?? "",
 		entryNode: graph.entryNode,
-		nodes: graph.nodes.map((node) => ({
-			localId: node.id,
-			id: node.id,
-			nodeKey: node.nodeKey,
-			nodeType: node.nodeType,
-			x: node.x,
-			y: node.y,
-			inputKey: node.inputKey,
-			outputKey: node.outputKey,
-			modelId: node.modelId,
-			toolIds: node.toolIds,
-			config: node.config,
-			tools: node.tools,
-			toolNames: node.toolNames,
-			modelLabel: node.modelLabel,
-		})),
+		nodes: graph.nodes.map((node) =>
+			buildEditorNode(node, {
+				tools: node.tools,
+				toolNames: node.toolNames,
+				modelLabel: node.modelLabel,
+			}),
+		),
 		edges: graph.edges.map((edge) => ({
 			fromNode: edge.fromNode,
 			toNode: edge.toNode,
