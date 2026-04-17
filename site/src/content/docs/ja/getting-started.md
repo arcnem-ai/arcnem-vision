@@ -119,6 +119,10 @@ GET http://localhost:3021/health   # MCP
 - `S3_BUCKET=arcnem-vision`
 - `S3_ENDPOINT=http://localhost:9000`
 - `S3_REGION=us-east-1`
-- `S3_USE_PATH_STYLE=true`（agentsのみ）
+- `S3_USE_PATH_STYLE=true`
 
 ホスト型ストレージを使う場合は、AWS S3、Cloudflare R2、Railway Object Storage、Backblaze B2 などの認証情報に置き換えてください。
+
+- `S3_USE_PATH_STYLE` はプロバイダーごとに明示的に設定してください。
+- Cloudflare R2 では `S3_REGION=auto` と `S3_USE_PATH_STYLE=false` が必要になることがあります。
+- ダッシュボードがブラウザからストレージへ直接アップロードする場合、R2 のようなプロバイダーではダッシュボードの origin と `PUT` を許可するバケット CORS 設定も必要です。

@@ -118,7 +118,7 @@ GET /api/dashboard/documents?organizationId=<orgId>&query=<text>&limit=<n>&curso
 
 補足:
 
-- `organizationId` は、ローカルデバッグ時またはセッションにアクティブ組織がない場合に必須です。
+- `organizationId` は、認証済みのダッシュボードセッション文脈がない場合にのみ必要です。
 - `query` は任意です。
 - 検索では常に語彙検索を含めます。
 - `DOCUMENT_SEARCH_MODE=hybrid` の場合は、埋め込みがあると説明文ベースのセマンティック検索もブレンドします。

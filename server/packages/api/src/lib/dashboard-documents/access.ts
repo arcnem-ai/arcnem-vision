@@ -1,6 +1,7 @@
 import { schema } from "@arcnem-vision/db";
 import { and, eq, sql } from "drizzle-orm";
 import type { Context as HonoContext } from "hono";
+import { getDashboardSessionContext } from "@/lib/dashboard-auth";
 import type { HonoServerContext } from "@/types/serverContext";
 import { toDocumentItem } from "./presenters";
 import type {
@@ -53,11 +54,9 @@ export async function resolveDashboardOrganizationId(
 	requestedOrganizationId: string,
 ): Promise<DashboardOrganizationResolution> {
 	const organizationId = requestedOrganizationId.trim();
-	const dbClient = c.get("dbClient");
-	const session = c.get("session");
-	const user = c.get("user");
+	const sessionContext = await getDashboardSessionContext(c);
 
-	if (!session || !user) {
+	if (!sessionContext.session || !sessionContext.user) {
 		if (!organizationId) {
 			return {
 				status: 400,
@@ -69,37 +68,13 @@ export async function resolveDashboardOrganizationId(
 		return { organizationId };
 	}
 
-	const activeOrganizationId =
-		(session as { activeOrganizationId?: string | null })
-			.activeOrganizationId ?? null;
-	if (activeOrganizationId) {
-		return { organizationId: activeOrganizationId };
-	}
-
-	if (!organizationId) {
-		return {
-			status: 400,
-			message:
-				"organizationId is required when no active organization is selected",
-		};
-	}
-
-	const membership = await dbClient.query.members.findFirst({
-		where: (row, { and, eq }) =>
-			and(eq(row.userId, user.id), eq(row.organizationId, organizationId)),
-		columns: {
-			organizationId: true,
-		},
-	});
-	if (!membership) {
-		return {
-			status: 403,
-			message: "organizationId is not available for this session",
-		};
+	if (sessionContext.organizationId) {
+		return { organizationId: sessionContext.organizationId };
 	}
 
 	return {
-		organizationId: membership.organizationId,
+		status: 400,
+		message: "organizationId is required when no organization is available",
 	};
 }
 

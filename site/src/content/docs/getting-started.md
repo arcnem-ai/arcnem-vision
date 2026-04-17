@@ -117,6 +117,10 @@ Default local dev uses MinIO from `docker-compose.yaml`. The `.env.example` file
 - `S3_BUCKET=arcnem-vision`
 - `S3_ENDPOINT=http://localhost:9000`
 - `S3_REGION=us-east-1`
-- `S3_USE_PATH_STYLE=true` (agents only)
+- `S3_USE_PATH_STYLE=true`
 
 For hosted storage, substitute your AWS S3, Cloudflare R2, Railway Object Storage, or Backblaze B2 credentials.
+
+- Set `S3_USE_PATH_STYLE` explicitly for your provider.
+- Cloudflare R2 commonly needs `S3_REGION=auto` and `S3_USE_PATH_STYLE=false`.
+- When the dashboard uploads directly from the browser to storage, some providers such as R2 also need bucket CORS configured to allow your dashboard origin and `PUT` requests.

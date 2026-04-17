@@ -227,7 +227,7 @@ GET /api/dashboard/documents?organizationId=<orgId>&query=<text>&limit=<n>&curso
 
 Notes:
 
-- `organizationId` is required in local debug mode or when there is no active organization in the session.
+- `organizationId` is only needed when there is no authenticated dashboard session context.
 - `query` is optional.
 - Search always includes lexical ranking.
 - When `DOCUMENT_SEARCH_MODE=hybrid`, the API also blends in semantic description matches when embeddings are available.
