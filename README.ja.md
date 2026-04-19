@@ -12,8 +12,7 @@
   <a href="README.md">English</a> ·
   <a href="#クイックスタート">クイックスタート</a> ·
   <a href="#アーキテクチャ">アーキテクチャ</a> ·
-  <a href="site/">ドキュメントサイト</a> ·
-  <a href="docs/">ディープダイブ</a>
+  <a href="site/">ドキュメントサイト</a>
 </p>
 
 ---
@@ -221,8 +220,7 @@ arcnem-vision/
 │   ├── mcp/                OCR・埋め込み・説明文・セグメンテーション・取得系ツール
 │   ├── db/                 GORMモデル生成
 │   └── shared/             S3やリアルタイム配信の共通処理
-├── client/                 Flutterデモクライアント
-└── docs/                   埋め込み、LangChain、LangGraph、GenUIの補足資料
+└── client/                 Flutterデモクライアント
 ```
 
 ## ドキュメント
@@ -233,10 +231,6 @@ arcnem-vision/
 | [site/src/content/docs/ja/architecture.md](site/src/content/docs/ja/architecture.md) | 取り込み経路、ワークフロー、保存データ、実行追跡の全体像 |
 | [site/src/content/docs/ja/guides/dashboard-workflow-editor.md](site/src/content/docs/ja/guides/dashboard-workflow-editor.md) | ダッシュボード運用、ワークフロー編集、Docsタブ、Runsタブ |
 | [site/src/content/docs/ja/reference/api.md](site/src/content/docs/ja/reference/api.md) | ワークフローキー経路、ダッシュボードアップロード、ワークフロー投入、リアルタイムAPI |
-| [docs/embeddings.md](docs/embeddings.md) | 埋め込み実装の詳細 |
-| [docs/langgraphgo.md](docs/langgraphgo.md) | LangGraphでのオーケストレーション設計 |
-| [docs/langchaingo.md](docs/langchaingo.md) | LangChainとツール連携の補足 |
-| [docs/genui.md](docs/genui.md) | Flutter GenUIまわりの実験メモ |
 
 ## コントリビューション
 

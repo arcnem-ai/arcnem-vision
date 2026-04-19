@@ -175,8 +175,7 @@ arcnem-vision/
 │   ├── mcp/                MCP tool server
 │   ├── db/                 GORM model generation
 │   └── shared/             Shared runtime utilities
-├── client/                 Optional Flutter demo client
-└── docs/                   Deep-dive notes
+└── client/                 Optional Flutter demo client
 ```
 
 ## Service Ports

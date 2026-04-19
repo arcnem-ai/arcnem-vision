@@ -175,8 +175,7 @@ arcnem-vision/
 │   ├── mcp/                MCPツールサーバー
 │   ├── db/                 GORMモデル生成
 │   └── shared/             実行時の共通処理
-├── client/                 Flutterデモクライアント
-└── docs/                   詳細メモ
+└── client/                 Flutterデモクライアント
 ```
 
 ## サービスポート

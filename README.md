@@ -12,8 +12,7 @@
   <a href="README.ja.md">日本語</a> ·
   <a href="#quickstart">Quickstart</a> ·
   <a href="#architecture">Architecture</a> ·
-  <a href="site/">Docs Site</a> ·
-  <a href="docs/">Deep Dives</a>
+  <a href="site/">Docs Site</a>
 </p>
 
 ---
@@ -222,8 +221,7 @@ arcnem-vision/
 │   ├── mcp/                OCR, embeddings, descriptions, segmentation, retrieval
 │   ├── db/                 GORM model generation
 │   └── shared/             Shared env, S3, realtime utilities
-├── client/                 Optional Flutter demo client
-└── docs/                   Deep dives on embeddings, LangChain, LangGraph, GenUI
+└── client/                 Optional Flutter demo client
 ```
 
 ## Documentation
@@ -234,10 +232,6 @@ arcnem-vision/
 | [site/src/content/docs/architecture.md](site/src/content/docs/architecture.md) | Service architecture, ingestion paths, workflow model, persistence |
 | [site/src/content/docs/guides/dashboard-workflow-editor.md](site/src/content/docs/guides/dashboard-workflow-editor.md) | Dashboard operations, workflow canvas, docs tab, runs tab |
 | [site/src/content/docs/reference/api.md](site/src/content/docs/reference/api.md) | Workflow-key ingestion, dashboard uploads, run queueing, realtime feed |
-| [docs/embeddings.md](docs/embeddings.md) | Embedding implementation details |
-| [docs/langgraphgo.md](docs/langgraphgo.md) | LangGraph orchestration patterns and graph execution notes |
-| [docs/langchaingo.md](docs/langchaingo.md) | LangChain and tool-integration notes |
-| [docs/genui.md](docs/genui.md) | Flutter GenUI experiments and widget protocol details |
 
 ## Testing
 

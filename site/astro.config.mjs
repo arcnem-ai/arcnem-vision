@@ -58,26 +58,6 @@ export default defineConfig({
 					translations: { ja: "ガイド" },
 					items: [
 						{
-							label: "Embeddings & pgvector",
-							translations: { ja: "エンベディングとpgvector" },
-							slug: "guides/embeddings",
-						},
-						{
-							label: "LangChain Go",
-							translations: { ja: "LangChain Go" },
-							slug: "guides/langchaingo",
-						},
-						{
-							label: "LangGraph Go",
-							translations: { ja: "LangGraph Go" },
-							slug: "guides/langgraphgo",
-						},
-						{
-							label: "Flutter GenUI",
-							translations: { ja: "Flutter GenUI" },
-							slug: "guides/genui",
-						},
-						{
 							label: "Dashboard Workflow Editor",
 							translations: { ja: "ダッシュボード ワークフローエディタ" },
 							slug: "guides/dashboard-workflow-editor",
