@@ -66,6 +66,7 @@ export async function loadDashboardWorkflowAPIKeys(
 				agentGraphs: {
 					columns: {
 						name: true,
+						archivedAt: true,
 					},
 				},
 				projects: {
@@ -120,9 +121,16 @@ export async function loadDashboardServiceAPIKeys(
 		);
 }
 
-export async function loadDashboardWorkflows(db: PGDB, organizationId: string) {
+export async function loadDashboardWorkflows(
+	db: PGDB,
+	organizationId: string,
+	includeArchived: boolean,
+) {
 	return db.query.agentGraphs.findMany({
-		where: (row, { eq }) => eq(row.organizationId, organizationId),
+		where: (row) =>
+			includeArchived
+				? eq(row.organizationId, organizationId)
+				: and(eq(row.organizationId, organizationId), isNull(row.archivedAt)),
 		columns: {
 			id: true,
 			name: true,
@@ -130,6 +138,7 @@ export async function loadDashboardWorkflows(db: PGDB, organizationId: string) {
 			entryNode: true,
 			agentGraphTemplateId: true,
 			agentGraphTemplateVersionId: true,
+			archivedAt: true,
 		},
 		with: {
 			agentGraphTemplateVersions: {
@@ -186,13 +195,21 @@ export async function loadDashboardWorkflows(db: PGDB, organizationId: string) {
 export async function loadDashboardWorkflowTemplates(
 	db: PGDB,
 	organizationId: string,
+	includeArchived: boolean,
 ) {
 	return db.query.agentGraphTemplates.findMany({
-		where: (row) => buildWorkflowTemplateAccessCondition(row, organizationId),
+		where: (row) =>
+			includeArchived
+				? buildWorkflowTemplateAccessCondition(row, organizationId)
+				: and(
+						buildWorkflowTemplateAccessCondition(row, organizationId),
+						isNull(row.archivedAt),
+					),
 		columns: {
 			id: true,
 			visibility: true,
 			organizationId: true,
+			archivedAt: true,
 		},
 		with: {
 			currentVersion: {
@@ -203,6 +220,12 @@ export async function loadDashboardWorkflowTemplates(
 				},
 			},
 			agentGraphTemplateVersions: {
+				columns: {
+					id: true,
+				},
+			},
+			agentGraphs: {
+				where: (row, { eq }) => eq(row.organizationId, organizationId),
 				columns: {
 					id: true,
 				},

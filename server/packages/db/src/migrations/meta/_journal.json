@@ -57,6 +57,13 @@
       "when": 1776312362806,
       "tag": "0007_api_key_workflows",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1776765755176,
+      "tag": "0008_worthless_ares",
+      "breakpoints": true
     }
   ]
 }

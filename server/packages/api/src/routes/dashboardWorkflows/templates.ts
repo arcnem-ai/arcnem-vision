@@ -6,6 +6,7 @@ import {
 	normalizeWorkflowTemplateVisibility,
 	parseCanvasPosition,
 	parseWorkflowTemplateSnapshot,
+	setWorkflowTemplateArchivedInputSchema,
 	updateWorkflowTemplateInputSchema,
 } from "@arcnem-vision/shared";
 import { and, eq } from "drizzle-orm";
@@ -17,6 +18,77 @@ import type { HonoServerContext } from "@/types/serverContext";
 export const dashboardWorkflowTemplatesRouter = new Hono<HonoServerContext>({
 	strict: false,
 });
+
+dashboardWorkflowTemplatesRouter.post(
+	"/dashboard/workflow-templates/archive",
+	async (c) => {
+		const access = await requireDashboardOrganizationContext(c);
+		if (!access.ok) return access.response;
+		const parsed = await readValidatedBody(
+			c,
+			setWorkflowTemplateArchivedInputSchema,
+		);
+		if (!parsed.ok) return parsed.response;
+
+		const db = c.get("dbClient");
+		const template = await db.query.agentGraphTemplates.findFirst({
+			where: (row, { and, eq }) =>
+				and(
+					eq(row.id, parsed.data.templateId),
+					eq(row.organizationId, access.context.organizationId),
+				),
+			columns: {
+				id: true,
+				archivedAt: true,
+			},
+			with: {
+				currentVersion: {
+					columns: {
+						snapshot: true,
+					},
+				},
+			},
+		});
+		if (!template) {
+			return c.json(
+				{ message: "Template not found in your organization." },
+				404,
+			);
+		}
+
+		const snapshot = template.currentVersion
+			? parseWorkflowTemplateSnapshot(template.currentVersion.snapshot)
+			: null;
+		const templateName = snapshot?.name ?? "Workflow template";
+		const timestamp = parsed.data.archived
+			? (template.archivedAt ?? new Date())
+			: null;
+
+		const [updatedTemplate] = await db
+			.update(schema.agentGraphTemplates)
+			.set({
+				archivedAt: timestamp,
+				updatedAt: new Date(),
+			})
+			.where(eq(schema.agentGraphTemplates.id, parsed.data.templateId))
+			.returning({
+				id: schema.agentGraphTemplates.id,
+				archivedAt: schema.agentGraphTemplates.archivedAt,
+			});
+		if (!updatedTemplate) {
+			return c.json(
+				{ message: "Failed to update template archive state." },
+				500,
+			);
+		}
+
+		return c.json({
+			id: updatedTemplate.id,
+			name: templateName,
+			archivedAt: updatedTemplate.archivedAt?.toISOString() ?? null,
+		});
+	},
+);
 
 dashboardWorkflowTemplatesRouter.post(
 	"/dashboard/workflow-templates/from-workflow",
@@ -31,10 +103,11 @@ dashboardWorkflowTemplatesRouter.post(
 
 		const result = await c.get("dbClient").transaction(async (tx) => {
 			const sourceWorkflow = await tx.query.agentGraphs.findFirst({
-				where: (row, { and, eq }) =>
+				where: (row, { and, eq, isNull }) =>
 					and(
 						eq(row.id, parsed.data.workflowId),
 						eq(row.organizationId, access.context.organizationId),
+						isNull(row.archivedAt),
 					),
 				columns: {
 					id: true,

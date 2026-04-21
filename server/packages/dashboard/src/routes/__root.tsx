@@ -9,6 +9,8 @@ import {
 } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
+import { Toaster } from "@/components/ui/sonner";
+import { DEFAULT_DASHBOARD_TAB } from "@/features/dashboard/dashboard-navigation";
 import appCss from "../../styles.css?url";
 
 export const Route = createRootRoute({
@@ -62,6 +64,10 @@ function NotFoundComponent() {
 						<div className="pt-6 border-t border-border/30">
 							<Link
 								to="/"
+								search={{
+									showArchived: false,
+									tab: DEFAULT_DASHBOARD_TAB,
+								}}
 								className="block w-full px-4 py-2 bg-foreground text-background rounded-lg font-medium hover:opacity-90 transition-opacity text-center text-sm"
 							>
 								← Back to Home
@@ -90,6 +96,7 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
 			</head>
 			<body>
 				{children}
+				<Toaster />
 				<Scripts />
 			</body>
 		</html>

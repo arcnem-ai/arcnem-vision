@@ -21,4 +21,8 @@ func TestLoadAgentGraphSnapshotQueryProjectsServiceExecutionFields(t *testing.T)
 			t.Fatalf("query is missing required fragment %q:\n%s", fragment, query)
 		}
 	}
+
+	if strings.Contains(query, "ag.archived_at IS NULL") {
+		t.Fatalf("query should not exclude archived workflows:\n%s", query)
+	}
 }

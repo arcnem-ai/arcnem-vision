@@ -33,10 +33,21 @@ async function workflowExists(
 	db: HonoServerContext["Variables"]["dbClient"],
 	organizationId: string,
 	agentGraphId: string,
+	options?: {
+		includeArchived?: boolean;
+	},
 ) {
 	const workflow = await db.query.agentGraphs.findFirst({
-		where: (row, { and, eq }) =>
-			and(eq(row.id, agentGraphId), eq(row.organizationId, organizationId)),
+		where: (row, { and, eq, isNull }) => {
+			const baseCondition = and(
+				eq(row.id, agentGraphId),
+				eq(row.organizationId, organizationId),
+			);
+
+			return options?.includeArchived === true
+				? baseCondition
+				: and(baseCondition, isNull(row.archivedAt));
+		},
 		columns: { id: true },
 	});
 
@@ -246,7 +257,7 @@ dashboardProjectsRouter.post(
 					eq(row.organizationId, access.context.organizationId),
 					eq(row.kind, "workflow"),
 				),
-			columns: { id: true, projectId: true },
+			columns: { id: true, projectId: true, agentGraphId: true },
 		});
 		if (!apiKey) {
 			return c.json(
@@ -282,6 +293,9 @@ dashboardProjectsRouter.post(
 				db,
 				access.context.organizationId,
 				parsed.data.agentGraphId,
+				{
+					includeArchived: apiKey.agentGraphId === parsed.data.agentGraphId,
+				},
 			))
 		) {
 			return c.json(

@@ -13,6 +13,24 @@ export function isDocumentVisibility(
 	);
 }
 
+export type WorkflowUploadProcessing =
+	| {
+			status: "queued";
+	  }
+	| {
+			status: "skipped";
+			code: "workflow_unavailable";
+	  }
+	| {
+			status: "failed";
+			code: "processing_enqueue_failed";
+	  };
+
+type UploadProcessingSkippedCode = Extract<
+	WorkflowUploadProcessing,
+	{ status: "skipped" }
+>["code"];
+
 export type PendingUpload = {
 	id: string;
 	bucket: string;
@@ -30,14 +48,32 @@ export type VerifiedUploadObject = {
 	lastModifiedAt: Date;
 };
 
-export type QueueProcessingOptions = {
-	enabled: boolean;
-	inngestClient?: Inngest;
-	agentGraphId?: string;
+export type QueueProcessingWithoutResult = {
+	enabled: false;
+	code?: undefined;
 };
+
+export type QueueProcessingWithResult =
+	| {
+			enabled: false;
+			code: UploadProcessingSkippedCode;
+	  }
+	| {
+			enabled: true;
+			inngestClient: Inngest;
+			agentGraphId?: string;
+	  };
+
+export type QueueProcessingOptions =
+	| QueueProcessingWithoutResult
+	| QueueProcessingWithResult;
 
 export type AcknowledgedUpload = {
 	status: "verified";
 	documentId: string;
 	presignedUploadId: string;
+};
+
+export type AcknowledgedUploadWithProcessing = AcknowledgedUpload & {
+	processing: WorkflowUploadProcessing;
 };

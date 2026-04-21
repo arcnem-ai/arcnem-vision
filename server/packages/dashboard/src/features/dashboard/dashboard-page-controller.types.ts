@@ -23,6 +23,8 @@ export type DashboardWorkflowLibraryController = {
 	startingTemplateId: string | null;
 	savingTemplateFromWorkflowId: string | null;
 	generatingWorkflowDraft: boolean;
+	settingWorkflowArchiveId: string | null;
+	settingTemplateArchiveId: string | null;
 	onOpenCreate: () => void;
 	onOpenEdit: (workflow: WorkflowSummary) => void;
 	onOpenEditTemplate: (template: WorkflowTemplateSummary) => void;
@@ -32,6 +34,8 @@ export type DashboardWorkflowLibraryController = {
 		templateDraft: TemplateDraftSeed,
 	) => Promise<unknown>;
 	onStartFromTemplate: (template: WorkflowTemplateSummary) => Promise<void>;
+	onToggleWorkflowArchive: (workflow: WorkflowSummary) => Promise<void>;
+	onToggleTemplateArchive: (template: WorkflowTemplateSummary) => Promise<void>;
 };
 
 export type DashboardWorkflowCanvasController = {

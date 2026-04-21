@@ -1,4 +1,5 @@
 import {
+	Archive,
 	Layers3,
 	Play,
 	PlusCircle,
@@ -531,21 +532,29 @@ function WorkflowTemplateCreateDialog({
 export function WorkflowLibraryPanel({
 	workflowTemplates,
 	workflows,
+	showArchived,
 	startingTemplateId,
 	savingTemplateFromWorkflowId,
 	generatingWorkflowDraft,
+	settingWorkflowArchiveId,
+	settingTemplateArchiveId,
 	onOpenCreate,
 	onOpenEdit,
 	onOpenEditTemplate,
 	onGenerateDraft,
 	onCreateTemplateFromWorkflow,
 	onStartFromTemplate,
+	onToggleWorkflowArchive,
+	onToggleTemplateArchive,
 }: {
 	workflowTemplates: DashboardData["workflowTemplates"];
 	workflows: DashboardData["workflows"];
+	showArchived: boolean;
 	startingTemplateId: string | null;
 	savingTemplateFromWorkflowId: string | null;
 	generatingWorkflowDraft: boolean;
+	settingWorkflowArchiveId: string | null;
+	settingTemplateArchiveId: string | null;
 	onOpenCreate: () => void;
 	onOpenEdit: (workflow: DashboardData["workflows"][number]) => void;
 	onOpenEditTemplate: (
@@ -560,18 +569,52 @@ export function WorkflowLibraryPanel({
 		>,
 	) => Promise<unknown>;
 	onStartFromTemplate: (workflowTemplate: WorkflowTemplate) => Promise<void>;
+	onToggleWorkflowArchive: (
+		workflow: DashboardData["workflows"][number],
+	) => Promise<void>;
+	onToggleTemplateArchive: (
+		template: DashboardData["workflowTemplates"][number],
+	) => Promise<void>;
 }) {
 	const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
 	const [isDraftGenerationOpen, setIsDraftGenerationOpen] = useState(false);
 	const [templateDraftWorkflowId, setTemplateDraftWorkflowId] = useState<
 		string | null
 	>(null);
-	const ownedWorkflowTemplates = useMemo(
-		() => workflowTemplates.filter((template) => template.canEdit),
+	const activeWorkflows = useMemo(
+		() => workflows.filter((workflow) => workflow.archivedAt === null),
+		[workflows],
+	);
+	const archivedWorkflows = useMemo(
+		() => workflows.filter((workflow) => workflow.archivedAt !== null),
+		[workflows],
+	);
+	const visibleWorkflows = useMemo(
+		() => [...activeWorkflows, ...(showArchived ? archivedWorkflows : [])],
+		[activeWorkflows, archivedWorkflows, showArchived],
+	);
+	const activeWorkflowTemplates = useMemo(
+		() => workflowTemplates.filter((template) => template.archivedAt === null),
 		[workflowTemplates],
 	);
+	const archivedWorkflowTemplates = useMemo(
+		() => workflowTemplates.filter((template) => template.archivedAt !== null),
+		[workflowTemplates],
+	);
+	const visibleWorkflowTemplates = useMemo(
+		() => [
+			...activeWorkflowTemplates,
+			...(showArchived ? archivedWorkflowTemplates : []),
+		],
+		[activeWorkflowTemplates, archivedWorkflowTemplates, showArchived],
+	);
+	const ownedWorkflowTemplates = useMemo(
+		() => visibleWorkflowTemplates.filter((template) => template.canEdit),
+		[visibleWorkflowTemplates],
+	);
 	const ownedTemplateCount = ownedWorkflowTemplates.length;
-	const sharedTemplateCount = workflowTemplates.length - ownedTemplateCount;
+	const sharedTemplateCount =
+		visibleWorkflowTemplates.length - ownedTemplateCount;
 	const internalTemplateCount = ownedWorkflowTemplates.filter(
 		(template) => template.visibility === "organization",
 	).length;
@@ -619,7 +662,7 @@ export function WorkflowLibraryPanel({
 								<Sparkles className="mr-1.5 size-4" />
 								Generate With AI
 							</Button>
-							{workflowTemplates.length > 0 ? (
+							{activeWorkflowTemplates.length > 0 ? (
 								<Button
 									type="button"
 									variant="outline"
@@ -631,10 +674,10 @@ export function WorkflowLibraryPanel({
 								</Button>
 							) : null}
 						</div>
-						{workflowTemplates.length > 0 ? (
+						{visibleWorkflowTemplates.length > 0 ? (
 							<div className="flex flex-wrap items-center gap-2 text-xs text-slate-700">
 								<Badge className="rounded-full border border-slate-900/10 bg-white/80 text-slate-700 hover:bg-white">
-									{workflowTemplates.length} reusable templates
+									{activeWorkflowTemplates.length} reusable templates
 								</Badge>
 								<Badge className="rounded-full border border-slate-900/10 bg-white/80 text-slate-700 hover:bg-white">
 									{ownedTemplateCount} org-owned
@@ -642,6 +685,13 @@ export function WorkflowLibraryPanel({
 								<Badge className="rounded-full border border-slate-900/10 bg-white/80 text-slate-700 hover:bg-white">
 									{sharedTemplateCount} shared into this library
 								</Badge>
+								{showArchived ? (
+									<Badge className="rounded-full border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-50">
+										{archivedWorkflows.length +
+											archivedWorkflowTemplates.length}{" "}
+										archived items visible
+									</Badge>
+								) : null}
 								<span className="rounded-full border border-white/60 bg-white/55 px-3 py-1 text-slate-600 backdrop-blur">
 									Create templates from active graphs. Edit templates below.
 								</span>
@@ -653,19 +703,19 @@ export function WorkflowLibraryPanel({
 				<div className="space-y-4">
 					<div>
 						<p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-							Active Graphs
+							{showArchived ? "Workflow Inventory" : "Active Graphs"}
 						</p>
 						<h3 className="font-display text-2xl text-slate-900">
-							Live agent workflows
+							{showArchived ? "Agent graphs" : "Live agent workflows"}
 						</h3>
 						<p className="mt-1 max-w-3xl text-sm text-slate-600">
-							These are the working graphs attached to workflow keys and daily
-							runs. Edit the workflow itself here, or create a reusable template
-							from it when the graph is ready to share.
+							{showArchived
+								? "Archived graphs stay out of normal launch paths, but you can still review or restore them here."
+								: "These are the working graphs attached to workflow keys and daily runs. Edit the workflow itself here, or create a reusable template from it when the graph is ready to share."}
 						</p>
 					</div>
 
-					{workflows.length === 0 ? (
+					{visibleWorkflows.length === 0 ? (
 						<Card>
 							<CardContent className="flex flex-col items-center gap-3 py-12 text-center">
 								<div className="rounded-2xl bg-slate-100 p-4">
@@ -681,22 +731,29 @@ export function WorkflowLibraryPanel({
 						</Card>
 					) : (
 						<div className="grid gap-4 md:grid-cols-2">
-							{workflows.map((workflow) => (
+							{visibleWorkflows.map((workflow) => (
 								<Card
 									key={workflow.id}
 									className="border-slate-900/10 bg-white/90 shadow-[0_12px_36px_rgba(2,132,199,0.1)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_44px_rgba(2,132,199,0.16)]"
 								>
 									<CardHeader className="space-y-2">
-										<div className="flex items-start justify-between gap-3">
-											<div>
-												<CardTitle className="font-display text-xl">
-													{workflow.name}
-												</CardTitle>
+										<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+											<div className="min-w-0">
+												<div className="flex flex-wrap items-center gap-2">
+													<CardTitle className="font-display text-xl">
+														{workflow.name}
+													</CardTitle>
+													{workflow.archivedAt ? (
+														<Badge className="rounded-full bg-amber-100 text-amber-800 hover:bg-amber-100">
+															Archived
+														</Badge>
+													) : null}
+												</div>
 												<CardDescription>
 													{workflow.description ?? "No description yet."}
 												</CardDescription>
 											</div>
-											<div className="flex items-center gap-2">
+											<div className="flex flex-wrap items-center gap-2 lg:max-w-68 lg:justify-end">
 												<Badge className="rounded-full border-transparent bg-slate-900 text-slate-100 hover:bg-slate-900">
 													{workflow.attachedWorkflowKeyCount} workflow keys
 												</Badge>
@@ -715,11 +772,28 @@ export function WorkflowLibraryPanel({
 													onClick={() =>
 														setTemplateDraftWorkflowId(workflow.id)
 													}
-													disabled={savingTemplateFromWorkflowId !== null}
+													disabled={
+														savingTemplateFromWorkflowId !== null ||
+														workflow.archivedAt !== null
+													}
 												>
 													{savingTemplateFromWorkflowId === workflow.id
 														? "Creating..."
 														: "Create Template"}
+												</Button>
+												<Button
+													type="button"
+													variant="outline"
+													className="h-8 rounded-full px-3 text-xs"
+													onClick={() => void onToggleWorkflowArchive(workflow)}
+													disabled={settingWorkflowArchiveId === workflow.id}
+												>
+													<Archive className="mr-1.5 size-3.5" />
+													{settingWorkflowArchiveId === workflow.id
+														? "Saving..."
+														: workflow.archivedAt
+															? "Restore"
+															: "Archive"}
 												</Button>
 											</div>
 										</div>
@@ -844,6 +918,11 @@ export function WorkflowLibraryPanel({
 														<Badge className="rounded-full border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-50">
 															v{template.version}
 														</Badge>
+														{template.archivedAt ? (
+															<Badge className="rounded-full bg-amber-100 text-amber-800 hover:bg-amber-100">
+																Archived
+															</Badge>
+														) : null}
 													</div>
 													<CardDescription className="text-sm leading-6 text-slate-600">
 														{template.description ?? "No description yet."}
@@ -884,16 +963,36 @@ export function WorkflowLibraryPanel({
 											</div>
 											<div className="flex items-center justify-between gap-3 pt-1">
 												<p className="text-xs leading-5 text-slate-500">
-													Edit this template to publish the next version.
+													{template.archivedAt
+														? "Restore this template before using it to start new workflows."
+														: "Edit this template to publish the next version."}
 												</p>
-												<Button
-													type="button"
-													variant="outline"
-													className="rounded-full px-5"
-													onClick={() => onOpenEditTemplate(template)}
-												>
-													Edit
-												</Button>
+												<div className="flex flex-wrap items-center gap-2 lg:max-w-68 lg:justify-end">
+													<Button
+														type="button"
+														variant="outline"
+														className="rounded-full px-5"
+														onClick={() => onOpenEditTemplate(template)}
+													>
+														Edit
+													</Button>
+													<Button
+														type="button"
+														variant="outline"
+														className="rounded-full px-5"
+														onClick={() =>
+															void onToggleTemplateArchive(template)
+														}
+														disabled={settingTemplateArchiveId === template.id}
+													>
+														<Archive className="mr-1.5 size-3.5" />
+														{settingTemplateArchiveId === template.id
+															? "Saving..."
+															: template.archivedAt
+																? "Restore"
+																: "Archive"}
+													</Button>
+												</div>
 											</div>
 										</CardContent>
 									</Card>
@@ -906,7 +1005,7 @@ export function WorkflowLibraryPanel({
 
 			<WorkflowTemplatePicker
 				isOpen={isTemplatePickerOpen}
-				workflowTemplates={workflowTemplates}
+				workflowTemplates={activeWorkflowTemplates}
 				startingTemplateId={startingTemplateId}
 				onClose={() => setIsTemplatePickerOpen(false)}
 				onStartFromTemplate={onStartFromTemplate}

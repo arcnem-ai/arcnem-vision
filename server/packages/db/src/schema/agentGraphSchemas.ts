@@ -41,6 +41,7 @@ export const agentGraphTemplates = pgTable(
 		currentVersionId: uuid("current_version_id").references(
 			(): AnyPgColumn => agentGraphTemplateVersions.id,
 		),
+		archivedAt: timestamp("archived_at"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at")
 			.defaultNow()
@@ -49,8 +50,16 @@ export const agentGraphTemplates = pgTable(
 	},
 	(t) => [
 		index("agent_graph_templates_organization_id_idx").on(t.organizationId),
+		index("agent_graph_templates_organization_archived_at_idx").on(
+			t.organizationId,
+			t.archivedAt,
+		),
 		index("agent_graph_templates_current_version_id_idx").on(
 			t.currentVersionId,
+		),
+		index("agent_graph_templates_visibility_archived_at_idx").on(
+			t.visibility,
+			t.archivedAt,
 		),
 	],
 );
@@ -98,6 +107,7 @@ export const agentGraphs = pgTable(
 			.references(() => organizations.id, {
 				onDelete: "cascade",
 			}),
+		archivedAt: timestamp("archived_at"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at")
 			.defaultNow()
@@ -106,6 +116,10 @@ export const agentGraphs = pgTable(
 	},
 	(t) => [
 		index("agent_graphs_organization_id_idx").on(t.organizationId),
+		index("agent_graphs_organization_archived_at_idx").on(
+			t.organizationId,
+			t.archivedAt,
+		),
 		index("agent_graphs_template_id_idx").on(t.agentGraphTemplateId),
 		index("agent_graphs_template_version_id_idx").on(
 			t.agentGraphTemplateVersionId,

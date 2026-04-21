@@ -19,6 +19,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { toast } from "sonner";
 import {
 	AlertDialog,
 	AlertDialogCancel,
@@ -405,6 +406,11 @@ export function ProjectAPIKeysPanel({
 	const [settingProjectArchiveId, setSettingProjectArchiveId] = useState<
 		string | null
 	>(null);
+	const activeWorkflows = useMemo(
+		() =>
+			dashboard.workflows.filter((workflow) => workflow.archivedAt === null),
+		[dashboard.workflows],
+	);
 
 	const refresh = async () => {
 		await router.invalidate();
@@ -448,9 +454,9 @@ export function ProjectAPIKeysPanel({
 				: (dashboard.projects[0]?.id ?? ""),
 		);
 		setNewWorkflowKeyWorkflowId((current) =>
-			dashboard.workflows.some((workflow) => workflow.id === current)
+			activeWorkflows.some((workflow) => workflow.id === current)
 				? current
-				: (dashboard.workflows[0]?.id ?? ""),
+				: (activeWorkflows[0]?.id ?? ""),
 		);
 		setWorkflowKeyDrafts(
 			Object.fromEntries(
@@ -476,10 +482,10 @@ export function ProjectAPIKeysPanel({
 			),
 		);
 	}, [
+		activeWorkflows,
 		dashboard.projects,
 		dashboard.serviceApiKeys,
 		dashboard.workflowApiKeys,
-		dashboard.workflows,
 	]);
 
 	useEffect(() => {
@@ -530,6 +536,27 @@ export function ProjectAPIKeysPanel({
 			),
 		[dashboard.serviceApiKeys, selectedProjectId],
 	);
+	const workflowOptionsForKey = (apiKey: WorkflowAPIKey) => {
+		const currentWorkflow = activeWorkflows.find(
+			(workflow) => workflow.id === apiKey.agentGraphId,
+		);
+		if (currentWorkflow) {
+			return activeWorkflows;
+		}
+
+		if (!apiKey.workflowArchivedAt || !apiKey.workflowName) {
+			return activeWorkflows;
+		}
+
+		return [
+			...activeWorkflows,
+			{
+				id: apiKey.agentGraphId,
+				name: apiKey.workflowName,
+				archivedAt: apiKey.workflowArchivedAt,
+			},
+		];
+	};
 
 	const copySecret = async (apiKey: GeneratedAPIKey) => {
 		try {
@@ -631,21 +658,18 @@ export function ProjectAPIKeysPanel({
 					archived: !selectedProject.archivedAt,
 				},
 			});
-			setPanelMessage({
-				tone: "success",
-				text: selectedProject.archivedAt
+			toast.success(
+				selectedProject.archivedAt
 					? `${selectedProject.name} restored.`
 					: `${selectedProject.name} archived.`,
-			});
+			);
 			await refresh();
 		} catch (error) {
-			setPanelMessage({
-				tone: "error",
-				text:
-					error instanceof Error
-						? error.message
-						: "Failed to update project archive state.",
-			});
+			toast.error(
+				error instanceof Error
+					? error.message
+					: "Failed to update project archive state.",
+			);
 		} finally {
 			setSettingProjectArchiveId(null);
 		}
@@ -1021,15 +1045,14 @@ export function ProjectAPIKeysPanel({
 									value={newWorkflowKeyWorkflowId}
 									onValueChange={setNewWorkflowKeyWorkflowId}
 									disabled={
-										isSelectedProjectArchived ||
-										dashboard.workflows.length === 0
+										isSelectedProjectArchived || activeWorkflows.length === 0
 									}
 								>
 									<SelectTrigger className="border-slate-300 bg-white">
 										<SelectValue placeholder="Choose a workflow" />
 									</SelectTrigger>
 									<SelectContent>
-										{dashboard.workflows.map((workflow) => (
+										{activeWorkflows.map((workflow) => (
 											<SelectItem key={workflow.id} value={workflow.id}>
 												{workflow.name}
 											</SelectItem>
@@ -1041,7 +1064,7 @@ export function ProjectAPIKeysPanel({
 									disabled={
 										isSelectedProjectArchived ||
 										creatingWorkflowKey ||
-										dashboard.workflows.length === 0
+										activeWorkflows.length === 0
 									}
 									className="w-full"
 								>
@@ -1117,6 +1140,7 @@ export function ProjectAPIKeysPanel({
 																{apiKey.workflowName ??
 																	workflowNameById.get(apiKey.agentGraphId) ??
 																	"Unknown workflow"}
+																{apiKey.workflowArchivedAt ? " (archived)" : ""}
 															</span>
 														</p>
 													</div>
@@ -1162,12 +1186,13 @@ export function ProjectAPIKeysPanel({
 															<SelectValue placeholder="Choose a workflow" />
 														</SelectTrigger>
 														<SelectContent>
-															{dashboard.workflows.map((workflow) => (
+															{workflowOptionsForKey(apiKey).map((workflow) => (
 																<SelectItem
 																	key={workflow.id}
 																	value={workflow.id}
 																>
 																	{workflow.name}
+																	{workflow.archivedAt ? " (archived)" : ""}
 																</SelectItem>
 															))}
 														</SelectContent>

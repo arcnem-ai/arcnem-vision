@@ -20,6 +20,21 @@ func TestLoadDocumentAndAgentGraphQueryUsesTemplateVersionID(t *testing.T) {
 	}
 }
 
+func TestDocumentAndAgentGraphQuerySpecDoesNotFilterArchivedWorkflows(t *testing.T) {
+	documentID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	workflowID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+
+	defaultSpec := buildDocumentAndAgentGraphQuerySpec(documentID, nil)
+	if strings.Contains(defaultSpec.graphJoin, "ag.archived_at IS NULL") {
+		t.Fatalf("default query spec should not exclude archived workflows:\n%s", defaultSpec.graphJoin)
+	}
+
+	explicitSpec := buildDocumentAndAgentGraphQuerySpec(documentID, &workflowID)
+	if strings.Contains(explicitSpec.graphJoin, "ag.archived_at IS NULL") {
+		t.Fatalf("explicit workflow query spec should not exclude archived workflows:\n%s", explicitSpec.graphJoin)
+	}
+}
+
 func TestOrderWorkflowDocumentsPreservesRequestedOrder(t *testing.T) {
 	firstID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	secondID := uuid.MustParse("22222222-2222-2222-2222-222222222222")

@@ -1,10 +1,13 @@
 import {
+	archiveStateResponseSchema,
 	createWorkflowFromTemplateInputSchema,
 	createWorkflowInputSchema,
 	createWorkflowTemplateFromWorkflowInputSchema,
 	generatedWorkflowDraftResponseSchema,
 	generateWorkflowDraftInputSchema,
 	idResponseSchema,
+	setWorkflowArchivedInputSchema,
+	setWorkflowTemplateArchivedInputSchema,
 	updateWorkflowInputSchema,
 	updateWorkflowTemplateInputSchema,
 	workflowFromTemplateResponseSchema,
@@ -58,6 +61,22 @@ export const updateWorkflow = createServerFn({ method: "POST" })
 		),
 	);
 
+export const setWorkflowArchived = createServerFn({ method: "POST" })
+	.inputValidator((input: unknown) =>
+		setWorkflowArchivedInputSchema.parse(input),
+	)
+	.handler(async ({ data }) =>
+		fetchDashboardAPI(
+			"/dashboard/workflows/archive",
+			{
+				method: "POST",
+				body: data,
+				fallbackErrorMessage: "Failed to update workflow archive state.",
+			},
+			archiveStateResponseSchema,
+		),
+	);
+
 export const createWorkflowFromTemplate = createServerFn({ method: "POST" })
 	.inputValidator((input: unknown) =>
 		createWorkflowFromTemplateInputSchema.parse(input),
@@ -105,5 +124,21 @@ export const updateWorkflowTemplate = createServerFn({ method: "POST" })
 				fallbackErrorMessage: "Failed to update workflow template.",
 			},
 			workflowTemplateUpdatedResponseSchema,
+		),
+	);
+
+export const setWorkflowTemplateArchived = createServerFn({ method: "POST" })
+	.inputValidator((input: unknown) =>
+		setWorkflowTemplateArchivedInputSchema.parse(input),
+	)
+	.handler(async ({ data }) =>
+		fetchDashboardAPI(
+			"/dashboard/workflow-templates/archive",
+			{
+				method: "POST",
+				body: data,
+				fallbackErrorMessage: "Failed to update template archive state.",
+			},
+			archiveStateResponseSchema,
 		),
 	);

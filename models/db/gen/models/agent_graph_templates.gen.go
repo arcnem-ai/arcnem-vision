@@ -12,12 +12,13 @@ const TableNameAgentGraphTemplate = "agent_graph_templates"
 
 // AgentGraphTemplate mapped from table <agent_graph_templates>
 type AgentGraphTemplate struct {
-	ID               string    `gorm:"column:id;type:uuid;primaryKey;default:uuidv7()" json:"id"`
-	Visibility       string    `gorm:"column:visibility;type:text;not null" json:"visibility"`
-	OrganizationID   *string   `gorm:"column:organization_id;type:uuid" json:"organization_id"`
-	CreatedAt        time.Time `gorm:"column:created_at;type:timestamp without time zone;not null;default:now()" json:"created_at"`
-	UpdatedAt        time.Time `gorm:"column:updated_at;type:timestamp without time zone;not null;default:now()" json:"updated_at"`
-	CurrentVersionID *string   `gorm:"column:current_version_id;type:uuid" json:"current_version_id"`
+	ID               string     `gorm:"column:id;type:uuid;primaryKey;default:uuidv7()" json:"id"`
+	Visibility       string     `gorm:"column:visibility;type:text;not null" json:"visibility"`
+	OrganizationID   *string    `gorm:"column:organization_id;type:uuid" json:"organization_id"`
+	ArchivedAt       *time.Time `gorm:"column:archived_at;type:timestamp without time zone" json:"archived_at"`
+	CreatedAt        time.Time  `gorm:"column:created_at;type:timestamp without time zone;not null;default:now()" json:"created_at"`
+	UpdatedAt        time.Time  `gorm:"column:updated_at;type:timestamp without time zone;not null;default:now()" json:"updated_at"`
+	CurrentVersionID *string    `gorm:"column:current_version_id;type:uuid" json:"current_version_id"`
 }
 
 // TableName AgentGraphTemplate's table name

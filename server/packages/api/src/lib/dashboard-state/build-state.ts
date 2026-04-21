@@ -95,8 +95,8 @@ export async function buildDashboardState(
 		loadDashboardProjects(db, organizationId, includeArchived),
 		loadDashboardWorkflowAPIKeys(db, organizationId, includeArchived),
 		loadDashboardServiceAPIKeys(db, organizationId, includeArchived),
-		loadDashboardWorkflows(db, organizationId),
-		loadDashboardWorkflowTemplates(db, organizationId),
+		loadDashboardWorkflows(db, organizationId, includeArchived),
+		loadDashboardWorkflowTemplates(db, organizationId, includeArchived),
 	]);
 
 	const workflowApiKeyCountByProjectId = new Map<string, number>();
@@ -135,18 +135,6 @@ export async function buildDashboardState(
 		);
 	}
 
-	const startedWorkflowCountByTemplateId = new Map<string, number>();
-	for (const workflow of workflowRows) {
-		if (!workflow.agentGraphTemplateId) {
-			continue;
-		}
-		startedWorkflowCountByTemplateId.set(
-			workflow.agentGraphTemplateId,
-			(startedWorkflowCountByTemplateId.get(workflow.agentGraphTemplateId) ??
-				0) + 1,
-		);
-	}
-
 	return {
 		auth,
 		organizations: organizationOptions,
@@ -164,6 +152,7 @@ export async function buildDashboardState(
 			projectId: apiKey.projectId,
 			agentGraphId: apiKey.agentGraphId ?? "",
 			workflowName: apiKey.agentGraphs?.name ?? null,
+			workflowArchivedAt: apiKey.agentGraphs?.archivedAt?.toISOString() ?? null,
 			name: apiKey.name,
 			start: apiKey.start,
 			prefix: apiKey.prefix,
@@ -208,6 +197,7 @@ export async function buildDashboardState(
 				id: workflow.id,
 				name: workflow.name,
 				description: workflow.description,
+				archivedAt: workflow.archivedAt?.toISOString() ?? null,
 				entryNode: workflow.entryNode,
 				edgeCount: workflow.agentGraphEdges.length,
 				attachedWorkflowKeyCount:
@@ -252,11 +242,11 @@ export async function buildDashboardState(
 						versionId: template.currentVersion.id,
 						version: template.currentVersion.version,
 						versionCount: template.agentGraphTemplateVersions.length,
+						archivedAt: template.archivedAt?.toISOString() ?? null,
 						snapshot,
 						visibility: template.visibility,
 						canEdit: template.organizationId === organizationId,
-						startedWorkflowCount:
-							startedWorkflowCountByTemplateId.get(template.id) ?? 0,
+						startedWorkflowCount: template.agentGraphs.length,
 						modelLabelById,
 						toolOptionById,
 					}),

@@ -56,6 +56,7 @@ export const dashboardDataSchema = z.object({
 			id: z.string().min(1),
 			name: z.string().min(1),
 			description: z.string().nullable(),
+			archivedAt: z.string().nullable(),
 			entryNode: z.string().min(1),
 			edgeCount: z.number().int().nonnegative(),
 			attachedWorkflowKeyCount: z.number().int().nonnegative(),

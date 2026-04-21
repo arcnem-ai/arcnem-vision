@@ -103,6 +103,7 @@ export function mapTemplateSummaryFromSnapshot(input: {
 	versionId: string;
 	version: number;
 	versionCount: number;
+	archivedAt: string | null;
 	snapshot: WorkflowTemplateSnapshot;
 	visibility: string;
 	canEdit: boolean;
@@ -138,6 +139,7 @@ export function mapTemplateSummaryFromSnapshot(input: {
 		id: input.templateId,
 		name: input.snapshot.name,
 		description: input.snapshot.description,
+		archivedAt: input.archivedAt,
 		version: input.version,
 		versionCount: input.versionCount,
 		visibility: normalizeWorkflowTemplateVisibility(input.visibility),

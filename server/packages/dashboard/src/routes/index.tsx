@@ -1,20 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { parseDashboardSearch } from "@/features/dashboard/dashboard-navigation";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { getDashboardData } from "@/features/dashboard/server-fns";
 import { getDocuments } from "@/features/documents/server/documents-data";
 import { getAgentGraphRuns } from "@/features/runs/server/runs-data";
 
-type DashboardSearch = {
-	showArchived?: boolean;
-};
-
 export const Route = createFileRoute("/")({
-	validateSearch: (search: Record<string, unknown>): DashboardSearch => ({
-		showArchived:
-			search.showArchived === true || search.showArchived === "true",
-	}),
+	validateSearch: parseDashboardSearch,
 	loaderDeps: ({ search }) => ({
-		showArchived: search.showArchived ?? false,
+		showArchived: search.showArchived,
 	}),
 	component: DashboardRoute,
 	loader: async ({ deps }) => {
@@ -57,7 +51,8 @@ function DashboardRoute() {
 			dashboard={dashboard}
 			documents={documents}
 			runs={runs}
-			showArchived={search.showArchived ?? false}
+			showArchived={search.showArchived}
+			activeTab={search.tab}
 		/>
 	);
 }

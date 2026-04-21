@@ -8,9 +8,10 @@ import {
 	normalizeGraphData,
 	normalizeWorkflowFields,
 	parseWorkflowTemplateSnapshot,
+	setWorkflowArchivedInputSchema,
 	updateWorkflowInputSchema,
 } from "@arcnem-vision/shared";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { requireDashboardOrganizationContext } from "@/lib/dashboard-auth";
 import { loadDashboardCatalog } from "@/lib/dashboard-state/catalog";
@@ -26,6 +27,65 @@ import type { HonoServerContext } from "@/types/serverContext";
 export const dashboardWorkflowRecordsRouter = new Hono<HonoServerContext>({
 	strict: false,
 });
+
+dashboardWorkflowRecordsRouter.post(
+	"/dashboard/workflows/archive",
+	async (c) => {
+		const access = await requireDashboardOrganizationContext(c);
+		if (!access.ok) return access.response;
+		const parsed = await readValidatedBody(c, setWorkflowArchivedInputSchema);
+		if (!parsed.ok) return parsed.response;
+
+		const db = c.get("dbClient");
+		const workflow = await db.query.agentGraphs.findFirst({
+			where: (row, { and, eq }) =>
+				and(
+					eq(row.id, parsed.data.workflowId),
+					eq(row.organizationId, access.context.organizationId),
+				),
+			columns: {
+				id: true,
+				name: true,
+				archivedAt: true,
+			},
+		});
+		if (!workflow) {
+			return c.json(
+				{ message: "Workflow not found in your organization." },
+				404,
+			);
+		}
+
+		const timestamp = parsed.data.archived
+			? (workflow.archivedAt ?? new Date())
+			: null;
+
+		const [updatedWorkflow] = await db
+			.update(schema.agentGraphs)
+			.set({
+				archivedAt: timestamp,
+				updatedAt: new Date(),
+			})
+			.where(eq(schema.agentGraphs.id, parsed.data.workflowId))
+			.returning({
+				id: schema.agentGraphs.id,
+				name: schema.agentGraphs.name,
+				archivedAt: schema.agentGraphs.archivedAt,
+			});
+		if (!updatedWorkflow) {
+			return c.json(
+				{ message: "Failed to update workflow archive state." },
+				500,
+			);
+		}
+
+		return c.json({
+			id: updatedWorkflow.id,
+			name: updatedWorkflow.name,
+			archivedAt: updatedWorkflow.archivedAt?.toISOString() ?? null,
+		});
+	},
+);
 
 dashboardWorkflowRecordsRouter.post(
 	"/dashboard/workflows/generate-draft",
@@ -254,6 +314,7 @@ dashboardWorkflowRecordsRouter.post(
 							row,
 							access.context.organizationId,
 						),
+						isNull(row.archivedAt),
 					),
 				columns: { id: true },
 				with: {

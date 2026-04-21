@@ -1,11 +1,14 @@
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
 	createWorkflow,
 	createWorkflowFromTemplate,
 	createWorkflowTemplateFromWorkflow,
 	generateWorkflowDraft,
+	setWorkflowArchived,
+	setWorkflowTemplateArchived,
 	updateWorkflow,
 	updateWorkflowTemplate,
 } from "@/features/dashboard/server-fns";
@@ -32,6 +35,10 @@ export function useDashboardPageController(dashboard: DashboardData) {
 		createWorkflowTemplateFromWorkflow,
 	);
 	const generateWorkflowDraftFn = useServerFn(generateWorkflowDraft);
+	const setWorkflowArchivedFn = useServerFn(setWorkflowArchived);
+	const setWorkflowTemplateArchivedFn = useServerFn(
+		setWorkflowTemplateArchived,
+	);
 	const updateWorkflowFn = useServerFn(updateWorkflow);
 	const updateWorkflowTemplateFn = useServerFn(updateWorkflowTemplate);
 
@@ -48,6 +55,12 @@ export function useDashboardPageController(dashboard: DashboardData) {
 	const [updatingTemplateId, setUpdatingTemplateId] = useState<string | null>(
 		null,
 	);
+	const [settingWorkflowArchiveId, setSettingWorkflowArchiveId] = useState<
+		string | null
+	>(null);
+	const [settingTemplateArchiveId, setSettingTemplateArchiveId] = useState<
+		string | null
+	>(null);
 	const [editorMessage, setEditorMessage] = useState<StatusMessage | null>(
 		null,
 	);
@@ -238,6 +251,60 @@ export function useDashboardPageController(dashboard: DashboardData) {
 		}
 	};
 
+	const toggleWorkflowArchive = async (workflow: WorkflowSummary) => {
+		setSettingWorkflowArchiveId(workflow.id);
+		setEditorMessage(null);
+		try {
+			await setWorkflowArchivedFn({
+				data: {
+					workflowId: workflow.id,
+					archived: !workflow.archivedAt,
+				},
+			});
+			toast.success(
+				workflow.archivedAt
+					? `${workflow.name} restored.`
+					: `${workflow.name} archived.`,
+			);
+			await router.invalidate();
+		} catch (error) {
+			toast.error(
+				error instanceof Error
+					? error.message
+					: "Failed to update workflow archive state.",
+			);
+		} finally {
+			setSettingWorkflowArchiveId(null);
+		}
+	};
+
+	const toggleTemplateArchive = async (template: WorkflowTemplateSummary) => {
+		setSettingTemplateArchiveId(template.id);
+		setEditorMessage(null);
+		try {
+			await setWorkflowTemplateArchivedFn({
+				data: {
+					templateId: template.id,
+					archived: !template.archivedAt,
+				},
+			});
+			toast.success(
+				template.archivedAt
+					? `${template.name} restored.`
+					: `${template.name} archived.`,
+			);
+			await router.invalidate();
+		} catch (error) {
+			toast.error(
+				error instanceof Error
+					? error.message
+					: "Failed to update template archive state.",
+			);
+		} finally {
+			setSettingTemplateArchiveId(null);
+		}
+	};
+
 	const activeCanvasWorkflow =
 		canvasTarget?.kind === "workflow"
 			? (dashboard.workflows.find(
@@ -281,6 +348,8 @@ export function useDashboardPageController(dashboard: DashboardData) {
 			startingTemplateId,
 			savingTemplateFromWorkflowId,
 			generatingWorkflowDraft,
+			settingWorkflowArchiveId,
+			settingTemplateArchiveId,
 			onOpenCreate: () => {
 				setCanvasTarget({
 					kind: "workflow-create",
@@ -308,6 +377,8 @@ export function useDashboardPageController(dashboard: DashboardData) {
 			onGenerateDraft: generateDraftFromDescription,
 			onCreateTemplateFromWorkflow: createTemplateFromWorkflow,
 			onStartFromTemplate: startWorkflowFromTemplate,
+			onToggleWorkflowArchive: toggleWorkflowArchive,
+			onToggleTemplateArchive: toggleTemplateArchive,
 		} satisfies DashboardWorkflowLibraryController,
 		showCreateOrganization:
 			dashboard.auth.state === "ready" && !hasOrganizations,

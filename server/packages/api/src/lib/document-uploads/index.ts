@@ -1,10 +1,14 @@
 export { acknowledgePresignedUpload } from "./acknowledge";
 export type {
 	AcknowledgedUpload,
+	AcknowledgedUploadWithProcessing,
 	DocumentVisibility,
 	PendingUpload,
 	QueueProcessingOptions,
+	QueueProcessingWithoutResult,
+	QueueProcessingWithResult,
 	VerifiedUploadObject,
+	WorkflowUploadProcessing,
 } from "./acknowledge.types";
 export {
 	DOCUMENT_VISIBILITIES,

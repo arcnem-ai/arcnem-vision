@@ -97,6 +97,7 @@ export const workflowTemplateSummarySchema = z.object({
 	id: z.string().min(1),
 	name: z.string().min(1),
 	description: z.string().nullable(),
+	archivedAt: z.string().nullable(),
 	version: z.number().int().nonnegative(),
 	versionCount: z.number().int().positive(),
 	visibility: workflowTemplateVisibilitySchema,
@@ -137,6 +138,7 @@ export const workflowApiKeySchema = managedApiKeySchema.extend({
 	projectId: z.string().min(1),
 	agentGraphId: z.string().min(1),
 	workflowName: z.string().nullable(),
+	workflowArchivedAt: z.string().nullable(),
 });
 
 export type WorkflowAPIKey = z.infer<typeof workflowApiKeySchema>;

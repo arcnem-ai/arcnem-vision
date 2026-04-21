@@ -89,6 +89,16 @@ export const setProjectArchivedInputSchema = z.object({
 	archived: z.boolean(),
 });
 
+export const setWorkflowArchivedInputSchema = z.object({
+	workflowId: z.string().min(1),
+	archived: z.boolean(),
+});
+
+export const setWorkflowTemplateArchivedInputSchema = z.object({
+	templateId: z.string().min(1),
+	archived: z.boolean(),
+});
+
 export const createWorkflowInputSchema = workflowDraftSchema;
 export const updateWorkflowInputSchema = workflowDraftSchema.extend({
 	workflowId: z.string().min(1),

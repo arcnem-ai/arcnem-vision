@@ -36,6 +36,7 @@ import {
 	parsePresignRequestBody,
 	toDocumentUploadErrorResponse,
 } from "@/lib/document-uploads";
+import { findActiveWorkflowById } from "@/lib/workflow-run-availability";
 import {
 	requireAPIKey,
 	requireAPIKeyPermission,
@@ -364,7 +365,9 @@ serviceRouter.post(
 						...uploadForKey,
 						visibility: uploadForKey.visibility,
 					},
-					queueProcessing: { enabled: false },
+					queueProcessing: {
+						enabled: false,
+					},
 				}),
 			);
 		} catch (error) {
@@ -435,16 +438,11 @@ serviceRouter.post(
 
 		const dbClient = c.get("dbClient");
 		const inngestClient = c.get("inngestClient");
-		const workflow = await dbClient.query.agentGraphs.findFirst({
-			where: (row, { and, eq }) =>
-				and(
-					eq(row.id, body.workflowId),
-					eq(row.organizationId, apiKey.organizationId),
-				),
-			columns: {
-				id: true,
-			},
-		});
+		const workflow = await findActiveWorkflowById(
+			dbClient,
+			apiKey.organizationId,
+			body.workflowId,
+		);
 		if (!workflow) {
 			return c.json({ message: "Workflow not found" }, 404);
 		}
@@ -568,7 +566,12 @@ serviceRouter.get(
 				updatedAt: agentGraphs.updatedAt,
 			})
 			.from(agentGraphs)
-			.where(eq(agentGraphs.organizationId, apiKey.organizationId))
+			.where(
+				and(
+					eq(agentGraphs.organizationId, apiKey.organizationId),
+					isNull(agentGraphs.archivedAt),
+				),
+			)
 			.orderBy(asc(agentGraphs.name), asc(agentGraphs.id));
 
 		return c.json({

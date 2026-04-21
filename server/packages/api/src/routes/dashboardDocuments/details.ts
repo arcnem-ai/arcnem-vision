@@ -9,6 +9,7 @@ import {
 	toOCRResultItem,
 	toSegmentedResultItem,
 } from "@/lib/dashboard-documents";
+import { findActiveWorkflowById } from "@/lib/workflow-run-availability";
 import { requireSession } from "@/middleware/requireSession";
 import type { HonoServerContext } from "@/types/serverContext";
 
@@ -78,17 +79,11 @@ export function registerDashboardDocumentDetailRoutes(
 		}
 		const { document: targetDocument } = documentAccess;
 
-		const workflow = await dbClient.query.agentGraphs.findFirst({
-			where: (row, { and, eq }) =>
-				and(
-					eq(row.id, workflowId.trim()),
-					eq(row.organizationId, targetDocument.organizationId),
-				),
-			columns: {
-				id: true,
-				name: true,
-			},
-		});
+		const workflow = await findActiveWorkflowById(
+			dbClient,
+			targetDocument.organizationId,
+			workflowId.trim(),
+		);
 		if (!workflow) {
 			return c.json({ message: "Workflow not found" }, 404);
 		}

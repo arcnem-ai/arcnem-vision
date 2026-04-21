@@ -10,9 +10,13 @@ import { ALLOWED_IMAGE_MIME_TYPES } from "@/constants/uploads";
 import { publishDashboardRealtimeEvent } from "@/lib/dashboard-realtime";
 import type {
 	AcknowledgedUpload,
+	AcknowledgedUploadWithProcessing,
 	PendingUpload,
 	QueueProcessingOptions,
+	QueueProcessingWithoutResult,
+	QueueProcessingWithResult,
 	VerifiedUploadObject,
+	WorkflowUploadProcessing,
 } from "./acknowledge.types";
 import { fail } from "./errors";
 
@@ -145,13 +149,14 @@ const enqueueDocumentProcessing = async ({
 	options: QueueProcessingOptions;
 	documentId: string;
 	objectKey: string;
-}) => {
+}): Promise<WorkflowUploadProcessing | null> => {
 	if (!options.enabled) {
-		return;
-	}
-
-	if (!options.inngestClient) {
-		throw new Error("Expected an Inngest client when queueing processing");
+		return options.code
+			? {
+					status: "skipped" as const,
+					code: options.code,
+				}
+			: null;
 	}
 
 	try {
@@ -164,16 +169,37 @@ const enqueueDocumentProcessing = async ({
 					: {}),
 			},
 		});
+
+		return {
+			status: "queued" as const,
+		};
 	} catch (error) {
 		console.error("Failed to enqueue document processing", {
 			documentId,
 			objectKey,
 			error,
 		});
+
+		return {
+			status: "failed" as const,
+			code: "processing_enqueue_failed" as const,
+		};
 	}
 };
 
-export const acknowledgePresignedUpload = async ({
+export function acknowledgePresignedUpload(args: {
+	dbClient: PGDB;
+	s3Client: S3Client;
+	upload: PendingUpload;
+	queueProcessing: QueueProcessingWithoutResult;
+}): Promise<AcknowledgedUpload>;
+export function acknowledgePresignedUpload(args: {
+	dbClient: PGDB;
+	s3Client: S3Client;
+	upload: PendingUpload;
+	queueProcessing: QueueProcessingWithResult;
+}): Promise<AcknowledgedUploadWithProcessing>;
+export async function acknowledgePresignedUpload({
 	dbClient,
 	s3Client,
 	upload,
@@ -183,7 +209,7 @@ export const acknowledgePresignedUpload = async ({
 	s3Client: S3Client;
 	upload: PendingUpload;
 	queueProcessing: QueueProcessingOptions;
-}): Promise<AcknowledgedUpload> => {
+}): Promise<AcknowledgedUpload | AcknowledgedUploadWithProcessing> {
 	const verifiedObject = await statUploadedObject({
 		s3Client,
 		objectKey: upload.objectKey,
@@ -199,7 +225,7 @@ export const acknowledgePresignedUpload = async ({
 		documentId: acknowledgedUpload.documentId,
 	});
 
-	await enqueueDocumentProcessing({
+	const processing = await enqueueDocumentProcessing({
 		options: queueProcessing,
 		documentId: acknowledgedUpload.documentId,
 		objectKey: upload.objectKey,
@@ -209,5 +235,6 @@ export const acknowledgePresignedUpload = async ({
 		status: "verified",
 		documentId: acknowledgedUpload.documentId,
 		presignedUploadId: acknowledgedUpload.presignedUploadId,
+		...(processing ? { processing } : {}),
 	};
-};
+}

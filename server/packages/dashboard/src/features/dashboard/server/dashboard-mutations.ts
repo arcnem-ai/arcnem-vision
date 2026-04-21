@@ -15,6 +15,8 @@ export {
 	createWorkflowFromTemplate,
 	createWorkflowTemplateFromWorkflow,
 	generateWorkflowDraft,
+	setWorkflowArchived,
+	setWorkflowTemplateArchived,
 	updateWorkflow,
 	updateWorkflowTemplate,
 } from "./workflow-graph-mutations";

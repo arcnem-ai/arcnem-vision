@@ -4,6 +4,7 @@ import {
 	serviceDocumentScopeSchema,
 	serviceDocumentVisibilityUpdateSchema,
 	serviceUploadAcknowledgeRequestSchema,
+	serviceUploadAcknowledgeResponseSchema,
 	serviceUploadPresignRequestSchema,
 	serviceWorkflowExecutionRequestSchema,
 } from "./service-api";
@@ -93,6 +94,16 @@ describe("service API schemas", () => {
 		if (parsed.success) {
 			expect(parsed.data).toEqual({ objectKey: "uploads/demo.png" });
 		}
+	});
+
+	test("accepts minimal upload acknowledgements", () => {
+		expect(
+			serviceUploadAcknowledgeResponseSchema.safeParse({
+				status: "verified",
+				documentId: "doc-1",
+				presignedUploadId: "upload-1",
+			}).success,
+		).toBe(true);
 	});
 
 	test("requires at least one document id for visibility changes", () => {

@@ -4,6 +4,7 @@ import { DashboardHeader } from "@/features/dashboard/components/dashboard-heade
 import { DashboardSessionToolbar } from "@/features/dashboard/components/dashboard-session-toolbar";
 import { DashboardWorkspaceTabs } from "@/features/dashboard/components/dashboard-workspace-tabs";
 import { WorkflowCanvasEditor } from "@/features/dashboard/components/workflow-canvas-editor";
+import type { DashboardTab } from "@/features/dashboard/dashboard-navigation";
 import { useDashboardPageController } from "@/features/dashboard/dashboard-page-controller";
 import type { DashboardData } from "@/features/dashboard/types";
 import type { DocumentsResponse } from "@/features/documents/types";
@@ -15,11 +16,13 @@ export function DashboardPage({
 	documents,
 	runs,
 	showArchived,
+	activeTab,
 }: {
 	dashboard: DashboardData;
 	documents: DocumentsResponse;
 	runs: RunsResponse;
 	showArchived: boolean;
+	activeTab: DashboardTab;
 }) {
 	const controller = useDashboardPageController(dashboard);
 
@@ -68,6 +71,7 @@ export function DashboardPage({
 									documents={documents}
 									runs={runs}
 									showArchived={showArchived}
+									activeTab={activeTab}
 									library={controller.library}
 								/>
 							) : null}

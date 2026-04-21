@@ -1,6 +1,7 @@
 import { schema } from "@arcnem-vision/db";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
+import type { QueueProcessingWithResult } from "@/lib/document-uploads";
 import {
 	acknowledgePresignedUpload,
 	isDocumentVisibility,
@@ -8,6 +9,7 @@ import {
 	readJSONBody,
 	toDocumentUploadErrorResponse,
 } from "@/lib/document-uploads";
+import { findActiveWorkflowById } from "@/lib/workflow-run-availability";
 import {
 	requireAPIKey,
 	requireAPIKeyPermission,
@@ -75,6 +77,24 @@ ackUploadRouter.post(
 				return c.json({ message: "Upload has invalid visibility" }, 500);
 			}
 
+			const activeWorkflow = verifiedKey.agentGraphId
+				? await findActiveWorkflowById(
+						dbClient,
+						verifiedKey.organizationId,
+						verifiedKey.agentGraphId,
+					)
+				: null;
+			const queueProcessing: QueueProcessingWithResult = activeWorkflow
+				? {
+						enabled: true,
+						inngestClient,
+						agentGraphId: activeWorkflow.id,
+					}
+				: {
+						enabled: false,
+						code: "workflow_unavailable",
+					};
+
 			return c.json(
 				await acknowledgePresignedUpload({
 					dbClient,
@@ -83,11 +103,7 @@ ackUploadRouter.post(
 						...uploadForKey,
 						visibility: uploadForKey.visibility,
 					},
-					queueProcessing: {
-						enabled: true,
-						inngestClient,
-						agentGraphId: verifiedKey.agentGraphId ?? undefined,
-					},
+					queueProcessing,
 				}),
 			);
 		} catch (error) {

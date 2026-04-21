@@ -117,8 +117,23 @@ class _VisionChatScreenState extends State<VisionChatScreen> {
       },
       (data) {
         final documentId = data['documentId'] ?? 'unknown';
+        final processing =
+            data['processing'] is Map<String, dynamic>
+                ? data['processing'] as Map<String, dynamic>
+                : null;
+        final processingStatus = processing?['status'] as String?;
+        final processingMessage = switch (processingStatus) {
+          'queued' => ' Processing queued.',
+          'skipped' => ' Processing unavailable.',
+          'failed' => ' Processing could not be started.',
+          _ => '',
+        };
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload complete. Document: $documentId')),
+          SnackBar(
+            content: Text(
+              'Upload complete. Document: $documentId$processingMessage',
+            ),
+          ),
         );
       },
     );
