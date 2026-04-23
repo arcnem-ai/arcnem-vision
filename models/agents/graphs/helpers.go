@@ -94,6 +94,28 @@ func extractLastAIMessage(messages []llms.MessageContent) (string, error) {
 	return "", fmt.Errorf("agent result did not include an AI text message")
 }
 
+func replaceLastAIMessage(messages []llms.MessageContent, replacement string) ([]llms.MessageContent, error) {
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role != llms.ChatMessageTypeAI {
+			continue
+		}
+
+		for j := len(messages[i].Parts) - 1; j >= 0; j-- {
+			if _, ok := messages[i].Parts[j].(llms.TextContent); !ok {
+				continue
+			}
+
+			nextMessages := append([]llms.MessageContent(nil), messages...)
+			nextParts := append([]llms.ContentPart(nil), nextMessages[i].Parts...)
+			nextParts[j] = llms.TextContent{Text: replacement}
+			nextMessages[i].Parts = nextParts
+			return nextMessages, nil
+		}
+	}
+
+	return nil, fmt.Errorf("agent result did not include an AI text message")
+}
+
 func buildWorkerAgentOptions(config workerAgentConfig) (int, []prebuilt.CreateAgentOption) {
 	var opts []prebuilt.CreateAgentOption
 	if config.SystemMessage != "" {
