@@ -21,10 +21,11 @@ func BuildWorkerNode(snapshotNode *SnapshotNode, modelClient any, mcpClient *cli
 	}
 
 	graphTools := agenttools.DBToolsToLangGraphTools(snapshotNode.Tools, mcpClient)
-	maxIterations, opts, err := parseWorkerConfig(snapshotNode)
+	workerConfig, maxIterations, opts, err := parseWorkerConfig(snapshotNode)
 	if err != nil {
 		return nil, err
 	}
+	outputRetries := outputRetryCount(workerConfig)
 	inputConfig, err := parseNodeInputConfig(snapshotNode.Node.Config)
 	if err != nil {
 		return nil, fmt.Errorf("worker node %q: invalid input config json: %w", snapshotNode.Node.NodeKey, err)
@@ -66,40 +67,72 @@ func BuildWorkerNode(snapshotNode *SnapshotNode, modelClient any, mcpClient *cli
 				)
 				return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
 			}
-			result, err := agent.Invoke(ctx, map[string]any{
-				"messages": []llms.MessageContent{humanMessage},
-			})
-			if err != nil {
+
+			messages := []llms.MessageContent{humanMessage}
+			var output string
+			var messageCount int
+			for attempt := 1; attempt <= outputRetries; attempt++ {
+				result, err := agent.Invoke(ctx, map[string]any{
+					"messages": messages,
+				})
+				if err != nil {
+					log.Printf(
+						"graph worker error node=%s max_iterations=%d attempt=%d/%d err=%v",
+						snapshotNode.Node.NodeKey,
+						maxIterations,
+						attempt,
+						outputRetries,
+						err,
+					)
+					return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
+				}
+
+				messages, err = loadResultMessages(result)
+				if err != nil {
+					return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
+				}
+
+				output, err = extractLastAIMessage(messages)
+				if err != nil {
+					return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
+				}
+
+				messageCount = len(messages)
+				if isMaxIterationsMessage(output) {
+					log.Printf(
+						"graph worker iteration_limit node=%s max_iterations=%d input_preview=%q output_preview=%q",
+						snapshotNode.Node.NodeKey,
+						maxIterations,
+						previewText(input),
+						previewText(output),
+					)
+					return nil, fmt.Errorf("worker node %q hit max iterations: %s", snapshotNode.Node.NodeKey, output)
+				}
+
+				normalizedOutput, validationErr := normalizeStructuredWorkerOutput(output, workerConfig.OutputSchema)
+				if validationErr == nil {
+					output = normalizedOutput
+					break
+				}
+
+				if attempt == outputRetries {
+					return nil, fmt.Errorf("worker node %q: invalid structured output: %w", snapshotNode.Node.NodeKey, validationErr)
+				}
+
 				log.Printf(
-					"graph worker error node=%s max_iterations=%d err=%v",
+					"graph worker output_retry node=%s attempt=%d/%d err=%v output_preview=%q",
 					snapshotNode.Node.NodeKey,
-					maxIterations,
-					err,
-				)
-				return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
-			}
-
-			messages, err := loadResultMessages(result)
-			if err != nil {
-				return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
-			}
-
-			output, err := extractLastAIMessage(messages)
-			if err != nil {
-				return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
-			}
-
-			messageCount := len(messages)
-			if isMaxIterationsMessage(output) {
-				log.Printf(
-					"graph worker iteration_limit node=%s max_iterations=%d input_preview=%q output_preview=%q",
-					snapshotNode.Node.NodeKey,
-					maxIterations,
-					previewText(input),
+					attempt,
+					outputRetries,
+					validationErr,
 					previewText(output),
 				)
-				return nil, fmt.Errorf("worker node %q hit max iterations: %s", snapshotNode.Node.NodeKey, output)
+				messages = append(messages, llms.TextParts(
+					llms.ChatMessageTypeHuman,
+					buildWorkerOutputRepairPrompt(validationErr, workerConfig.OutputSchema),
+				))
 			}
+
 			log.Printf(
 				"graph worker end node=%s message_count=%d output_len=%d output_preview=%q",
 				snapshotNode.Node.NodeKey,
@@ -133,7 +166,7 @@ func BuildSupervisorMemberWorkerNode(snapshotNode *SnapshotNode, modelClient any
 	}
 
 	graphTools := agenttools.DBToolsToLangGraphTools(snapshotNode.Tools, mcpClient)
-	maxIterations, opts, err := parseWorkerConfig(snapshotNode)
+	_, maxIterations, opts, err := parseWorkerConfig(snapshotNode)
 	if err != nil {
 		return nil, err
 	}

@@ -13,19 +13,22 @@ import (
 type workerAgentConfig struct {
 	SystemMessage string
 	MaxIterations int
+	OutputRetries int                 `json:"output_retries"`
+	OutputSchema  *workerOutputSchema `json:"output_schema"`
 }
 
 const defaultWorkerMaxIterations = 10
+const defaultWorkerOutputRetries = 3
 
-// parseWorkerConfig extracts system_message and max_iterations from a node's config jsonb.
-func parseWorkerConfig(snapshotNode *SnapshotNode) (int, []prebuilt.CreateAgentOption, error) {
+// parseWorkerConfig extracts worker runtime settings from a node's config jsonb.
+func parseWorkerConfig(snapshotNode *SnapshotNode) (workerAgentConfig, int, []prebuilt.CreateAgentOption, error) {
 	var config workerAgentConfig
 	if err := json.Unmarshal([]byte(snapshotNode.Node.Config), &config); err != nil {
-		return 0, nil, fmt.Errorf("worker node %q: invalid config json: %w", snapshotNode.Node.NodeKey, err)
+		return workerAgentConfig{}, 0, nil, fmt.Errorf("worker node %q: invalid config json: %w", snapshotNode.Node.NodeKey, err)
 	}
 
 	maxIterations, opts := buildWorkerAgentOptions(config)
-	return maxIterations, opts, nil
+	return config, maxIterations, opts, nil
 }
 
 func loadStateString(state map[string]any, key string) (string, error) {
@@ -103,6 +106,16 @@ func buildWorkerAgentOptions(config workerAgentConfig) (int, []prebuilt.CreateAg
 	}
 
 	return maxIterations, opts
+}
+
+func outputRetryCount(config workerAgentConfig) int {
+	if config.OutputSchema == nil {
+		return 1
+	}
+	if config.OutputRetries > 0 {
+		return config.OutputRetries
+	}
+	return defaultWorkerOutputRetries
 }
 
 // buildAgentMap creates a ReAct agent StateRunnable via the prebuilt package.

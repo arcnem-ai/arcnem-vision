@@ -74,22 +74,30 @@ func BuildToolNode(snapshotNode *SnapshotNode, mcpClient *clients.MCPClient) (*N
 				return nil, fmt.Errorf("tool node %q: %w", snapshotNode.Node.NodeKey, err)
 			}
 
-			// Map tool output fields to state: for each field in the tool's output schema,
-			// check if output_mapping has a rename, otherwise use field name as state key.
-			delta := make(map[string]any)
-			for _, field := range outputFields {
-				stateKey := field
-				if mapped, ok := config.OutputMapping[field]; ok {
-					stateKey = mapped
-				}
-				if v, ok := toolOutput[field]; ok {
-					delta[stateKey] = v
-				}
-			}
-
-			return delta, nil
+			return mapToolOutputToState(toolOutput, outputFields, config.OutputMapping), nil
 		},
 	}, nil
+}
+
+func mapToolOutputToState(toolOutput map[string]any, outputFields []string, outputMapping map[string]string) map[string]any {
+	delta := make(map[string]any)
+	restrictToMappedOutputs := len(outputMapping) > 0
+
+	for _, field := range outputFields {
+		stateKey, isMapped := outputMapping[field]
+		if restrictToMappedOutputs && !isMapped {
+			continue
+		}
+		if !isMapped {
+			stateKey = field
+		}
+
+		if v, ok := toolOutput[field]; ok {
+			delta[stateKey] = v
+		}
+	}
+
+	return delta
 }
 
 func resolveToolInputMappingValue(mappingValue any, state map[string]any) (any, bool) {

@@ -135,3 +135,42 @@ func TestResolveToolInputMappingValue_StringConstant(t *testing.T) {
 		t.Fatalf("expected REPLICATE, got %v", got)
 	}
 }
+
+func TestMapToolOutputToState_DefaultsToSchemaFieldNames(t *testing.T) {
+	got := mapToolOutputToState(
+		map[string]any{
+			"description_id": "desc-123",
+			"text":           "saved text",
+		},
+		[]string{"description_id", "text"},
+		nil,
+	)
+
+	want := map[string]any{
+		"description_id": "desc-123",
+		"text":           "saved text",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestMapToolOutputToState_RestrictsToExplicitMappings(t *testing.T) {
+	got := mapToolOutputToState(
+		map[string]any{
+			"description_id": "desc-123",
+			"text":           "saved text",
+		},
+		[]string{"description_id", "text"},
+		map[string]string{
+			"description_id": "document_description_id",
+		},
+	)
+
+	want := map[string]any{
+		"document_description_id": "desc-123",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
