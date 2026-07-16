@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:arcnem_vision_client/catalog/vision_catalog.dart';
 import 'package:arcnem_vision_client/screens/camera_screen.dart';
 import 'package:arcnem_vision_client/services/gemma_service.dart';
@@ -27,9 +29,10 @@ class _VisionChatScreenState extends State<VisionChatScreen> {
   final GemmaService _gemmaService = GemmaService();
   final TextEditingController _textController = TextEditingController();
 
-  late final A2uiMessageProcessor _messageProcessor;
+  late final SurfaceController _surfaceController;
   late final VisionContentGenerator _contentGenerator;
-  late final GenUiConversation _conversation;
+  late final Conversation _conversation;
+  StreamSubscription<ConversationEvent>? _conversationSubscription;
 
   final List<String> _surfaceIds = [];
   bool _isUploading = false;
@@ -40,15 +43,16 @@ class _VisionChatScreenState extends State<VisionChatScreen> {
     super.initState();
 
     final catalog = createVisionCatalog();
-    _messageProcessor = A2uiMessageProcessor(catalogs: [catalog]);
+    _surfaceController = SurfaceController(catalogs: [catalog]);
 
     _contentGenerator = VisionContentGenerator(gemmaService: _gemmaService);
 
-    _conversation = GenUiConversation(
-      a2uiMessageProcessor: _messageProcessor,
-      contentGenerator: _contentGenerator,
-      onSurfaceAdded: _onSurfaceAdded,
-      onSurfaceDeleted: _onSurfaceDeleted,
+    _conversation = Conversation(
+      controller: _surfaceController,
+      transport: _contentGenerator,
+    );
+    _conversationSubscription = _conversation.events.listen(
+      _onConversationEvent,
     );
 
     _initializeGemma();
@@ -63,18 +67,20 @@ class _VisionChatScreenState extends State<VisionChatScreen> {
     setState(() => _gemmaLoading = false);
   }
 
-  void _onSurfaceAdded(SurfaceAdded event) {
+  void _onConversationEvent(ConversationEvent event) {
     if (!mounted) return;
-    setState(() {
-      _surfaceIds.add(event.surfaceId);
-    });
-  }
-
-  void _onSurfaceDeleted(SurfaceRemoved event) {
-    if (!mounted) return;
-    setState(() {
-      _surfaceIds.remove(event.surfaceId);
-    });
+    switch (event) {
+      case ConversationSurfaceAdded(:final surfaceId):
+        setState(() {
+          if (!_surfaceIds.contains(surfaceId)) {
+            _surfaceIds.add(surfaceId);
+          }
+        });
+      case ConversationSurfaceRemoved(:final surfaceId):
+        setState(() => _surfaceIds.remove(surfaceId));
+      default:
+        break;
+    }
   }
 
   void _sendMessage() {
@@ -82,7 +88,7 @@ class _VisionChatScreenState extends State<VisionChatScreen> {
     if (text.isEmpty) return;
 
     _textController.clear();
-    _conversation.sendRequest(UserMessage([TextPart(text)]));
+    _conversation.sendRequest(ChatMessage.user(text));
   }
 
   Future<void> _captureAndUpload() async {
@@ -117,10 +123,9 @@ class _VisionChatScreenState extends State<VisionChatScreen> {
       },
       (data) {
         final documentId = data['documentId'] ?? 'unknown';
-        final processing =
-            data['processing'] is Map<String, dynamic>
-                ? data['processing'] as Map<String, dynamic>
-                : null;
+        final processing = data['processing'] is Map<String, dynamic>
+            ? data['processing'] as Map<String, dynamic>
+            : null;
         final processingStatus = processing?['status'] as String?;
         final processingMessage = switch (processingStatus) {
           'queued' => ' Processing queued.',
@@ -143,7 +148,10 @@ class _VisionChatScreenState extends State<VisionChatScreen> {
 
   @override
   void dispose() {
+    _conversationSubscription?.cancel();
     _conversation.dispose();
+    _contentGenerator.dispose();
+    _surfaceController.dispose();
     _gemmaService.dispose();
     _textController.dispose();
     super.dispose();
@@ -345,7 +353,9 @@ class _VisionChatScreenState extends State<VisionChatScreen> {
                 child: Opacity(opacity: value, child: child),
               );
             },
-            child: GenUiSurface(host: _messageProcessor, surfaceId: surfaceId),
+            child: Surface(
+              surfaceContext: _surfaceController.contextFor(surfaceId),
+            ),
           ),
         );
       },

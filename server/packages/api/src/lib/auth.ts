@@ -4,7 +4,7 @@ import { getAuthFeatureFlags } from "@arcnem-vision/shared";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
-import { admin, apiKey, emailOTP, organization } from "better-auth/plugins";
+import { admin, emailOTP, organization } from "better-auth/plugins";
 import { getRedisClient } from "@/clients/redis";
 import { getAPIEnvVar } from "@/env/getAPIEnvVar";
 import { sendAuthOTPEmail } from "@/lib/auth-email";
@@ -89,7 +89,6 @@ export const auth = betterAuth({
 				});
 			},
 		}),
-		apiKey({ storage: "secondary-storage" }),
 		organization({
 			allowUserToCreateOrganization: async () =>
 				authFeatureFlags.organizationCreationEnabled,

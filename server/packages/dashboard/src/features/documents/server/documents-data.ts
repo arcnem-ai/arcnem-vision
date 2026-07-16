@@ -8,7 +8,7 @@ import type {
 import { fetchDashboardAPI } from "@/lib/api-server";
 
 export const getDocuments = createServerFn({ method: "GET" })
-	.inputValidator(
+	.validator(
 		(input: {
 			cursor?: string;
 			limit?: number;
@@ -37,7 +37,7 @@ export const getDocuments = createServerFn({ method: "GET" })
 	});
 
 export const getDocumentSegmentations = createServerFn({ method: "GET" })
-	.inputValidator((input: { documentId: string }) => input)
+	.validator((input: { documentId: string }) => input)
 	.handler(async ({ data }): Promise<DocumentSegmentationsResponse> => {
 		return fetchDashboardAPI<DocumentSegmentationsResponse>(
 			`/dashboard/documents/${encodeURIComponent(data.documentId)}/segmentations`,
@@ -49,7 +49,7 @@ export const getDocumentSegmentations = createServerFn({ method: "GET" })
 	});
 
 export const getDocumentOCRResults = createServerFn({ method: "GET" })
-	.inputValidator((input: { documentId: string }) => input)
+	.validator((input: { documentId: string }) => input)
 	.handler(async ({ data }): Promise<DocumentOCRResultsResponse> => {
 		return fetchDashboardAPI<DocumentOCRResultsResponse>(
 			`/dashboard/documents/${encodeURIComponent(data.documentId)}/ocr`,
@@ -61,7 +61,7 @@ export const getDocumentOCRResults = createServerFn({ method: "GET" })
 	});
 
 export const getDocument = createServerFn({ method: "GET" })
-	.inputValidator((input: { documentId: string }) => input)
+	.validator((input: { documentId: string }) => input)
 	.handler(async ({ data }): Promise<DocumentItem> => {
 		return fetchDashboardAPI<DocumentItem>(
 			`/dashboard/documents/${encodeURIComponent(data.documentId)}`,

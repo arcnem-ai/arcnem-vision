@@ -7,7 +7,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { fetchDashboardAPI } from "@/lib/api-server";
 
 export const getAgentGraphRuns = createServerFn({ method: "GET" })
-	.inputValidator(
+	.validator(
 		(input: { organizationId: string; cursor?: string; limit?: number }) =>
 			input,
 	)
@@ -27,7 +27,7 @@ export const getAgentGraphRuns = createServerFn({ method: "GET" })
 	});
 
 export const getAgentGraphRun = createServerFn({ method: "GET" })
-	.inputValidator((input: { runId: string }) => input)
+	.validator((input: { runId: string }) => input)
 	.handler(async ({ data }) =>
 		fetchDashboardAPI(
 			`/dashboard/runs/${encodeURIComponent(data.runId)}`,
@@ -40,7 +40,7 @@ export const getAgentGraphRun = createServerFn({ method: "GET" })
 	);
 
 export const getAgentGraphRunSteps = createServerFn({ method: "GET" })
-	.inputValidator((input: { runId: string }) => input)
+	.validator((input: { runId: string }) => input)
 	.handler(async ({ data }) =>
 		fetchDashboardAPI(
 			`/dashboard/runs/${encodeURIComponent(data.runId)}/steps`,

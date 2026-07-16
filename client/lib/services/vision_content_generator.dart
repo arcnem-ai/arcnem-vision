@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:a2ui_core/a2ui_core.dart' as core;
 import 'package:arcnem_vision_client/enums/document_intent.dart';
 import 'package:arcnem_vision_client/models/document.dart';
 import 'package:arcnem_vision_client/services/a2ui_builder.dart';
@@ -9,13 +11,12 @@ import 'package:arcnem_vision_client/services/intent_parser.dart';
 import 'package:flutter/foundation.dart';
 import 'package:genui/genui.dart';
 
-class VisionContentGenerator implements ContentGenerator {
+class VisionContentGenerator implements Transport {
   final GemmaService _gemmaService;
   final DocumentService _documentService;
 
-  final _a2uiController = StreamController<A2uiMessage>.broadcast();
+  final _a2uiController = StreamController<core.A2uiMessage>.broadcast();
   final _textController = StreamController<String>.broadcast();
-  final _errorController = StreamController<ContentGeneratorError>.broadcast();
   final _isProcessingNotifier = ValueNotifier<bool>(false);
 
   int _surfaceCounter = 0;
@@ -28,33 +29,24 @@ class VisionContentGenerator implements ContentGenerator {
        _documentService = documentService ?? DocumentService();
 
   @override
-  Stream<A2uiMessage> get a2uiMessageStream => _a2uiController.stream;
+  Stream<core.A2uiMessage> get incomingMessages => _a2uiController.stream;
 
   @override
-  Stream<String> get textResponseStream => _textController.stream;
+  Stream<String> get incomingText => _textController.stream;
 
-  @override
-  Stream<ContentGeneratorError> get errorStream => _errorController.stream;
-
-  @override
   ValueListenable<bool> get isProcessing => _isProcessingNotifier;
 
   @override
-  Future<void> sendRequest(
-    ChatMessage message, {
-    Iterable<ChatMessage>? history,
-    A2UiClientCapabilities? clientCapabilities,
-  }) async {
-    switch (message) {
-      case UserMessage():
-        final text = message.text.trim();
-        if (text.isNotEmpty) {
-          await _handleUserText(text);
-        }
-      case UserUiInteractionMessage():
-        await _handleUiInteraction(message);
-      default:
-        break;
+  Future<void> sendRequest(ChatMessage message) async {
+    for (final interaction in message.parts.uiInteractionParts) {
+      if (await _handleUiInteraction(interaction)) {
+        return;
+      }
+    }
+
+    final text = message.text.trim();
+    if (text.isNotEmpty) {
+      await _handleUserText(text);
     }
   }
 
@@ -81,37 +73,39 @@ class VisionContentGenerator implements ContentGenerator {
     }
   }
 
-  Future<void> _handleUiInteraction(UserUiInteractionMessage message) async {
-    final text = message.text.trim();
-    if (text.isEmpty) return;
+  Future<bool> _handleUiInteraction(UiInteractionPart interaction) async {
+    final Object? payload;
+    try {
+      payload = jsonDecode(interaction.interaction);
+    } on FormatException {
+      return false;
+    }
+    if (payload is! Map<String, dynamic>) return false;
 
-    // Parse the interaction text for findSimilar events
-    // The UserUiInteractionMessage parts contain context from the UserActionEvent
-    final parts = message.parts.whereType<DataPart>();
-    for (final part in parts) {
-      final data = part.data;
-      if (data == null) continue;
-      final name = data['name'] as String?;
-      final documentId = data['documentId'] as String?;
-      if (name == 'findSimilar' && documentId != null) {
-        _isProcessingNotifier.value = true;
-        try {
-          await _executeIntent(
-            ParsedIntent(
-              intent: DocumentIntent.findSimilar,
-              documentId: documentId,
-              rawResponse: 'findSimilar:$documentId',
-            ),
-          );
-        } finally {
-          _isProcessingNotifier.value = false;
-        }
-        return;
-      }
+    final action = payload['action'];
+    if (action is! Map<String, dynamic>) return false;
+
+    final context = action['context'];
+    if (action['name'] != 'findSimilar' || context is! Map<String, dynamic>) {
+      return false;
     }
 
-    // Fallback: treat as text input
-    await _handleUserText(text);
+    final documentId = context['documentId'];
+    if (documentId is! String || documentId.isEmpty) return false;
+
+    _isProcessingNotifier.value = true;
+    try {
+      await _executeIntent(
+        ParsedIntent(
+          intent: DocumentIntent.findSimilar,
+          documentId: documentId,
+          rawResponse: 'findSimilar:$documentId',
+        ),
+      );
+    } finally {
+      _isProcessingNotifier.value = false;
+    }
+    return true;
   }
 
   Future<void> _executeIntent(ParsedIntent parsed) async {
@@ -222,7 +216,6 @@ class VisionContentGenerator implements ContentGenerator {
   void dispose() {
     _a2uiController.close();
     _textController.close();
-    _errorController.close();
     _isProcessingNotifier.dispose();
   }
 }

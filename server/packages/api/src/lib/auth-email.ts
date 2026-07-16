@@ -47,7 +47,7 @@ export async function sendAuthOTPEmail({
 }: {
 	email: string;
 	otp: string;
-	type: "sign-in" | "email-verification" | "forget-password";
+	type: "sign-in" | "email-verification" | "forget-password" | "change-email";
 }) {
 	const resend = getResendClient();
 	const from = process.env.TRANSACTIONAL_EMAIL_ADDRESS?.trim();

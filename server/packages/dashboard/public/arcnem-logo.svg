@@ -1,4 +1,5 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Arcnem Vision</title>
   <rect width="1024" height="1024" rx="512" fill="#F5F1E8" />
   <circle cx="512" cy="512" r="380" fill="#F5F1E8" stroke="#0F172A" stroke-width="36" />
   <circle cx="618" cy="388" r="120" fill="#FF1A1A" />

@@ -15,7 +15,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { fetchDashboardAPI } from "@/lib/api-server";
 
 export const createProject = createServerFn({ method: "POST" })
-	.inputValidator((input: unknown) => createProjectInputSchema.parse(input))
+	.validator((input: unknown) => createProjectInputSchema.parse(input))
 	.handler(async ({ data }) =>
 		fetchDashboardAPI(
 			"/dashboard/projects",
@@ -29,9 +29,7 @@ export const createProject = createServerFn({ method: "POST" })
 	);
 
 export const createWorkflowAPIKey = createServerFn({ method: "POST" })
-	.inputValidator((input: unknown) =>
-		createWorkflowApiKeyInputSchema.parse(input),
-	)
+	.validator((input: unknown) => createWorkflowApiKeyInputSchema.parse(input))
 	.handler(
 		async ({ data }): Promise<GeneratedAPIKey> =>
 			fetchDashboardAPI(
@@ -46,9 +44,7 @@ export const createWorkflowAPIKey = createServerFn({ method: "POST" })
 	);
 
 export const updateWorkflowAPIKey = createServerFn({ method: "POST" })
-	.inputValidator((input: unknown) =>
-		updateWorkflowApiKeyInputSchema.parse(input),
-	)
+	.validator((input: unknown) => updateWorkflowApiKeyInputSchema.parse(input))
 	.handler(async ({ data }) =>
 		fetchDashboardAPI(
 			"/dashboard/workflow-api-keys/update",
@@ -62,9 +58,7 @@ export const updateWorkflowAPIKey = createServerFn({ method: "POST" })
 	);
 
 export const createServiceAPIKey = createServerFn({ method: "POST" })
-	.inputValidator((input: unknown) =>
-		createServiceApiKeyInputSchema.parse(input),
-	)
+	.validator((input: unknown) => createServiceApiKeyInputSchema.parse(input))
 	.handler(
 		async ({ data }): Promise<GeneratedAPIKey> =>
 			fetchDashboardAPI(
@@ -79,9 +73,7 @@ export const createServiceAPIKey = createServerFn({ method: "POST" })
 	);
 
 export const updateServiceAPIKey = createServerFn({ method: "POST" })
-	.inputValidator((input: unknown) =>
-		updateServiceApiKeyInputSchema.parse(input),
-	)
+	.validator((input: unknown) => updateServiceApiKeyInputSchema.parse(input))
 	.handler(async ({ data }) =>
 		fetchDashboardAPI(
 			"/dashboard/service-api-keys/update",
@@ -95,9 +87,7 @@ export const updateServiceAPIKey = createServerFn({ method: "POST" })
 	);
 
 export const setProjectArchived = createServerFn({ method: "POST" })
-	.inputValidator((input: unknown) =>
-		setProjectArchivedInputSchema.parse(input),
-	)
+	.validator((input: unknown) => setProjectArchivedInputSchema.parse(input))
 	.handler(async ({ data }) =>
 		fetchDashboardAPI(
 			"/dashboard/projects/archive",

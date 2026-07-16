@@ -2,8 +2,8 @@
 	"name": "@arcnem-vision/shared",
 	"dependencies": {
 		"@arcnem-vision/db": "workspace:*",
-		"drizzle-orm": "0.44.7",
-		"zod": "^4.3.6"
+		"drizzle-orm": "0.45.2",
+		"zod": "^4.4.3"
 	},
 	"type": "module",
 	"exports": {

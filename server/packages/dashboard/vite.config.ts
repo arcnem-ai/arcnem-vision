@@ -3,7 +3,6 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
-import tsConfigPaths from "vite-tsconfig-paths";
 
 function createAuthProxy(target: string | undefined) {
 	if (!target) {
@@ -43,7 +42,6 @@ export default defineConfig(({ mode }) => {
 			proxy: authProxy,
 		},
 		plugins: [
-			tsConfigPaths(),
 			tanstackStart({
 				spa: {
 					enabled: true,
@@ -54,6 +52,7 @@ export default defineConfig(({ mode }) => {
 			tailwindcss(),
 		],
 		resolve: {
+			tsconfigPaths: true,
 			alias: {
 				"@": path.resolve(__dirname, "./src"),
 			},

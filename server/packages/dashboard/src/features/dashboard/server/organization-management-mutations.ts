@@ -7,9 +7,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { fetchDashboardAPI } from "@/lib/api-server";
 
 export const createOrganization = createServerFn({ method: "POST" })
-	.inputValidator((input: unknown) =>
-		createOrganizationInputSchema.parse(input),
-	)
+	.validator((input: unknown) => createOrganizationInputSchema.parse(input))
 	.handler(async ({ data }) =>
 		fetchDashboardAPI(
 			"/dashboard/organizations",
@@ -23,9 +21,7 @@ export const createOrganization = createServerFn({ method: "POST" })
 	);
 
 export const switchActiveOrganization = createServerFn({ method: "POST" })
-	.inputValidator((input: unknown) =>
-		switchOrganizationInputSchema.parse(input),
-	)
+	.validator((input: unknown) => switchOrganizationInputSchema.parse(input))
 	.handler(async ({ data }) =>
 		fetchDashboardAPI(
 			"/dashboard/organizations/switch",

@@ -7,7 +7,7 @@ type GetDashboardDataInput = {
 };
 
 export const getDashboardData = createServerFn({ method: "GET" })
-	.inputValidator((input: GetDashboardDataInput | undefined) => input ?? {})
+	.validator((input: GetDashboardDataInput | undefined) => input ?? {})
 	.handler(async ({ data }): Promise<DashboardData> => {
 		const params = new URLSearchParams();
 		if (data.includeArchived === true) {
