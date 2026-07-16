@@ -89,7 +89,7 @@ app.on(["GET", "PUT", "POST"], "/api/inngest", (c) => {
 	const handler = serve({
 		client: inngestClient,
 		functions: [],
-		serveHost: process.env.JOB_SERVER_URL,
+		serveOrigin: process.env.JOB_SERVER_URL,
 	});
 
 	return handler(c);

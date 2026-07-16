@@ -196,7 +196,7 @@ const serviceJSONBodyValidation = (
 		success: boolean;
 		error?: readonly { message: string }[];
 	},
-	c: HonoContext<HonoServerContext>,
+	c: Pick<HonoContext, "json">,
 ) => {
 	if (!result.success) {
 		return c.json(

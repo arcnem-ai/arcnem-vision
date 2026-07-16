@@ -18,7 +18,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { fetchDashboardAPI } from "@/lib/api-server";
 
 export const createWorkflow = createServerFn({ method: "POST" })
-	.inputValidator((input: unknown) => createWorkflowInputSchema.parse(input))
+	.validator((input: unknown) => createWorkflowInputSchema.parse(input))
 	.handler(async ({ data }) =>
 		fetchDashboardAPI(
 			"/dashboard/workflows",
@@ -32,9 +32,7 @@ export const createWorkflow = createServerFn({ method: "POST" })
 	);
 
 export const generateWorkflowDraft = createServerFn({ method: "POST" })
-	.inputValidator((input: unknown) =>
-		generateWorkflowDraftInputSchema.parse(input),
-	)
+	.validator((input: unknown) => generateWorkflowDraftInputSchema.parse(input))
 	.handler(async ({ data }) =>
 		fetchDashboardAPI(
 			"/dashboard/workflows/generate-draft",
@@ -48,7 +46,7 @@ export const generateWorkflowDraft = createServerFn({ method: "POST" })
 	);
 
 export const updateWorkflow = createServerFn({ method: "POST" })
-	.inputValidator((input: unknown) => updateWorkflowInputSchema.parse(input))
+	.validator((input: unknown) => updateWorkflowInputSchema.parse(input))
 	.handler(async ({ data }) =>
 		fetchDashboardAPI(
 			"/dashboard/workflows/update",
@@ -62,9 +60,7 @@ export const updateWorkflow = createServerFn({ method: "POST" })
 	);
 
 export const setWorkflowArchived = createServerFn({ method: "POST" })
-	.inputValidator((input: unknown) =>
-		setWorkflowArchivedInputSchema.parse(input),
-	)
+	.validator((input: unknown) => setWorkflowArchivedInputSchema.parse(input))
 	.handler(async ({ data }) =>
 		fetchDashboardAPI(
 			"/dashboard/workflows/archive",
@@ -78,7 +74,7 @@ export const setWorkflowArchived = createServerFn({ method: "POST" })
 	);
 
 export const createWorkflowFromTemplate = createServerFn({ method: "POST" })
-	.inputValidator((input: unknown) =>
+	.validator((input: unknown) =>
 		createWorkflowFromTemplateInputSchema.parse(input),
 	)
 	.handler(async ({ data }) =>
@@ -96,7 +92,7 @@ export const createWorkflowFromTemplate = createServerFn({ method: "POST" })
 export const createWorkflowTemplateFromWorkflow = createServerFn({
 	method: "POST",
 })
-	.inputValidator((input: unknown) =>
+	.validator((input: unknown) =>
 		createWorkflowTemplateFromWorkflowInputSchema.parse(input),
 	)
 	.handler(async ({ data }) =>
@@ -112,9 +108,7 @@ export const createWorkflowTemplateFromWorkflow = createServerFn({
 	);
 
 export const updateWorkflowTemplate = createServerFn({ method: "POST" })
-	.inputValidator((input: unknown) =>
-		updateWorkflowTemplateInputSchema.parse(input),
-	)
+	.validator((input: unknown) => updateWorkflowTemplateInputSchema.parse(input))
 	.handler(async ({ data }) =>
 		fetchDashboardAPI(
 			"/dashboard/workflow-templates/update",
@@ -128,7 +122,7 @@ export const updateWorkflowTemplate = createServerFn({ method: "POST" })
 	);
 
 export const setWorkflowTemplateArchived = createServerFn({ method: "POST" })
-	.inputValidator((input: unknown) =>
+	.validator((input: unknown) =>
 		setWorkflowTemplateArchivedInputSchema.parse(input),
 	)
 	.handler(async ({ data }) =>

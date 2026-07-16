@@ -7,7 +7,7 @@ import type {
 import { fetchDashboardAPI } from "@/lib/api-server";
 
 export const createDocumentUpload = createServerFn({ method: "POST" })
-	.inputValidator(
+	.validator(
 		(input: { projectId: string; contentType: string; size: number }) => input,
 	)
 	.handler(async ({ data }): Promise<DocumentUploadTarget> => {
@@ -22,7 +22,7 @@ export const createDocumentUpload = createServerFn({ method: "POST" })
 	});
 
 export const acknowledgeDocumentUpload = createServerFn({ method: "POST" })
-	.inputValidator((input: { objectKey: string }) => input)
+	.validator((input: { objectKey: string }) => input)
 	.handler(async ({ data }): Promise<DocumentUploadAckResponse> => {
 		return fetchDashboardAPI<DocumentUploadAckResponse>(
 			"/dashboard/documents/uploads/ack",
@@ -35,7 +35,7 @@ export const acknowledgeDocumentUpload = createServerFn({ method: "POST" })
 	});
 
 export const runDocumentWorkflow = createServerFn({ method: "POST" })
-	.inputValidator((input: { documentId: string; workflowId: string }) => input)
+	.validator((input: { documentId: string; workflowId: string }) => input)
 	.handler(async ({ data }): Promise<DocumentWorkflowRunResponse> => {
 		return fetchDashboardAPI<DocumentWorkflowRunResponse>(
 			`/dashboard/documents/${data.documentId}/run`,

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.25.3-alpine AS builder
+FROM golang:1.26.5-alpine AS builder
 
 RUN apk add --no-cache ca-certificates git
 
@@ -27,7 +27,7 @@ WORKDIR /app/agents
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/agents .
 
-FROM alpine:3.22 AS runner
+FROM alpine:3.23 AS runner
 
 RUN apk add --no-cache ca-certificates \
 	&& addgroup -S app \

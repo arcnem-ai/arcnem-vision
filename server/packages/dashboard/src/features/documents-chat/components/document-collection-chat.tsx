@@ -28,7 +28,7 @@ const starterPrompts = [
 	"Which documents look most relevant to onboarding or instructions?",
 ];
 
-function messageText(parts: Array<{ type: string; content?: string }>) {
+function messageText(parts: Array<{ type: string; content?: unknown }>) {
 	return parts
 		.filter((part) => part.type === "text" && typeof part.content === "string")
 		.map((part) => part.content)

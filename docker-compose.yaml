@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: pgvector/pgvector:pg18
+    image: pgvector/pgvector:0.8.5-pg18
     ports:
       - "${POSTGRES_HOST_PORT:-5480}:5432"
     volumes:
@@ -21,7 +21,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7.2-alpine
+    image: redis:8.8.0-alpine
     ports:
       - "${REDIS_HOST_PORT:-6381}:6379"
     volumes:
@@ -33,7 +33,7 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     ports:
       - "${MINIO_API_HOST_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
@@ -50,7 +50,7 @@ services:
       retries: 5
 
   minio-init:
-    image: minio/mc
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
     depends_on:
       minio:
         condition: service_healthy

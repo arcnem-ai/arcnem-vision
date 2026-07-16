@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM oven/bun:1.3.11-alpine AS deps
+FROM oven/bun:1.3.14-alpine AS deps
 
 RUN apk add --no-cache python3 make g++
 
@@ -13,7 +13,7 @@ COPY packages/api/package.json ./packages/api/
 
 RUN bun install
 
-FROM oven/bun:1.3.11-alpine AS runner
+FROM oven/bun:1.3.14-alpine AS runner
 
 RUN apk add --no-cache ca-certificates \
 	&& addgroup -S app \

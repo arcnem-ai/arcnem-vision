@@ -1,6 +1,6 @@
 import type { ChatScope } from "@arcnem-vision/shared";
 import type { BaseMessageLike } from "@langchain/core/messages";
-import type { StreamChunk } from "@tanstack/ai";
+import { EventType, type StreamChunk } from "@tanstack/ai";
 import { createCitationSink, getDocumentChatAgent } from "./agent";
 import {
 	chunkAssistantText,
@@ -50,15 +50,14 @@ export function createDocumentChatResponse(options: DocumentChatStreamOptions) {
 						writeChunk(chunk);
 					}
 				} catch (error) {
+					const message =
+						error instanceof Error
+							? error.message
+							: "Document chat failed unexpectedly.";
 					writeChunk({
-						type: "RUN_ERROR",
+						type: EventType.RUN_ERROR,
 						runId: options.conversationId,
-						error: {
-							message:
-								error instanceof Error
-									? error.message
-									: "Document chat failed unexpectedly.",
-						},
+						message,
 						timestamp: Date.now(),
 					});
 				} finally {
@@ -100,7 +99,7 @@ async function* streamDocumentChatResponse(
 	const timestamp = () => Date.now();
 
 	yield {
-		type: "RUN_STARTED",
+		type: EventType.RUN_STARTED,
 		runId,
 		threadId: options.conversationId,
 		timestamp: timestamp(),
@@ -131,7 +130,7 @@ async function* streamDocumentChatResponse(
 		const citations = dedupeCitations(citationSink.citations).slice(0, 8);
 
 		yield {
-			type: "TEXT_MESSAGE_START",
+			type: EventType.TEXT_MESSAGE_START,
 			messageId,
 			role: "assistant",
 			timestamp: timestamp(),
@@ -139,7 +138,7 @@ async function* streamDocumentChatResponse(
 
 		for (const chunk of chunkAssistantText(answer)) {
 			yield {
-				type: "TEXT_MESSAGE_CONTENT",
+				type: EventType.TEXT_MESSAGE_CONTENT,
 				messageId,
 				delta: chunk,
 				timestamp: timestamp(),
@@ -148,7 +147,7 @@ async function* streamDocumentChatResponse(
 
 		if (citations.length > 0) {
 			yield {
-				type: "CUSTOM",
+				type: EventType.CUSTOM,
 				name: "assistant_sources",
 				value: {
 					messageId,
@@ -159,26 +158,26 @@ async function* streamDocumentChatResponse(
 		}
 
 		yield {
-			type: "TEXT_MESSAGE_END",
+			type: EventType.TEXT_MESSAGE_END,
 			messageId,
 			timestamp: timestamp(),
 		};
 		yield {
-			type: "RUN_FINISHED",
+			type: EventType.RUN_FINISHED,
+			threadId: options.conversationId,
 			runId,
 			finishReason: "stop",
 			timestamp: timestamp(),
 		};
 	} catch (error) {
+		const message =
+			error instanceof Error
+				? error.message
+				: "Document chat failed unexpectedly.";
 		yield {
-			type: "RUN_ERROR",
+			type: EventType.RUN_ERROR,
 			runId,
-			error: {
-				message:
-					error instanceof Error
-						? error.message
-						: "Document chat failed unexpectedly.",
-			},
+			message,
 			timestamp: timestamp(),
 		};
 	}
