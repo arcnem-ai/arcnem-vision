@@ -3,6 +3,7 @@ package graphs
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -14,8 +15,15 @@ type workerOutputSchema struct {
 }
 
 type workerOutputProperty struct {
-	Type any      `json:"type"`
-	Enum []string `json:"enum"`
+	Type                 any                             `json:"type"`
+	Enum                 []string                        `json:"enum,omitempty"`
+	Properties           map[string]workerOutputProperty `json:"properties,omitempty"`
+	Required             []string                        `json:"required,omitempty"`
+	AdditionalProperties *bool                           `json:"additionalProperties,omitempty"`
+	Items                *workerOutputProperty           `json:"items,omitempty"`
+	Minimum              *float64                        `json:"minimum,omitempty"`
+	Maximum              *float64                        `json:"maximum,omitempty"`
+	Pattern              string                          `json:"pattern,omitempty"`
 }
 
 func normalizeStructuredWorkerOutput(output string, schema *workerOutputSchema) (string, error) {
@@ -89,32 +97,7 @@ func validateStructuredWorkerOutput(record map[string]any, schema *workerOutputS
 		return fmt.Errorf("worker output schema must declare type object")
 	}
 
-	for _, key := range schema.Required {
-		if _, ok := record[key]; !ok {
-			return fmt.Errorf("missing required field %q", key)
-		}
-	}
-
-	allowAdditional := true
-	if schema.AdditionalProperties != nil {
-		allowAdditional = *schema.AdditionalProperties
-	}
-
-	for key, value := range record {
-		propertySchema, ok := schema.Properties[key]
-		if !ok {
-			if !allowAdditional {
-				return fmt.Errorf("unexpected field %q", key)
-			}
-			continue
-		}
-
-		if err := validateStructuredWorkerOutputValue(key, value, propertySchema); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return validateStructuredWorkerOutputObject("", record, schema.Properties, schema.Required, schema.AdditionalProperties)
 }
 
 func validateStructuredWorkerOutputValue(field string, value any, property workerOutputProperty) error {
@@ -134,6 +117,45 @@ func validateStructuredWorkerOutputValue(field string, value any, property worke
 		return fmt.Errorf("field %q has invalid type %T", field, value)
 	}
 
+	if object, ok := value.(map[string]any); ok && property.Properties != nil {
+		if err := validateStructuredWorkerOutputObject(
+			field,
+			object,
+			property.Properties,
+			property.Required,
+			property.AdditionalProperties,
+		); err != nil {
+			return err
+		}
+	}
+
+	if values, ok := value.([]any); ok && property.Items != nil {
+		for index, item := range values {
+			if err := validateStructuredWorkerOutputValue(fmt.Sprintf("%s[%d]", field, index), item, *property.Items); err != nil {
+				return err
+			}
+		}
+	}
+
+	if number, ok := value.(float64); ok {
+		if property.Minimum != nil && number < *property.Minimum {
+			return fmt.Errorf("field %q must be at least %v", field, *property.Minimum)
+		}
+		if property.Maximum != nil && number > *property.Maximum {
+			return fmt.Errorf("field %q must be at most %v", field, *property.Maximum)
+		}
+	}
+
+	if text, ok := value.(string); ok && property.Pattern != "" {
+		matched, err := regexp.MatchString(property.Pattern, text)
+		if err != nil {
+			return fmt.Errorf("field %q has invalid pattern %q: %w", field, property.Pattern, err)
+		}
+		if !matched {
+			return fmt.Errorf("field %q must match %q", field, property.Pattern)
+		}
+	}
+
 	if len(property.Enum) == 0 {
 		return nil
 	}
@@ -149,6 +171,43 @@ func validateStructuredWorkerOutputValue(field string, value any, property worke
 	}
 
 	return fmt.Errorf("field %q must be one of %v", field, property.Enum)
+}
+
+func validateStructuredWorkerOutputObject(
+	field string,
+	record map[string]any,
+	properties map[string]workerOutputProperty,
+	required []string,
+	additionalProperties *bool,
+) error {
+	for _, key := range required {
+		if _, ok := record[key]; !ok {
+			return fmt.Errorf("missing required field %q", joinWorkerOutputField(field, key))
+		}
+	}
+
+	allowAdditional := additionalProperties == nil || *additionalProperties
+	for key, value := range record {
+		property, ok := properties[key]
+		if !ok {
+			if !allowAdditional {
+				return fmt.Errorf("unexpected field %q", joinWorkerOutputField(field, key))
+			}
+			continue
+		}
+		if err := validateStructuredWorkerOutputValue(joinWorkerOutputField(field, key), value, property); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func joinWorkerOutputField(parent string, child string) string {
+	if parent == "" {
+		return child
+	}
+	return parent + "." + child
 }
 
 func workerOutputTypes(raw any) (map[string]bool, error) {
