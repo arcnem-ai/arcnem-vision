@@ -19,7 +19,7 @@ export const DEFAULT_WORKFLOW_API_KEY_PERMISSIONS: APIKeyPermissions = {
 
 export const DEFAULT_SERVICE_API_KEY_PERMISSIONS: APIKeyPermissions = {
 	uploads: ["presign", "ack"],
-	documents: ["list", "read", "visibility"],
+	documents: ["list", "read", "search", "visibility"],
 	workflows: ["execute", "read"],
 };
 

@@ -121,33 +121,101 @@ async function main() {
 		throw new Error(`Upload PUT failed with status ${putResponse.status}`);
 	}
 
-	const ack = await requestJSON<{ documentId: string }>(
+	const ackInput = {
+		objectKey: upload.objectKey,
+		idempotencyKey: `live-ack-${crypto.randomUUID()}`,
+	};
+	const ack = await requestJSON<{
+		documentId: string;
+		presignedUploadId: string;
+	}>(config, "/service/uploads/ack", {
+		method: "POST",
+		body: JSON.stringify(ackInput),
+	});
+	const retriedAck = await requestJSON<typeof ack>(
 		config,
 		"/service/uploads/ack",
 		{
 			method: "POST",
-			body: JSON.stringify({ objectKey: upload.objectKey }),
+			body: JSON.stringify(ackInput),
 		},
 	);
+	if (
+		retriedAck.documentId !== ack.documentId ||
+		retriedAck.presignedUploadId !== ack.presignedUploadId
+	) {
+		throw new Error("Upload acknowledgement retry returned a new result");
+	}
+	const ackConflict = await fetch(`${config.apiBaseUrl}/service/uploads/ack`, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			"x-api-key": config.apiKey,
+		},
+		body: JSON.stringify({
+			...ackInput,
+			objectKey: `${upload.objectKey}-conflict`,
+		}),
+	});
+	if (ackConflict.status !== 409) {
+		throw new Error(
+			`Conflicting upload acknowledgement returned ${ackConflict.status}, expected 409`,
+		);
+	}
 	console.log(`Acknowledged document ${ack.documentId}`);
 
+	const executionInput = {
+		workflowId: config.workflowId,
+		documentIds: [ack.documentId],
+		idempotencyKey: `live-execution-${crypto.randomUUID()}`,
+		initialState: {
+			analysis_label: "live-service-api-test",
+			source: "local-smoke",
+			requested_at: new Date().toISOString(),
+			tags: ["smoke", "service-api"],
+		},
+	};
 	const execution = await requestJSON<{ executionId: string }>(
 		config,
 		"/service/workflow-executions",
 		{
 			method: "POST",
+			body: JSON.stringify(executionInput),
+		},
+	);
+	const retriedExecution = await requestJSON<{ executionId: string }>(
+		config,
+		"/service/workflow-executions",
+		{
+			method: "POST",
+			body: JSON.stringify(executionInput),
+		},
+	);
+	if (retriedExecution.executionId !== execution.executionId) {
+		throw new Error("Workflow execution retry returned a new execution");
+	}
+	const executionConflict = await fetch(
+		`${config.apiBaseUrl}/service/workflow-executions`,
+		{
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"x-api-key": config.apiKey,
+			},
 			body: JSON.stringify({
-				workflowId: config.workflowId,
-				documentIds: [ack.documentId],
+				...executionInput,
 				initialState: {
-					analysis_label: "live-service-api-test",
-					source: "local-smoke",
-					requested_at: new Date().toISOString(),
-					tags: ["smoke", "service-api"],
+					...executionInput.initialState,
+					analysis_label: "conflicting-live-service-api-test",
 				},
 			}),
 		},
 	);
+	if (executionConflict.status !== 409) {
+		throw new Error(
+			`Conflicting workflow execution returned ${executionConflict.status}, expected 409`,
+		);
+	}
 	console.log(`Queued execution ${execution.executionId}`);
 
 	await waitForExecution(config, execution.executionId);

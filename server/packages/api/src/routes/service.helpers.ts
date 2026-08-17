@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
 	type ServiceDocumentListQuery,
 	type ServiceDocumentScope,
@@ -8,6 +9,28 @@ type ScopedDocumentSelection = {
 	documentIds?: string[];
 	scope?: ServiceDocumentScope;
 };
+
+function canonicalizeJSON(value: unknown): unknown {
+	if (Array.isArray(value)) {
+		return value.map(canonicalizeJSON);
+	}
+
+	if (value && typeof value === "object") {
+		return Object.fromEntries(
+			Object.entries(value)
+				.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+				.map(([key, child]) => [key, canonicalizeJSON(child)]),
+		);
+	}
+
+	return value;
+}
+
+export function createServiceIdempotencyRequestHash(input: unknown) {
+	return createHash("sha256")
+		.update(JSON.stringify(canonicalizeJSON(input)))
+		.digest("hex");
+}
 
 export function parseCSVList(value: string | undefined) {
 	if (!value) {
@@ -95,6 +118,17 @@ export function buildExecutionScope(
 	return {
 		...(scope ?? {}),
 		documentIds,
+	};
+}
+
+export function buildServiceDocumentSearchScope(
+	apiKey: { organizationId: string; projectId: string },
+	documentIds: string[],
+) {
+	return {
+		organization_id: apiKey.organizationId,
+		project_ids: [apiKey.projectId],
+		document_ids: documentIds,
 	};
 }
 

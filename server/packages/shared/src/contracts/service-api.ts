@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { workflowSchemaObjectSchema } from "./dashboard-shapes";
+import { searchDocumentsInScopeOutputSchema } from "./document-chat";
 import { jsonValueSchema } from "./json";
 
 export const serviceDocumentScopeSchema = z
@@ -74,8 +75,17 @@ export type ServiceUploadPresignResponse = z.infer<
 	typeof serviceUploadPresignResponseSchema
 >;
 
+export const SERVICE_IDEMPOTENCY_KEY_MAX_LENGTH = 200;
+
+const serviceIdempotencyKeySchema = z
+	.string()
+	.trim()
+	.min(1)
+	.max(SERVICE_IDEMPOTENCY_KEY_MAX_LENGTH);
+
 export const serviceUploadAcknowledgeRequestSchema = z.object({
 	objectKey: z.string().min(1),
+	idempotencyKey: serviceIdempotencyKeySchema.optional(),
 });
 
 export type ServiceUploadAcknowledgeRequest = z.infer<
@@ -98,6 +108,7 @@ export const serviceWorkflowExecutionRequestSchema = z
 		documentIds: z.array(z.string().min(1)).optional(),
 		scope: serviceDocumentScopeSchema.optional(),
 		initialState: z.record(z.string(), jsonValueSchema).optional(),
+		idempotencyKey: serviceIdempotencyKeySchema.optional(),
 	})
 	.refine(
 		(value) =>
@@ -145,6 +156,23 @@ export const serviceDocumentVisibilityUpdateSchema = z.object({
 
 export type ServiceDocumentVisibilityUpdate = z.infer<
 	typeof serviceDocumentVisibilityUpdateSchema
+>;
+
+export const serviceDocumentSearchRequestSchema = z.object({
+	query: z.string().trim().min(1),
+	documentIds: z.array(z.string().min(1)).min(1).max(500),
+	limit: z.number().int().positive().max(8).optional(),
+});
+
+export type ServiceDocumentSearchRequest = z.infer<
+	typeof serviceDocumentSearchRequestSchema
+>;
+
+export const serviceDocumentSearchResponseSchema =
+	searchDocumentsInScopeOutputSchema;
+
+export type ServiceDocumentSearchResponse = z.infer<
+	typeof serviceDocumentSearchResponseSchema
 >;
 
 export const serviceDocumentItemSchema = z.object({

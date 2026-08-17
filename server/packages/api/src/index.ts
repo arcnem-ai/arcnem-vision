@@ -44,7 +44,14 @@ app.use(requestId());
 
 app.use(
 	pinoLogger({
-		pino: { level: "debug" },
+		pino: {
+			level: "debug",
+			redact: [
+				'req.headers["x-api-key"]',
+				"req.headers.authorization",
+				"req.headers.cookie",
+			],
+		},
 	}),
 );
 
@@ -124,7 +131,7 @@ app.get(
 				{
 					name: "Service",
 					description:
-						"Upload images, acknowledge documents, run workflows, and manage visibility with service API keys.",
+						"Upload images, acknowledge documents, run workflows, search documents, and manage visibility with service API keys.",
 				},
 			],
 			security: [{ ApiKeyAuth: [] }],

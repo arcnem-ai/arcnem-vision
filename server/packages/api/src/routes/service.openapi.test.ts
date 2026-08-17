@@ -31,6 +31,12 @@ describe("service openapi", () => {
 			spec.paths["/service/workflow-executions"]?.post?.responses,
 		).toHaveProperty("202");
 		expect(
+			spec.paths["/service/workflow-executions"]?.post?.responses,
+		).toHaveProperty("409");
+		expect(spec.paths["/service/uploads/ack"]?.post?.responses).toHaveProperty(
+			"409",
+		);
+		expect(
 			spec.paths["/service/workflow-executions"]?.post?.requestBody,
 		).toMatchObject({
 			required: true,
@@ -45,5 +51,21 @@ describe("service openapi", () => {
 				expect.objectContaining({ name: "apiKeyBound", in: "query" }),
 			]),
 		);
+		expect(
+			spec.paths["/service/documents/search"]?.post?.requestBody,
+		).toMatchObject({
+			required: true,
+			content: {
+				"application/json": {
+					schema: expect.any(Object),
+				},
+			},
+		});
+		expect(
+			spec.paths["/service/documents/search"]?.post?.responses,
+		).toHaveProperty("200");
+		expect(
+			spec.paths["/service/documents/search"]?.post?.responses,
+		).toHaveProperty("502");
 	});
 });

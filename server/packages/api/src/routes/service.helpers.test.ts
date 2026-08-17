@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 import {
 	buildExecutionScope,
 	buildSeededInitialState,
+	buildServiceDocumentSearchScope,
 	buildWorkflowExecutionEventData,
+	createServiceIdempotencyRequestHash,
 	mergeRequestedDocumentIds,
 	parseBoolean,
 	parseCSVList,
@@ -10,6 +12,25 @@ import {
 } from "./service.helpers";
 
 describe("service route helpers", () => {
+	test("hashes equivalent JSON objects identically", () => {
+		expect(
+			createServiceIdempotencyRequestHash({
+				initialState: { label: "tea", nested: { b: 2, a: 1 } },
+				documentIds: ["document-1", "document-2"],
+			}),
+		).toBe(
+			createServiceIdempotencyRequestHash({
+				documentIds: ["document-1", "document-2"],
+				initialState: { nested: { a: 1, b: 2 }, label: "tea" },
+			}),
+		);
+		expect(
+			createServiceIdempotencyRequestHash({ documentIds: ["other"] }),
+		).not.toBe(
+			createServiceIdempotencyRequestHash({ documentIds: ["document-1"] }),
+		);
+	});
+
 	test("parseCSVList trims items and drops empty entries", () => {
 		expect(parseCSVList(" doc-1, ,doc-2 ,, doc-3 ")).toEqual([
 			"doc-1",
@@ -98,6 +119,19 @@ describe("service route helpers", () => {
 			apiKeyIds: ["key-1"],
 			apiKeyBound: true,
 			documentIds: ["doc-1", "doc-2"],
+		});
+	});
+
+	test("buildServiceDocumentSearchScope derives scope from the service key", () => {
+		expect(
+			buildServiceDocumentSearchScope(
+				{ organizationId: "org-1", projectId: "project-1" },
+				["doc-2", "doc-1"],
+			),
+		).toEqual({
+			organization_id: "org-1",
+			project_ids: ["project-1"],
+			document_ids: ["doc-2", "doc-1"],
 		});
 	});
 

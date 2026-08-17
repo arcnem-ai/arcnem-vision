@@ -277,7 +277,11 @@ The service API is the project-scoped orchestration surface for service integrat
 - `POST /api/service/workflow-executions` queues a workflow against explicit document ids or a scoped selection.
 - `GET /api/service/workflow-executions/:id` reads execution state.
 - `GET /api/service/documents` and `POST /api/service/documents/visibility` cover document inspection and publishing.
+- `POST /api/service/documents/search` searches an explicit document allowlist within the service key's project.
 - `GET /api/openapi.json` serves the generated OpenAPI spec for this surface.
+
+Upload acknowledgement and workflow execution accept an optional `idempotencyKey`. Repeating the same request with
+the same service key returns the original document or execution. Reusing that key with different input returns `409`.
 
 ## Contributing
 
