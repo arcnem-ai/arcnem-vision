@@ -75,8 +75,17 @@ export type ServiceUploadPresignResponse = z.infer<
 	typeof serviceUploadPresignResponseSchema
 >;
 
+export const SERVICE_IDEMPOTENCY_KEY_MAX_LENGTH = 200;
+
+const serviceIdempotencyKeySchema = z
+	.string()
+	.trim()
+	.min(1)
+	.max(SERVICE_IDEMPOTENCY_KEY_MAX_LENGTH);
+
 export const serviceUploadAcknowledgeRequestSchema = z.object({
 	objectKey: z.string().min(1),
+	idempotencyKey: serviceIdempotencyKeySchema.optional(),
 });
 
 export type ServiceUploadAcknowledgeRequest = z.infer<
@@ -99,6 +108,7 @@ export const serviceWorkflowExecutionRequestSchema = z
 		documentIds: z.array(z.string().min(1)).optional(),
 		scope: serviceDocumentScopeSchema.optional(),
 		initialState: z.record(z.string(), jsonValueSchema).optional(),
+		idempotencyKey: serviceIdempotencyKeySchema.optional(),
 	})
 	.refine(
 		(value) =>

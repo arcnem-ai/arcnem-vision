@@ -91,6 +91,7 @@ export const presignedUploads = pgTable(
 			.notNull()
 			.references(() => projects.id, { onDelete: "cascade" }),
 		apiKeyId: uuid("api_key_id").references(() => apikeys.id),
+		idempotencyKey: text("idempotency_key"),
 		visibility: text("visibility").notNull().default("org"),
 		status: text().notNull().default("issued"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -110,6 +111,13 @@ export const presignedUploads = pgTable(
 		index("presigned_uploads_api_key_status_idx").on(
 			table.apiKeyId,
 			table.status,
+		),
+		uniqueIndex("presigned_uploads_api_key_idempotency_key_uidx")
+			.on(table.apiKeyId, table.idempotencyKey)
+			.where(sql`${table.idempotencyKey} is not null`),
+		check(
+			"presigned_uploads_idempotency_key_scoped",
+			sql`${table.idempotencyKey} is null or ${table.apiKeyId} is not null`,
 		),
 		check(
 			"presigned_uploads_status_known",

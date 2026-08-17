@@ -89,12 +89,32 @@ describe("service API schemas", () => {
 		const parsed = serviceUploadAcknowledgeRequestSchema.safeParse({
 			objectKey: "uploads/demo.png",
 			visibility: "public",
+			idempotencyKey: " capture-42 ",
 		});
 
 		expect(parsed.success).toBe(true);
 		if (parsed.success) {
-			expect(parsed.data).toEqual({ objectKey: "uploads/demo.png" });
+			expect(parsed.data).toEqual({
+				objectKey: "uploads/demo.png",
+				idempotencyKey: "capture-42",
+			});
 		}
+	});
+
+	test("validates service idempotency keys", () => {
+		expect(
+			serviceUploadAcknowledgeRequestSchema.safeParse({
+				objectKey: "uploads/demo.png",
+				idempotencyKey: "   ",
+			}).success,
+		).toBe(false);
+		expect(
+			serviceWorkflowExecutionRequestSchema.safeParse({
+				workflowId: "workflow-1",
+				documentIds: ["document-1"],
+				idempotencyKey: "x".repeat(201),
+			}).success,
+		).toBe(false);
 	});
 
 	test("accepts minimal upload acknowledgements", () => {

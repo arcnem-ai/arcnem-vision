@@ -22,6 +22,7 @@ type PresignedUpload struct {
 	ProjectID      string    `gorm:"column:project_id;type:uuid;not null" json:"project_id"`
 	Visibility     string    `gorm:"column:visibility;type:text;not null;default:org" json:"visibility"`
 	APIKeyID       *string   `gorm:"column:api_key_id;type:uuid" json:"api_key_id"`
+	IdempotencyKey *string   `gorm:"column:idempotency_key;type:text" json:"idempotency_key"`
 }
 
 // TableName PresignedUpload's table name

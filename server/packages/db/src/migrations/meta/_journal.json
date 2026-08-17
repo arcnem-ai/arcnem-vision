@@ -64,6 +64,13 @@
       "when": 1776765755176,
       "tag": "0008_worthless_ares",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786827472552,
+      "tag": "0009_overconfident_puppet_master",
+      "breakpoints": true
     }
   ]
 }

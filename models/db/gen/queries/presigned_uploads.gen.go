@@ -37,6 +37,7 @@ func newPresignedUpload(db *gorm.DB, opts ...gen.DOOption) presignedUpload {
 	_presignedUpload.ProjectID = field.NewString(tableName, "project_id")
 	_presignedUpload.Visibility = field.NewString(tableName, "visibility")
 	_presignedUpload.APIKeyID = field.NewString(tableName, "api_key_id")
+	_presignedUpload.IdempotencyKey = field.NewString(tableName, "idempotency_key")
 
 	_presignedUpload.fillFieldMap()
 
@@ -57,6 +58,7 @@ type presignedUpload struct {
 	ProjectID      field.String
 	Visibility     field.String
 	APIKeyID       field.String
+	IdempotencyKey field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -83,6 +85,7 @@ func (p *presignedUpload) updateTableName(table string) *presignedUpload {
 	p.ProjectID = field.NewString(table, "project_id")
 	p.Visibility = field.NewString(table, "visibility")
 	p.APIKeyID = field.NewString(table, "api_key_id")
+	p.IdempotencyKey = field.NewString(table, "idempotency_key")
 
 	p.fillFieldMap()
 
@@ -111,7 +114,7 @@ func (p *presignedUpload) GetFieldByName(fieldName string) (field.OrderExpr, boo
 }
 
 func (p *presignedUpload) fillFieldMap() {
-	p.fieldMap = make(map[string]field.Expr, 10)
+	p.fieldMap = make(map[string]field.Expr, 11)
 	p.fieldMap["id"] = p.ID
 	p.fieldMap["bucket"] = p.Bucket
 	p.fieldMap["object_key"] = p.ObjectKey
@@ -122,6 +125,7 @@ func (p *presignedUpload) fillFieldMap() {
 	p.fieldMap["project_id"] = p.ProjectID
 	p.fieldMap["visibility"] = p.Visibility
 	p.fieldMap["api_key_id"] = p.APIKeyID
+	p.fieldMap["idempotency_key"] = p.IdempotencyKey
 }
 
 func (p presignedUpload) clone(db *gorm.DB) presignedUpload {

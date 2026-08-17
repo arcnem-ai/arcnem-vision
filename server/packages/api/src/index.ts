@@ -44,7 +44,14 @@ app.use(requestId());
 
 app.use(
 	pinoLogger({
-		pino: { level: "debug" },
+		pino: {
+			level: "debug",
+			redact: [
+				'req.headers["x-api-key"]',
+				"req.headers.authorization",
+				"req.headers.cookie",
+			],
+		},
 	}),
 );
 

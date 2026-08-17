@@ -1,5 +1,9 @@
 import { schema } from "@arcnem-vision/db";
+import type { PGDB } from "@arcnem-vision/db/server";
 import {
+	type ServiceUploadAcknowledgeResponse,
+	type ServiceWorkflowExecutionAccepted,
+	type ServiceWorkflowExecutionRequest,
 	serviceDocumentItemSchema,
 	serviceDocumentSearchRequestSchema,
 	serviceDocumentSearchResponseSchema,
@@ -29,6 +33,7 @@ import {
 } from "drizzle-orm";
 import { Hono, type Context as HonoContext } from "hono";
 import { describeRoute, resolver, validator } from "hono-openapi";
+import type { Inngest } from "inngest";
 import { getApiMcpClient } from "@/clients/apiMcpClient";
 import { toAPIDocumentItem } from "@/lib/document-api";
 import {
@@ -51,6 +56,7 @@ import {
 	buildSeededInitialState,
 	buildServiceDocumentSearchScope,
 	buildWorkflowExecutionEventData,
+	createServiceIdempotencyRequestHash,
 	mergeRequestedDocumentIds,
 	parseServiceDocumentListQuery,
 } from "./service.helpers";
@@ -68,12 +74,147 @@ const {
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_SCOPED_DOCUMENTS = 500;
+const WORKFLOW_ENQUEUE_ERROR = "Failed to enqueue workflow execution";
 const jsonErrorSchema = resolver(serviceErrorResponseSchema);
 const jsonSelectionErrorSchema = resolver(serviceDocumentSelectionErrorSchema);
 
 export const serviceRouter = new Hono<HonoServerContext>({
 	strict: false,
 });
+
+type ServiceKeyScope = {
+	id: string;
+	organizationId: string;
+	projectId: string;
+};
+
+async function findServiceUpload(
+	dbClient: PGDB,
+	apiKey: ServiceKeyScope,
+	filter: { objectKey: string } | { idempotencyKey: string },
+) {
+	const [upload] = await dbClient
+		.select()
+		.from(presignedUploads)
+		.where(
+			and(
+				eq(presignedUploads.organizationId, apiKey.organizationId),
+				eq(presignedUploads.projectId, apiKey.projectId),
+				eq(presignedUploads.apiKeyId, apiKey.id),
+				"objectKey" in filter
+					? eq(presignedUploads.objectKey, filter.objectKey)
+					: eq(presignedUploads.idempotencyKey, filter.idempotencyKey),
+			),
+		)
+		.limit(1);
+
+	return upload;
+}
+
+async function findIdempotentWorkflowRun(
+	dbClient: PGDB,
+	apiKey: ServiceKeyScope,
+	idempotencyKey: string,
+) {
+	const [run] = await dbClient
+		.select({
+			requestHash: agentGraphRuns.idempotencyRequestHash,
+			response: agentGraphRuns.idempotencyResponse,
+			status: agentGraphRuns.status,
+		})
+		.from(agentGraphRuns)
+		.where(
+			and(
+				eq(agentGraphRuns.apiKeyId, apiKey.id),
+				eq(agentGraphRuns.projectId, apiKey.projectId),
+				eq(agentGraphRuns.idempotencyKey, idempotencyKey),
+			),
+		)
+		.limit(1);
+
+	return run;
+}
+
+async function findAcknowledgedServiceUpload(
+	dbClient: PGDB,
+	upload: {
+		id: string;
+		bucket: string;
+		objectKey: string;
+		organizationId: string;
+		projectId: string;
+		apiKeyId: string | null;
+	},
+): Promise<ServiceUploadAcknowledgeResponse | undefined> {
+	if (!upload.apiKeyId) {
+		return undefined;
+	}
+
+	const [document] = await dbClient
+		.select({ id: documents.id })
+		.from(documents)
+		.where(
+			and(
+				eq(documents.bucket, upload.bucket),
+				eq(documents.objectKey, upload.objectKey),
+				eq(documents.organizationId, upload.organizationId),
+				eq(documents.projectId, upload.projectId),
+				eq(documents.apiKeyId, upload.apiKeyId),
+			),
+		)
+		.limit(1);
+
+	return document
+		? {
+				status: "verified",
+				documentId: document.id,
+				presignedUploadId: upload.id,
+			}
+		: undefined;
+}
+
+async function dispatchServiceWorkflowExecution(input: {
+	inngestClient: Inngest;
+	projectId: string;
+	request: ServiceWorkflowExecutionRequest;
+	response: ServiceWorkflowExecutionAccepted;
+	run: { status: string };
+}) {
+	const { inngestClient, projectId, request, response, run } = input;
+
+	if (run.status !== "running") {
+		return true;
+	}
+
+	const executionScope = buildExecutionScope(
+		request.scope,
+		response.documentIds,
+	);
+	const seededState = buildSeededInitialState(
+		request.initialState,
+		projectId,
+		executionScope,
+	);
+
+	try {
+		await inngestClient.send({
+			// A stable event ID keeps concurrent retries from starting another run.
+			id: response.executionId,
+			name: "workflow/execute",
+			data: buildWorkflowExecutionEventData(
+				response.executionId,
+				response.workflowId,
+				response.documentIds,
+				executionScope,
+				seededState,
+			),
+		});
+		return true;
+	} catch {
+		// Delivery can be ambiguous. Keep the run resumable; retries reuse the stable event ID.
+		return false;
+	}
+}
 
 async function getServiceUploadTarget(c: HonoContext<HonoServerContext>) {
 	const apiKey = c.get("apiKey");
@@ -303,6 +444,10 @@ serviceRouter.post(
 				description: "Forbidden",
 				content: { "application/json": { schema: jsonErrorSchema } },
 			},
+			409: {
+				description: "Idempotency key conflict",
+				content: { "application/json": { schema: jsonErrorSchema } },
+			},
 			404: {
 				description: "Upload not found",
 				content: { "application/json": { schema: jsonErrorSchema } },
@@ -328,28 +473,18 @@ serviceRouter.post(
 			const s3Client = c.get("s3Client");
 			const body = c.req.valid("json");
 			const { objectKey } = parseAckRequestBody(body);
-			const [uploadForKey] = await dbClient
-				.select({
-					id: presignedUploads.id,
-					bucket: presignedUploads.bucket,
-					objectKey: presignedUploads.objectKey,
-					organizationId: presignedUploads.organizationId,
-					projectId: presignedUploads.projectId,
-					apiKeyId: presignedUploads.apiKeyId,
-					visibility: presignedUploads.visibility,
-				})
-				.from(presignedUploads)
-				.where(
-					and(
-						eq(presignedUploads.organizationId, apiKey.organizationId),
-						eq(presignedUploads.projectId, apiKey.projectId),
-						eq(presignedUploads.apiKeyId, apiKey.id),
-						eq(presignedUploads.objectKey, objectKey),
-						eq(presignedUploads.status, "issued"),
-					),
-				)
-				.limit(1);
+			const { idempotencyKey } = body;
+			let uploadForKey = idempotencyKey
+				? await findServiceUpload(dbClient, apiKey, { idempotencyKey })
+				: undefined;
+			if (uploadForKey && uploadForKey.objectKey !== objectKey) {
+				return c.json(
+					{ message: "Idempotency key was already used with different input" },
+					409,
+				);
+			}
 
+			uploadForKey ??= await findServiceUpload(dbClient, apiKey, { objectKey });
 			if (!uploadForKey) {
 				return c.json(
 					{ message: "Upload objectKey is not valid for this API key" },
@@ -357,23 +492,86 @@ serviceRouter.post(
 				);
 			}
 
+			if (idempotencyKey && uploadForKey.idempotencyKey !== idempotencyKey) {
+				if (uploadForKey.idempotencyKey) {
+					return c.json(
+						{
+							message: "Upload was already claimed by another idempotency key",
+						},
+						409,
+					);
+				}
+
+				try {
+					await dbClient
+						.update(presignedUploads)
+						.set({ idempotencyKey })
+						.where(
+							and(
+								eq(presignedUploads.id, uploadForKey.id),
+								eq(presignedUploads.apiKeyId, apiKey.id),
+								isNull(presignedUploads.idempotencyKey),
+							),
+						);
+				} catch (error) {
+					if (
+						!(await findServiceUpload(dbClient, apiKey, { idempotencyKey }))
+					) {
+						throw error;
+					}
+				}
+
+				const claimedUpload = await findServiceUpload(dbClient, apiKey, {
+					idempotencyKey,
+				});
+				if (!claimedUpload || claimedUpload.objectKey !== objectKey) {
+					return c.json(
+						{
+							message: "Idempotency key was already used with different input",
+						},
+						409,
+					);
+				}
+				uploadForKey = claimedUpload;
+			}
+
 			if (!isDocumentVisibility(uploadForKey.visibility)) {
 				return c.json({ message: "Upload has invalid visibility" }, 500);
 			}
 
-			return c.json(
-				await acknowledgePresignedUpload({
-					dbClient,
-					s3Client,
-					upload: {
-						...uploadForKey,
-						visibility: uploadForKey.visibility,
-					},
-					queueProcessing: {
-						enabled: false,
-					},
-				}),
+			let acknowledgedUpload = await findAcknowledgedServiceUpload(
+				dbClient,
+				uploadForKey,
 			);
+			if (!acknowledgedUpload && uploadForKey.status === "issued") {
+				try {
+					acknowledgedUpload = await acknowledgePresignedUpload({
+						dbClient,
+						s3Client,
+						upload: {
+							...uploadForKey,
+							visibility: uploadForKey.visibility,
+						},
+						queueProcessing: {
+							enabled: false,
+						},
+					});
+				} catch (error) {
+					acknowledgedUpload = await findAcknowledgedServiceUpload(
+						dbClient,
+						uploadForKey,
+					);
+					if (!acknowledgedUpload) {
+						throw error;
+					}
+				}
+			}
+
+			if (!acknowledgedUpload) {
+				throw new Error("Verified upload is missing its document");
+			}
+
+			return c.json(acknowledgedUpload);
 		} catch (error) {
 			return toDocumentUploadErrorResponse(
 				c,
@@ -414,6 +612,10 @@ serviceRouter.post(
 				description: "Forbidden",
 				content: { "application/json": { schema: jsonErrorSchema } },
 			},
+			409: {
+				description: "Idempotency key conflict",
+				content: { "application/json": { schema: jsonErrorSchema } },
+			},
 			404: {
 				description: "Workflow or document not found",
 				content: { "application/json": { schema: jsonErrorSchema } },
@@ -439,9 +641,53 @@ serviceRouter.post(
 		}
 
 		const body = c.req.valid("json");
-
 		const dbClient = c.get("dbClient");
 		const inngestClient = c.get("inngestClient");
+		const { idempotencyKey, ...requestInput } = body;
+		const requestHash = createServiceIdempotencyRequestHash(requestInput);
+
+		const replayExecution = async (run: {
+			requestHash: string | null;
+			response: unknown;
+			status: string;
+		}) => {
+			if (run.requestHash !== requestHash) {
+				return c.json(
+					{ message: "Idempotency key was already used with different input" },
+					409,
+				);
+			}
+
+			const replay = serviceWorkflowExecutionAcceptedSchema.safeParse(
+				run.response,
+			);
+			if (!replay.success) {
+				throw new Error("Stored workflow execution response is invalid");
+			}
+
+			const enqueued = await dispatchServiceWorkflowExecution({
+				inngestClient,
+				projectId: apiKey.projectId,
+				request: body,
+				response: replay.data,
+				run,
+			});
+			return enqueued
+				? c.json(replay.data, 202)
+				: c.json({ message: WORKFLOW_ENQUEUE_ERROR }, 502);
+		};
+
+		if (idempotencyKey) {
+			const existingRun = await findIdempotentWorkflowRun(
+				dbClient,
+				apiKey,
+				idempotencyKey,
+			);
+			if (existingRun) {
+				return replayExecution(existingRun);
+			}
+		}
+
 		const workflow = await findActiveWorkflowById(
 			dbClient,
 			apiKey.organizationId,
@@ -476,52 +722,58 @@ serviceRouter.post(
 			apiKey.projectId,
 			executionScope,
 		);
+		const response = {
+			executionId,
+			workflowId: workflow.id,
+			status: "running" as const,
+			documentIds: scopedDocumentResolution.documentIds,
+			documentCount: scopedDocumentResolution.documentIds.length,
+		};
 
-		await dbClient.insert(agentGraphRuns).values({
-			id: executionId,
-			agentGraphId: workflow.id,
-			projectId: apiKey.projectId,
-			status: "running",
-			initialState: seededState,
-		});
+		const [created] = await dbClient
+			.insert(agentGraphRuns)
+			.values({
+				id: executionId,
+				agentGraphId: workflow.id,
+				projectId: apiKey.projectId,
+				status: "running",
+				initialState: seededState,
+				apiKeyId: idempotencyKey ? apiKey.id : null,
+				idempotencyKey: idempotencyKey ?? null,
+				idempotencyRequestHash: idempotencyKey ? requestHash : null,
+				idempotencyResponse: idempotencyKey ? response : null,
+			})
+			.onConflictDoNothing({
+				target: [agentGraphRuns.apiKeyId, agentGraphRuns.idempotencyKey],
+				where: isNotNull(agentGraphRuns.idempotencyKey),
+			})
+			.returning({ id: agentGraphRuns.id });
 
-		try {
-			await inngestClient.send({
-				name: "workflow/execute",
-				data: buildWorkflowExecutionEventData(
-					executionId,
-					workflow.id,
-					scopedDocumentResolution.documentIds,
-					executionScope,
-					seededState,
-				),
-			});
-		} catch (error) {
-			await dbClient
-				.update(agentGraphRuns)
-				.set({
-					status: "failed",
-					error:
-						error instanceof Error
-							? error.message
-							: "Failed to enqueue execution",
-					finishedAt: new Date(),
-				})
-				.where(eq(agentGraphRuns.id, executionId));
-
-			return c.json({ message: "Failed to enqueue workflow execution" }, 502);
+		if (!created) {
+			if (!idempotencyKey) {
+				throw new Error("Failed to create workflow execution");
+			}
+			const racedRun = await findIdempotentWorkflowRun(
+				dbClient,
+				apiKey,
+				idempotencyKey,
+			);
+			if (!racedRun) {
+				throw new Error("Workflow idempotency conflict is missing its run");
+			}
+			return replayExecution(racedRun);
 		}
 
-		return c.json(
-			{
-				executionId,
-				workflowId: workflow.id,
-				status: "running",
-				documentIds: scopedDocumentResolution.documentIds,
-				documentCount: scopedDocumentResolution.documentIds.length,
-			},
-			202,
-		);
+		const enqueued = await dispatchServiceWorkflowExecution({
+			inngestClient,
+			projectId: apiKey.projectId,
+			request: body,
+			response,
+			run: { status: "running" },
+		});
+		return enqueued
+			? c.json(response, 202)
+			: c.json({ message: WORKFLOW_ENQUEUE_ERROR }, 502);
 	},
 );
 

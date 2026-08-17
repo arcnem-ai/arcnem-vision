@@ -12,7 +12,7 @@ import {
 	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
-import { organizations, projects } from "./authSchema";
+import { apikeys, organizations, projects } from "./authSchema";
 import { models } from "./projectSchema";
 
 export const tools = pgTable(
@@ -220,6 +220,10 @@ export const agentGraphRuns = pgTable(
 		projectId: uuid("project_id").references(() => projects.id, {
 			onDelete: "set null",
 		}),
+		apiKeyId: uuid("api_key_id").references(() => apikeys.id),
+		idempotencyKey: text("idempotency_key"),
+		idempotencyRequestHash: text("idempotency_request_hash"),
+		idempotencyResponse: jsonb("idempotency_response"),
 		status: text().notNull().default("running"),
 		initialState: jsonb("initial_state"),
 		finalState: jsonb("final_state"),
@@ -231,6 +235,23 @@ export const agentGraphRuns = pgTable(
 		index("agent_graph_runs_graph_id_idx").on(t.agentGraphId),
 		index("agent_graph_runs_project_id_idx").on(t.projectId),
 		index("agent_graph_runs_status_idx").on(t.status),
+		uniqueIndex("agent_graph_runs_api_key_idempotency_key_uidx")
+			.on(t.apiKeyId, t.idempotencyKey)
+			.where(sql`${t.idempotencyKey} is not null`),
+		check(
+			"agent_graph_runs_idempotency_fields_together",
+			sql`(
+				${t.idempotencyKey} is null and
+				${t.apiKeyId} is null and
+				${t.idempotencyRequestHash} is null and
+				${t.idempotencyResponse} is null
+			) or (
+				${t.idempotencyKey} is not null and
+				${t.apiKeyId} is not null and
+				${t.idempotencyRequestHash} is not null and
+				${t.idempotencyResponse} is not null
+			)`,
+		),
 		check(
 			"agent_graph_runs_status_known",
 			sql`${t.status} in ('running', 'completed', 'failed')`,

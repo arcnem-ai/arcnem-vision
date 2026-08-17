@@ -12,15 +12,19 @@ const TableNameAgentGraphRun = "agent_graph_runs"
 
 // AgentGraphRun mapped from table <agent_graph_runs>
 type AgentGraphRun struct {
-	ID           string     `gorm:"column:id;type:uuid;primaryKey;default:uuidv7()" json:"id"`
-	AgentGraphID string     `gorm:"column:agent_graph_id;type:uuid;not null" json:"agent_graph_id"`
-	Status       string     `gorm:"column:status;type:text;not null;default:running" json:"status"`
-	InitialState *string    `gorm:"column:initial_state;type:jsonb" json:"initial_state"`
-	FinalState   *string    `gorm:"column:final_state;type:jsonb" json:"final_state"`
-	Error        *string    `gorm:"column:error;type:text" json:"error"`
-	StartedAt    time.Time  `gorm:"column:started_at;type:timestamp without time zone;not null;default:now()" json:"started_at"`
-	FinishedAt   *time.Time `gorm:"column:finished_at;type:timestamp without time zone" json:"finished_at"`
-	ProjectID    *string    `gorm:"column:project_id;type:uuid" json:"project_id"`
+	ID                     string     `gorm:"column:id;type:uuid;primaryKey;default:uuidv7()" json:"id"`
+	AgentGraphID           string     `gorm:"column:agent_graph_id;type:uuid;not null" json:"agent_graph_id"`
+	Status                 string     `gorm:"column:status;type:text;not null;default:running" json:"status"`
+	InitialState           *string    `gorm:"column:initial_state;type:jsonb" json:"initial_state"`
+	FinalState             *string    `gorm:"column:final_state;type:jsonb" json:"final_state"`
+	Error                  *string    `gorm:"column:error;type:text" json:"error"`
+	StartedAt              time.Time  `gorm:"column:started_at;type:timestamp without time zone;not null;default:now()" json:"started_at"`
+	FinishedAt             *time.Time `gorm:"column:finished_at;type:timestamp without time zone" json:"finished_at"`
+	ProjectID              *string    `gorm:"column:project_id;type:uuid" json:"project_id"`
+	APIKeyID               *string    `gorm:"column:api_key_id;type:uuid" json:"api_key_id"`
+	IdempotencyKey         *string    `gorm:"column:idempotency_key;type:text" json:"idempotency_key"`
+	IdempotencyRequestHash *string    `gorm:"column:idempotency_request_hash;type:text" json:"idempotency_request_hash"`
+	IdempotencyResponse    *string    `gorm:"column:idempotency_response;type:jsonb" json:"idempotency_response"`
 }
 
 // TableName AgentGraphRun's table name

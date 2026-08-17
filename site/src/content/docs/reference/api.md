@@ -77,7 +77,8 @@ Body:
 
 ```json
 {
-  "objectKey": "uploads/.../service-api/.../image.png"
+  "objectKey": "uploads/.../service-api/.../image.png",
+  "idempotencyKey": "capture-42-ack"
 }
 ```
 
@@ -93,11 +94,15 @@ Body:
 {
   "workflowId": "<agentGraphId>",
   "documentIds": ["<documentId>"],
+  "idempotencyKey": "capture-42-extraction-1",
   "initialState": {
     "analysis_label": "orbit"
   }
 }
 ```
+
+`idempotencyKey` is optional for compatibility. When supplied, it is scoped to the authenticated service key and
+endpoint. An identical retry returns the original response. Reusing it with different input returns `409`.
 
 You can also select documents by scope:
 
