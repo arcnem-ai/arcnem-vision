@@ -124,7 +124,7 @@ app.get(
 				{
 					name: "Service",
 					description:
-						"Upload images, acknowledge documents, run workflows, and manage visibility with service API keys.",
+						"Upload images, acknowledge documents, run workflows, search documents, and manage visibility with service API keys.",
 				},
 			],
 			security: [{ ApiKeyAuth: [] }],

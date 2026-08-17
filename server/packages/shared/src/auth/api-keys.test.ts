@@ -19,6 +19,7 @@ describe("API key permissions", () => {
 			"execute",
 			"read",
 		]);
+		expect(DEFAULT_SERVICE_API_KEY_PERMISSIONS.documents).toContain("search");
 	});
 
 	test("falls back to defaults when the stored payload is missing or malformed", () => {

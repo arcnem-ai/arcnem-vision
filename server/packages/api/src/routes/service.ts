@@ -1,6 +1,8 @@
 import { schema } from "@arcnem-vision/db";
 import {
 	serviceDocumentItemSchema,
+	serviceDocumentSearchRequestSchema,
+	serviceDocumentSearchResponseSchema,
 	serviceDocumentSelectionErrorSchema,
 	serviceDocumentsResponseSchema,
 	serviceDocumentVisibilityUpdateSchema,
@@ -27,6 +29,7 @@ import {
 } from "drizzle-orm";
 import { Hono, type Context as HonoContext } from "hono";
 import { describeRoute, resolver, validator } from "hono-openapi";
+import { getApiMcpClient } from "@/clients/apiMcpClient";
 import { toAPIDocumentItem } from "@/lib/document-api";
 import {
 	acknowledgePresignedUpload,
@@ -46,6 +49,7 @@ import type { HonoServerContext } from "@/types/serverContext";
 import {
 	buildExecutionScope,
 	buildSeededInitialState,
+	buildServiceDocumentSearchScope,
 	buildWorkflowExecutionEventData,
 	mergeRequestedDocumentIds,
 	parseServiceDocumentListQuery,
@@ -823,6 +827,91 @@ serviceRouter.get(
 			documents: page.map((row) => toAPIDocumentItem(row, s3Client)),
 			nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
 		});
+	},
+);
+
+serviceRouter.post(
+	"/service/documents/search",
+	describeRoute({
+		tags: ["Service"],
+		summary: "Search documents",
+		description:
+			"Searches an explicit document allowlist within the calling service API key's organization and project.",
+		responses: {
+			200: {
+				description: "Document search results",
+				content: {
+					"application/json": {
+						schema: resolver(serviceDocumentSearchResponseSchema),
+					},
+				},
+			},
+			400: {
+				description: "Invalid request",
+				content: { "application/json": { schema: jsonErrorSchema } },
+			},
+			401: {
+				description: "Unauthorized",
+				content: { "application/json": { schema: jsonErrorSchema } },
+			},
+			403: {
+				description: "Forbidden",
+				content: { "application/json": { schema: jsonErrorSchema } },
+			},
+			404: {
+				description: "Document not found",
+				content: {
+					"application/json": { schema: jsonSelectionErrorSchema },
+				},
+			},
+			502: {
+				description: "Document search failed",
+				content: { "application/json": { schema: jsonErrorSchema } },
+			},
+		},
+	}),
+	requireAPIKey,
+	requireServiceAPIKey,
+	requireAPIKeyPermission("documents", "search"),
+	validator(
+		"json",
+		serviceDocumentSearchRequestSchema,
+		serviceJSONBodyValidation,
+	),
+	async (c) => {
+		const apiKey = c.get("apiKey");
+		if (!apiKey) {
+			return c.json({ message: "Unauthorized" }, 401);
+		}
+
+		const body = c.req.valid("json");
+		const scopedDocumentResolution = await resolveScopedDocumentIds(c, {
+			documentIds: body.documentIds,
+		});
+		if (!scopedDocumentResolution.ok) {
+			return c.json(
+				scopedDocumentResolution.body,
+				scopedDocumentResolution.status,
+			);
+		}
+
+		try {
+			const response = await getApiMcpClient().callTool<unknown>(
+				"search_documents_in_scope",
+				{
+					query: body.query,
+					limit: body.limit,
+					scope: buildServiceDocumentSearchScope(
+						apiKey,
+						scopedDocumentResolution.documentIds,
+					),
+				},
+			);
+			return c.json(serviceDocumentSearchResponseSchema.parse(response));
+		} catch (error) {
+			console.error("Service document search failed", error);
+			return c.json({ message: "Document search failed" }, 502);
+		}
 	},
 );
 

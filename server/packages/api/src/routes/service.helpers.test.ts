@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	buildExecutionScope,
 	buildSeededInitialState,
+	buildServiceDocumentSearchScope,
 	buildWorkflowExecutionEventData,
 	mergeRequestedDocumentIds,
 	parseBoolean,
@@ -98,6 +99,19 @@ describe("service route helpers", () => {
 			apiKeyIds: ["key-1"],
 			apiKeyBound: true,
 			documentIds: ["doc-1", "doc-2"],
+		});
+	});
+
+	test("buildServiceDocumentSearchScope derives scope from the service key", () => {
+		expect(
+			buildServiceDocumentSearchScope(
+				{ organizationId: "org-1", projectId: "project-1" },
+				["doc-2", "doc-1"],
+			),
+		).toEqual({
+			organization_id: "org-1",
+			project_ids: ["project-1"],
+			document_ids: ["doc-2", "doc-1"],
 		});
 	});
 

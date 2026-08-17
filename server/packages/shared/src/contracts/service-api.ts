@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { workflowSchemaObjectSchema } from "./dashboard-shapes";
+import { searchDocumentsInScopeOutputSchema } from "./document-chat";
 import { jsonValueSchema } from "./json";
 
 export const serviceDocumentScopeSchema = z
@@ -145,6 +146,23 @@ export const serviceDocumentVisibilityUpdateSchema = z.object({
 
 export type ServiceDocumentVisibilityUpdate = z.infer<
 	typeof serviceDocumentVisibilityUpdateSchema
+>;
+
+export const serviceDocumentSearchRequestSchema = z.object({
+	query: z.string().trim().min(1),
+	documentIds: z.array(z.string().min(1)).min(1).max(500),
+	limit: z.number().int().positive().max(8).optional(),
+});
+
+export type ServiceDocumentSearchRequest = z.infer<
+	typeof serviceDocumentSearchRequestSchema
+>;
+
+export const serviceDocumentSearchResponseSchema =
+	searchDocumentsInScopeOutputSchema;
+
+export type ServiceDocumentSearchResponse = z.infer<
+	typeof serviceDocumentSearchResponseSchema
 >;
 
 export const serviceDocumentItemSchema = z.object({

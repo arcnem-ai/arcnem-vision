@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	serviceDocumentListQuerySchema,
 	serviceDocumentScopeSchema,
+	serviceDocumentSearchRequestSchema,
 	serviceDocumentVisibilityUpdateSchema,
 	serviceUploadAcknowledgeRequestSchema,
 	serviceUploadAcknowledgeResponseSchema,
@@ -113,5 +114,34 @@ describe("service API schemas", () => {
 		});
 
 		expect(parsed.success).toBe(false);
+	});
+
+	test("requires an explicit document allowlist for search", () => {
+		expect(
+			serviceDocumentSearchRequestSchema.safeParse({
+				query: "green tea",
+				documentIds: [],
+			}).success,
+		).toBe(false);
+		expect(
+			serviceDocumentSearchRequestSchema.safeParse({
+				query: "   ",
+				documentIds: ["doc-1"],
+			}).success,
+		).toBe(false);
+	});
+
+	test("accepts bounded document search requests", () => {
+		expect(
+			serviceDocumentSearchRequestSchema.parse({
+				query: "  green tea  ",
+				documentIds: ["doc-1", "doc-2"],
+				limit: 8,
+			}),
+		).toEqual({
+			query: "green tea",
+			documentIds: ["doc-1", "doc-2"],
+			limit: 8,
+		});
 	});
 });

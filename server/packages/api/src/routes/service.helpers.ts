@@ -98,6 +98,17 @@ export function buildExecutionScope(
 	};
 }
 
+export function buildServiceDocumentSearchScope(
+	apiKey: { organizationId: string; projectId: string },
+	documentIds: string[],
+) {
+	return {
+		organization_id: apiKey.organizationId,
+		project_ids: [apiKey.projectId],
+		document_ids: documentIds,
+	};
+}
+
 export function buildSeededInitialState<T extends Record<string, unknown>>(
 	initialState: T | undefined,
 	projectId: string,
