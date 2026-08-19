@@ -228,17 +228,20 @@ async function main() {
 	if (!/^[0-9a-f]{64}$/.test(completedExecution.snapshotHash ?? "")) {
 		throw new Error("The workflow execution did not expose a snapshot hash");
 	}
-	const findingSummary = completedExecution.finalState?.finding_summary;
-	if (typeof findingSummary !== "string") {
-		throw new Error("The workflow completed without a finding summary");
+	const description = completedExecution.finalState?.description;
+	if (typeof description !== "string" || !description.trim()) {
+		throw new Error("The workflow completed without a description");
 	}
-	const parsedFinding = JSON.parse(findingSummary) as unknown;
-	if (
-		!parsedFinding ||
-		typeof parsedFinding !== "object" ||
-		Array.isArray(parsedFinding)
-	) {
-		throw new Error("The workflow finding summary was not a JSON object");
+
+	const document = await requestJSON<{ description: string | null }>(
+		config,
+		`/service/documents/${ack.documentId}`,
+		{ method: "GET" },
+	);
+	if (!document.description?.trim()) {
+		throw new Error(
+			"The workflow completed without saving a document description",
+		);
 	}
 
 	await requestJSON(config, "/service/documents/visibility", {
@@ -284,6 +287,7 @@ async function main() {
 	}
 
 	console.log("Live service API test passed");
+	console.log(`Document description: ${document.description}`);
 	if (publicDocument.publicUrl) {
 		console.log(`Public URL: ${publicDocument.publicUrl}`);
 	}
