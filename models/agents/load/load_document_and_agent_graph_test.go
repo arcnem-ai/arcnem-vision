@@ -1,12 +1,52 @@
 package load
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
 	dbmodels "github.com/arcnem-ai/arcnem-vision/models/db/gen/models"
 	"github.com/google/uuid"
 )
+
+func TestDecodePinnedWorkflowSnapshotRowUsesAcceptedContent(t *testing.T) {
+	executionID := uuid.MustParse("55555555-5555-5555-5555-555555555555")
+	hash := strings.Repeat("a", 64)
+	snapshot, err := decodePinnedWorkflowSnapshotRow(
+		executionID,
+		workflowExecutionSnapshotRow{
+			GraphSnapshot: json.RawMessage(`{
+				"agent_graph": {
+					"id": "22222222-2222-2222-2222-222222222222",
+					"name": "Accepted workflow",
+					"description": null,
+					"entry_node": "inspect",
+					"state_schema": null,
+					"agent_graph_template_id": null,
+					"agent_graph_template_version_id": null,
+					"organization_id": "11111111-1111-1111-1111-111111111111"
+				},
+				"nodes": [],
+				"edges": []
+			}`),
+			GraphSnapshotHash: &hash,
+		},
+	)
+	if err != nil {
+		t.Fatalf("decodePinnedWorkflowSnapshotRow returned error: %v", err)
+	}
+	if snapshot.AgentGraph == nil || snapshot.AgentGraph.Name != "Accepted workflow" {
+		t.Fatalf("unexpected pinned snapshot: %#v", snapshot)
+	}
+}
+
+func TestDecodePinnedWorkflowSnapshotRowRejectsMissingProvenance(t *testing.T) {
+	executionID := uuid.MustParse("66666666-6666-6666-6666-666666666666")
+	_, err := decodePinnedWorkflowSnapshotRow(executionID, workflowExecutionSnapshotRow{})
+	if err == nil || !strings.Contains(err.Error(), "no pinned graph snapshot") {
+		t.Fatalf("expected missing snapshot error, got %v", err)
+	}
+}
 
 func TestLoadDocumentAndAgentGraphQueryUsesTemplateVersionID(t *testing.T) {
 	query := loadDocumentAndAgentGraphQuery("LEFT JOIN agent_graphs ag ON ag.id = dev.agent_graph_id")

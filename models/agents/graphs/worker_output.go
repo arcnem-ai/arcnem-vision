@@ -5,8 +5,13 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
+// workerOutputSchema supports type, properties, required, and
+// additionalProperties at the root. Properties additionally support type,
+// enum, properties, required, additionalProperties, items, minimum, maximum,
+// exclusiveMinimum, pattern, minLength, maxItems, and uniqueItems.
 type workerOutputSchema struct {
 	Type                 string                          `json:"type"`
 	Properties           map[string]workerOutputProperty `json:"properties"`
@@ -23,7 +28,26 @@ type workerOutputProperty struct {
 	Items                *workerOutputProperty           `json:"items,omitempty"`
 	Minimum              *float64                        `json:"minimum,omitempty"`
 	Maximum              *float64                        `json:"maximum,omitempty"`
+	ExclusiveMinimum     *float64                        `json:"exclusiveMinimum,omitempty"`
 	Pattern              string                          `json:"pattern,omitempty"`
+	MinLength            *int                            `json:"minLength,omitempty"`
+	MaxItems             *int                            `json:"maxItems,omitempty"`
+	UniqueItems          bool                            `json:"uniqueItems,omitempty"`
+}
+
+func (schema *workerOutputSchema) UnmarshalJSON(data []byte) error {
+	type supportedWorkerOutputSchema workerOutputSchema
+
+	decoder := json.NewDecoder(strings.NewReader(string(data)))
+	decoder.DisallowUnknownFields()
+
+	var decoded supportedWorkerOutputSchema
+	if err := decoder.Decode(&decoded); err != nil {
+		return fmt.Errorf("unsupported worker output schema: %w", err)
+	}
+
+	*schema = workerOutputSchema(decoded)
+	return nil
 }
 
 func normalizeStructuredWorkerOutput(output string, schema *workerOutputSchema) (string, error) {
@@ -129,10 +153,29 @@ func validateStructuredWorkerOutputValue(field string, value any, property worke
 		}
 	}
 
-	if values, ok := value.([]any); ok && property.Items != nil {
-		for index, item := range values {
-			if err := validateStructuredWorkerOutputValue(fmt.Sprintf("%s[%d]", field, index), item, *property.Items); err != nil {
-				return err
+	if values, ok := value.([]any); ok {
+		if property.MaxItems != nil && len(values) > *property.MaxItems {
+			return fmt.Errorf("field %q must contain at most %d items", field, *property.MaxItems)
+		}
+		if property.UniqueItems {
+			seen := make(map[string]struct{}, len(values))
+			for _, item := range values {
+				encoded, err := json.Marshal(item)
+				if err != nil {
+					return fmt.Errorf("field %q could not compare array items: %w", field, err)
+				}
+				key := string(encoded)
+				if _, exists := seen[key]; exists {
+					return fmt.Errorf("field %q must contain unique items", field)
+				}
+				seen[key] = struct{}{}
+			}
+		}
+		if property.Items != nil {
+			for index, item := range values {
+				if err := validateStructuredWorkerOutputValue(fmt.Sprintf("%s[%d]", field, index), item, *property.Items); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -144,15 +187,23 @@ func validateStructuredWorkerOutputValue(field string, value any, property worke
 		if property.Maximum != nil && number > *property.Maximum {
 			return fmt.Errorf("field %q must be at most %v", field, *property.Maximum)
 		}
+		if property.ExclusiveMinimum != nil && number <= *property.ExclusiveMinimum {
+			return fmt.Errorf("field %q must be greater than %v", field, *property.ExclusiveMinimum)
+		}
 	}
 
-	if text, ok := value.(string); ok && property.Pattern != "" {
-		matched, err := regexp.MatchString(property.Pattern, text)
-		if err != nil {
-			return fmt.Errorf("field %q has invalid pattern %q: %w", field, property.Pattern, err)
+	if text, ok := value.(string); ok {
+		if property.MinLength != nil && utf8.RuneCountInString(text) < *property.MinLength {
+			return fmt.Errorf("field %q must have at least %d characters", field, *property.MinLength)
 		}
-		if !matched {
-			return fmt.Errorf("field %q must match %q", field, property.Pattern)
+		if property.Pattern != "" {
+			matched, err := regexp.MatchString(property.Pattern, text)
+			if err != nil {
+				return fmt.Errorf("field %q has invalid pattern %q: %w", field, property.Pattern, err)
+			}
+			if !matched {
+				return fmt.Errorf("field %q must match %q", field, property.Pattern)
+			}
 		}
 	}
 

@@ -225,6 +225,8 @@ export const agentGraphRuns = pgTable(
 		idempotencyRequestHash: text("idempotency_request_hash"),
 		idempotencyResponse: jsonb("idempotency_response"),
 		status: text().notNull().default("running"),
+		graphSnapshot: jsonb("graph_snapshot"),
+		graphSnapshotHash: text("graph_snapshot_hash"),
 		initialState: jsonb("initial_state"),
 		finalState: jsonb("final_state"),
 		error: text(),

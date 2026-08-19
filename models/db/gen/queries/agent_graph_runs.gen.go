@@ -40,6 +40,8 @@ func newAgentGraphRun(db *gorm.DB, opts ...gen.DOOption) agentGraphRun {
 	_agentGraphRun.IdempotencyKey = field.NewString(tableName, "idempotency_key")
 	_agentGraphRun.IdempotencyRequestHash = field.NewString(tableName, "idempotency_request_hash")
 	_agentGraphRun.IdempotencyResponse = field.NewString(tableName, "idempotency_response")
+	_agentGraphRun.GraphSnapshot = field.NewString(tableName, "graph_snapshot")
+	_agentGraphRun.GraphSnapshotHash = field.NewString(tableName, "graph_snapshot_hash")
 
 	_agentGraphRun.fillFieldMap()
 
@@ -63,6 +65,8 @@ type agentGraphRun struct {
 	IdempotencyKey         field.String
 	IdempotencyRequestHash field.String
 	IdempotencyResponse    field.String
+	GraphSnapshot          field.String
+	GraphSnapshotHash      field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -92,6 +96,8 @@ func (a *agentGraphRun) updateTableName(table string) *agentGraphRun {
 	a.IdempotencyKey = field.NewString(table, "idempotency_key")
 	a.IdempotencyRequestHash = field.NewString(table, "idempotency_request_hash")
 	a.IdempotencyResponse = field.NewString(table, "idempotency_response")
+	a.GraphSnapshot = field.NewString(table, "graph_snapshot")
+	a.GraphSnapshotHash = field.NewString(table, "graph_snapshot_hash")
 
 	a.fillFieldMap()
 
@@ -120,7 +126,7 @@ func (a *agentGraphRun) GetFieldByName(fieldName string) (field.OrderExpr, bool)
 }
 
 func (a *agentGraphRun) fillFieldMap() {
-	a.fieldMap = make(map[string]field.Expr, 13)
+	a.fieldMap = make(map[string]field.Expr, 15)
 	a.fieldMap["id"] = a.ID
 	a.fieldMap["agent_graph_id"] = a.AgentGraphID
 	a.fieldMap["status"] = a.Status
@@ -134,6 +140,8 @@ func (a *agentGraphRun) fillFieldMap() {
 	a.fieldMap["idempotency_key"] = a.IdempotencyKey
 	a.fieldMap["idempotency_request_hash"] = a.IdempotencyRequestHash
 	a.fieldMap["idempotency_response"] = a.IdempotencyResponse
+	a.fieldMap["graph_snapshot"] = a.GraphSnapshot
+	a.fieldMap["graph_snapshot_hash"] = a.GraphSnapshotHash
 }
 
 func (a agentGraphRun) clone(db *gorm.DB) agentGraphRun {

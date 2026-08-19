@@ -6,6 +6,7 @@ import (
 
 	"github.com/arcnem-ai/arcnem-vision/models/agents/clients"
 	"github.com/smallnest/langgraphgo/graph"
+	"github.com/tmc/langchaingo/llms"
 )
 
 func buildModelClients(
@@ -166,5 +167,15 @@ func graphNodeModelClient(snapshotNode *SnapshotNode, modelClients map[string]an
 		snapshotNode.Model.Version,
 	)
 
-	return modelClients[key]
+	modelClient := modelClients[key]
+	model, ok := modelClient.(llms.Model)
+	if !ok {
+		return modelClient
+	}
+	return clients.WithProviderRetry(
+		model,
+		snapshotNode.Node.NodeKey,
+		snapshotNode.Model.Provider,
+		snapshotNode.Model.Name,
+	)
 }

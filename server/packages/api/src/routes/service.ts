@@ -44,7 +44,6 @@ import {
 	parsePresignRequestBody,
 	toDocumentUploadErrorResponse,
 } from "@/lib/document-uploads";
-import { findActiveWorkflowById } from "@/lib/workflow-run-availability";
 import {
 	requireAPIKey,
 	requireAPIKeyPermission,
@@ -56,7 +55,9 @@ import {
 	buildSeededInitialState,
 	buildServiceDocumentSearchScope,
 	buildWorkflowExecutionEventData,
+	buildWorkflowExecutionSnapshot,
 	createServiceIdempotencyRequestHash,
+	createWorkflowExecutionSnapshotHash,
 	mergeRequestedDocumentIds,
 	parseServiceDocumentListQuery,
 } from "./service.helpers";
@@ -175,6 +176,7 @@ async function findAcknowledgedServiceUpload(
 
 async function dispatchServiceWorkflowExecution(input: {
 	inngestClient: Inngest;
+	organizationId: string;
 	projectId: string;
 	request: ServiceWorkflowExecutionRequest;
 	response: ServiceWorkflowExecutionAccepted;
@@ -204,6 +206,7 @@ async function dispatchServiceWorkflowExecution(input: {
 			data: buildWorkflowExecutionEventData(
 				response.executionId,
 				response.workflowId,
+				input.organizationId,
 				response.documentIds,
 				executionScope,
 				seededState,
@@ -667,6 +670,7 @@ serviceRouter.post(
 
 			const enqueued = await dispatchServiceWorkflowExecution({
 				inngestClient,
+				organizationId: apiKey.organizationId,
 				projectId: apiKey.projectId,
 				request: body,
 				response: replay.data,
@@ -688,14 +692,81 @@ serviceRouter.post(
 			}
 		}
 
-		const workflow = await findActiveWorkflowById(
-			dbClient,
-			apiKey.organizationId,
-			body.workflowId,
-		);
+		const workflow = await dbClient.query.agentGraphs.findFirst({
+			where: (row, { and, eq, isNull }) =>
+				and(
+					eq(row.id, body.workflowId),
+					eq(row.organizationId, apiKey.organizationId),
+					isNull(row.archivedAt),
+				),
+			columns: {
+				id: true,
+				name: true,
+				description: true,
+				entryNode: true,
+				stateSchema: true,
+				agentGraphTemplateId: true,
+				agentGraphTemplateVersionId: true,
+				organizationId: true,
+			},
+			with: {
+				agentGraphNodes: {
+					columns: {
+						id: true,
+						nodeKey: true,
+						nodeType: true,
+						inputKey: true,
+						outputKey: true,
+						config: true,
+						agentGraphId: true,
+						modelId: true,
+					},
+					with: {
+						models: {
+							columns: {
+								id: true,
+								provider: true,
+								name: true,
+								type: true,
+								embeddingDim: true,
+								version: true,
+								inputSchema: true,
+								outputSchema: true,
+								config: true,
+							},
+						},
+						agentGraphNodeTools: {
+							columns: {},
+							with: {
+								tools: {
+									columns: {
+										id: true,
+										name: true,
+										description: true,
+										inputSchema: true,
+										outputSchema: true,
+									},
+								},
+							},
+						},
+					},
+				},
+				agentGraphEdges: {
+					columns: {
+						id: true,
+						fromNode: true,
+						toNode: true,
+						agentGraphId: true,
+					},
+				},
+			},
+		});
 		if (!workflow) {
 			return c.json({ message: "Workflow not found" }, 404);
 		}
+		const graphSnapshot = buildWorkflowExecutionSnapshot(workflow);
+		const graphSnapshotHash =
+			createWorkflowExecutionSnapshotHash(graphSnapshot);
 
 		const scopedDocumentResolution = await resolveScopedDocumentIds(c, body);
 		if (!scopedDocumentResolution.ok) {
@@ -737,6 +808,8 @@ serviceRouter.post(
 				agentGraphId: workflow.id,
 				projectId: apiKey.projectId,
 				status: "running",
+				graphSnapshot,
+				graphSnapshotHash,
 				initialState: seededState,
 				apiKeyId: idempotencyKey ? apiKey.id : null,
 				idempotencyKey: idempotencyKey ?? null,
@@ -766,6 +839,7 @@ serviceRouter.post(
 
 		const enqueued = await dispatchServiceWorkflowExecution({
 			inngestClient,
+			organizationId: apiKey.organizationId,
 			projectId: apiKey.projectId,
 			request: body,
 			response,
@@ -901,6 +975,7 @@ serviceRouter.get(
 				status: agentGraphRuns.status,
 				error: agentGraphRuns.error,
 				finalState: agentGraphRuns.finalState,
+				graphSnapshotHash: agentGraphRuns.graphSnapshotHash,
 				startedAt: agentGraphRuns.startedAt,
 				finishedAt: agentGraphRuns.finishedAt,
 				organizationId: agentGraphs.organizationId,
@@ -921,6 +996,7 @@ serviceRouter.get(
 		return c.json({
 			executionId: row.id,
 			workflowId: row.agentGraphId,
+			snapshotHash: row.graphSnapshotHash,
 			status: row.status,
 			startedAt: row.startedAt ? new Date(row.startedAt).toISOString() : null,
 			finishedAt: row.finishedAt

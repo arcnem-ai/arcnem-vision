@@ -3,8 +3,10 @@ package jobs
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
+	"github.com/arcnem-ai/arcnem-vision/models/agents/clients"
 	"github.com/arcnem-ai/arcnem-vision/models/agents/graphs"
 	"github.com/arcnem-ai/arcnem-vision/models/agents/inputs"
 	"github.com/arcnem-ai/arcnem-vision/models/agents/load"
@@ -77,7 +79,15 @@ func ProcessDocumentUpload(ctx context.Context, input inngestgo.Input[inputs.Pro
 		)
 	}
 
-	graphResult, err := step.Run(ctx, "run-graph", func(ctx context.Context) (map[string]any, error) {
+	graphResult, err := step.Run(ctx, "run-graph", func(ctx context.Context) (graphState map[string]any, runErr error) {
+		builtGraph, err := graphs.BuildGraph(result.GraphSnapshot, mcpClient)
+		if err != nil {
+			return nil, inngestgo.NoRetryError(fmt.Errorf("failed to build graph: %w", err))
+		}
+		if builtGraph == nil {
+			return nil, inngestgo.NoRetryError(fmt.Errorf("built graph is nil"))
+		}
+
 		initialState := map[string]any{
 			"document_id": result.Document.ID,
 			"temp_url":    tempURL,
@@ -95,25 +105,42 @@ func ProcessDocumentUpload(ctx context.Context, input inngestgo.Input[inputs.Pro
 		if err != nil {
 			return nil, fmt.Errorf("failed to create run tracker: %w", err)
 		}
-
-		builtGraph, err := graphs.BuildGraph(result.GraphSnapshot, mcpClient)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build graph: %w", err)
-		}
-		if builtGraph == nil {
-			return nil, fmt.Errorf("built graph is nil")
-		}
+		defer func() {
+			status := "failed"
+			if runErr == nil {
+				status = "completed"
+			}
+			_, finalizeErr := graphs.FinalizeRun(
+				db,
+				tracker.RunID(),
+				result.GraphSnapshot.AgentGraph.OrganizationID,
+				status,
+				graphState,
+				runErr,
+			)
+			if finalizeErr == nil {
+				if runErr != nil {
+					runErr = inngestgo.NoRetryError(fmt.Errorf("graph run failed: %w", runErr))
+				}
+				return
+			}
+			if runErr == nil {
+				graphState = nil
+				runErr = fmt.Errorf("failed to finalize graph run: %w", finalizeErr)
+			} else {
+				log.Printf("graph run finalization failed run_id=%s err=%v", tracker.RunID(), finalizeErr)
+			}
+			runErr = inngestgo.NoRetryError(fmt.Errorf("graph run failed: %w", runErr))
+		}()
 
 		tracer := graph.NewTracer()
 		tracer.AddHook(tracker)
 		// Attach tracer directly to the compiled runnable so node-level events fire.
 		builtGraph.SetTracer(tracer)
-		return builtGraph.Invoke(ctx, initialState)
+		return builtGraph.Invoke(clients.ContextWithExecutionID(ctx, tracker.RunID()), initialState)
 	})
 	if err != nil {
-		return nil, inngestgo.NoRetryError(
-			fmt.Errorf("graph run failed: %w", err),
-		)
+		return nil, err
 	}
 
 	return graphResult, nil
