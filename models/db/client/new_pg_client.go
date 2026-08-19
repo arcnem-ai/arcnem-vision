@@ -36,8 +36,9 @@ func NewPGClient() (*gorm.DB, error) {
 				log.New(os.Stdout, "", 0),
 				logger.Config{
 					SlowThreshold:             100 * time.Second,
-					LogLevel:                  logger.Info,
+					LogLevel:                  logger.Warn,
 					IgnoreRecordNotFoundError: true,
+					ParameterizedQueries:      true,
 					Colorful:                  true,
 				},
 			),

@@ -18,6 +18,8 @@ import (
 // Verify RunTracker implements TraceHook.
 var _ graph.TraceHook = (*RunTracker)(nil)
 
+var publishDashboardEvent = realtime.PublishDashboardEvent
+
 // RunTracker records graph execution to the agent_graph_runs and agent_graph_run_steps tables.
 type RunTracker struct {
 	db             *gorm.DB
@@ -57,46 +59,26 @@ func NewRunTrackerWithOptions(
 	initialState map[string]any,
 	options RunTrackerOptions,
 ) (*RunTracker, error) {
-	stateJSON, err := json.Marshal(initialState)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode initial state: %w", err)
-	}
-	stateStr := string(stateJSON)
-
 	run := &dbmodels.AgentGraphRun{
 		AgentGraphID: agentGraphID,
 		ProjectID:    toNullableString(options.ProjectID),
 		Status:       "running",
-		InitialState: &stateStr,
 	}
 	if options.RunID != "" {
 		run.ID = options.RunID
-		now := time.Now()
-		updates := map[string]any{
-			"agent_graph_id": agentGraphID,
-			"project_id":     toNullableString(options.ProjectID),
-			"status":         "running",
-			"initial_state":  stateStr,
-			"error":          nil,
-			"finished_at":    nil,
-			"started_at":     now,
+		if err := db.Select("id").Where("id = ? AND status = ?", options.RunID, "running").Take(run).Error; err != nil {
+			return nil, fmt.Errorf("failed to find accepted running run: %w", err)
 		}
-		tx := db.Model(&dbmodels.AgentGraphRun{}).
-			Where("id = ?", options.RunID).
-			Updates(updates)
-		if tx.Error != nil {
-			return nil, fmt.Errorf("failed to update run record: %w", tx.Error)
+	} else {
+		stateJSON, err := json.Marshal(initialState)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode initial state: %w", err)
 		}
-		if tx.RowsAffected == 0 {
-			run.StartedAt = now
-			if err := db.Create(run).Error; err != nil {
-				return nil, fmt.Errorf("failed to create run record: %w", err)
-			}
-		} else {
-			run.StartedAt = now
+		stateStr := string(stateJSON)
+		run.InitialState = &stateStr
+		if err := db.Create(run).Error; err != nil {
+			return nil, fmt.Errorf("failed to create run record: %w", err)
 		}
-	} else if err := db.Create(run).Error; err != nil {
-		return nil, fmt.Errorf("failed to create run record: %w", err)
 	}
 
 	tracker := &RunTracker{
@@ -177,12 +159,11 @@ func (t *RunTracker) OnEvent(_ context.Context, span *graph.TraceSpan) {
 			)
 		}
 		log.Printf(
-			"graph run node_end run_id=%s step_order=%d node=%s duration_ms=%d state_preview=%q",
+			"graph run node_end run_id=%s step_order=%d node=%s duration_ms=%d",
 			t.run.ID,
 			step.StepOrder,
 			step.NodeKey,
 			span.Duration.Milliseconds(),
-			previewState(span.State),
 		)
 		t.publish(realtime.DashboardReasonRunStepChanged)
 
@@ -193,9 +174,6 @@ func (t *RunTracker) OnEvent(_ context.Context, span *graph.TraceSpan) {
 			delete(t.steps, span.ID)
 		}
 		t.mu.Unlock()
-		if !ok {
-			return
-		}
 		updates := map[string]any{"finished_at": span.EndTime}
 		errorPayload := map[string]any{}
 		if span.Error != nil {
@@ -209,77 +187,103 @@ func (t *RunTracker) OnEvent(_ context.Context, span *graph.TraceSpan) {
 				updates["state_delta"] = string(payloadJSON)
 			}
 		}
-		if err := t.db.Model(step).Updates(updates).Error; err != nil {
-			log.Printf(
-				"graph run node_error db_write_failed run_id=%s step_order=%d node=%s err=%v",
-				t.run.ID,
-				step.StepOrder,
-				step.NodeKey,
-				err,
-			)
+		if ok {
+			if err := t.db.Model(step).Updates(updates).Error; err != nil {
+				log.Printf(
+					"graph run node_error db_write_failed run_id=%s step_order=%d node=%s err=%v",
+					t.run.ID,
+					step.StepOrder,
+					step.NodeKey,
+					err,
+				)
+			}
 		}
-		errText := "<nil>"
+		runErr := span.Error
 		if span.Error != nil {
-			errText = span.Error.Error()
+			runErr = span.Error
+		} else {
+			runErr = fmt.Errorf("node %s failed", span.NodeName)
+		}
+		stepOrder := int32(0)
+		if ok {
+			stepOrder = step.StepOrder
 		}
 		log.Printf(
-			"graph run node_error run_id=%s step_order=%d node=%s duration_ms=%d error=%q state_preview=%q",
+			"graph run node_error run_id=%s step_order=%d node=%s duration_ms=%d",
 			t.run.ID,
-			step.StepOrder,
-			step.NodeKey,
+			stepOrder,
+			span.NodeName,
 			span.Duration.Milliseconds(),
-			previewText(errText),
-			previewState(span.State),
 		)
-		t.publish(realtime.DashboardReasonRunStepChanged)
+		if ok {
+			t.publish(realtime.DashboardReasonRunStepChanged)
+		}
+		if _, err := FinalizeRun(t.db, t.run.ID, t.organizationID, "failed", span.State, runErr); err != nil {
+			log.Printf("graph run failed db_write_failed run_id=%s err=%v", t.run.ID, err)
+		}
 
-	case graph.TraceEventGraphEnd:
-		now := time.Now()
-		if span.Error != nil {
-			errStr := span.Error.Error()
-			if err := t.db.Model(t.run).Updates(map[string]any{
-				"status":      "failed",
-				"error":       errStr,
-				"finished_at": now,
-			}).Error; err != nil {
-				log.Printf(
-					"graph run failed db_write_failed run_id=%s err=%v",
-					t.run.ID,
-					err,
-				)
-			}
-			log.Printf(
-				"graph run failed run_id=%s error=%q final_state_preview=%q",
-				t.run.ID,
-				previewText(errStr),
-				previewState(span.State),
-			)
-			t.publish(realtime.DashboardReasonRunFinished)
-		} else {
-			updates := map[string]any{
-				"status":      "completed",
-				"finished_at": now,
-			}
-			if span.State != nil {
-				if stateJSON, err := json.Marshal(span.State); err == nil {
-					updates["final_state"] = string(stateJSON)
-				}
-			}
-			if err := t.db.Model(t.run).Updates(updates).Error; err != nil {
-				log.Printf(
-					"graph run completed db_write_failed run_id=%s err=%v",
-					t.run.ID,
-					err,
-				)
-			}
-			log.Printf(
-				"graph run completed run_id=%s final_state_preview=%q",
-				t.run.ID,
-				previewState(span.State),
-			)
-			t.publish(realtime.DashboardReasonRunFinished)
+	}
+}
+
+func terminalRunUpdates(status string, finalState any, runErr error) (map[string]any, error) {
+	if status != "completed" && status != "failed" {
+		return nil, fmt.Errorf("invalid terminal run status %q", status)
+	}
+	if status == "failed" && runErr == nil {
+		return nil, fmt.Errorf("failed run requires an error")
+	}
+
+	updates := map[string]any{
+		"status":      status,
+		"finished_at": time.Now(),
+		"error":       nil,
+	}
+	if runErr != nil {
+		updates["error"] = runErr.Error()
+	}
+	if finalState != nil {
+		stateJSON, err := json.Marshal(finalState)
+		if err == nil {
+			updates["final_state"] = string(stateJSON)
 		}
 	}
+
+	return updates, nil
+}
+
+func updateRunningRun(db *gorm.DB, runID string, updates map[string]any) *gorm.DB {
+	return db.Model(&dbmodels.AgentGraphRun{}).
+		Where("id = ? AND status = ?", runID, "running").
+		Updates(updates)
+}
+
+// FinalizeRun atomically transitions a running run once and publishes its terminal event.
+func FinalizeRun(db *gorm.DB, runID string, organizationID string, status string, finalState any, runErr error) (bool, error) {
+	updates, err := terminalRunUpdates(status, finalState, runErr)
+	if err != nil {
+		return false, err
+	}
+
+	tx := updateRunningRun(db, runID, updates)
+	if tx.Error != nil {
+		return false, tx.Error
+	}
+	if tx.RowsAffected == 0 {
+		return false, nil
+	}
+
+	event := realtime.NewDashboardEvent(realtime.DashboardReasonRunFinished, organizationID)
+	event.RunID = runID
+	if err := publishDashboardEvent(context.Background(), event); err != nil {
+		log.Printf(
+			"graph run realtime_publish_failed run_id=%s reason=%s err=%v",
+			runID,
+			realtime.DashboardReasonRunFinished,
+			err,
+		)
+	}
+
+	return true, nil
 }
 
 // RunID returns the ID of the tracked run.
@@ -291,7 +295,7 @@ func (t *RunTracker) publish(reason string) {
 	event := realtime.NewDashboardEvent(reason, t.organizationID)
 	event.RunID = t.run.ID
 
-	if err := realtime.PublishDashboardEvent(context.Background(), event); err != nil {
+	if err := publishDashboardEvent(context.Background(), event); err != nil {
 		log.Printf(
 			"graph run realtime_publish_failed run_id=%s reason=%s err=%v",
 			t.run.ID,

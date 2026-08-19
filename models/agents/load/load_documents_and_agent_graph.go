@@ -2,6 +2,7 @@ package load
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/arcnem-ai/arcnem-vision/models/agents/graphs"
@@ -13,6 +14,39 @@ import (
 type WorkflowExecutionPayload struct {
 	Documents     []*dbmodels.Document `json:"documents"`
 	GraphSnapshot *graphs.Snapshot     `json:"graph_snapshot"`
+}
+
+type workflowExecutionSnapshotRow struct {
+	GraphSnapshot     json.RawMessage `gorm:"column:graph_snapshot"`
+	GraphSnapshotHash *string         `gorm:"column:graph_snapshot_hash"`
+}
+
+func loadPinnedWorkflowSnapshot(ctx context.Context, db *gorm.DB, executionID uuid.UUID) (*graphs.Snapshot, error) {
+	row := workflowExecutionSnapshotRow{}
+	if err := db.WithContext(ctx).
+		Table("agent_graph_runs").
+		Select("graph_snapshot, graph_snapshot_hash").
+		Where("id = ?", executionID).
+		Take(&row).Error; err != nil {
+		return nil, fmt.Errorf("load execution %s snapshot: %w", executionID, err)
+	}
+	return decodePinnedWorkflowSnapshotRow(executionID, row)
+}
+
+func decodePinnedWorkflowSnapshotRow(executionID uuid.UUID, row workflowExecutionSnapshotRow) (*graphs.Snapshot, error) {
+	if len(row.GraphSnapshot) == 0 || row.GraphSnapshotHash == nil || *row.GraphSnapshotHash == "" {
+		return nil, fmt.Errorf("execution %s has no pinned graph snapshot", executionID)
+	}
+
+	snapshot := &graphs.Snapshot{}
+	if err := json.Unmarshal(row.GraphSnapshot, snapshot); err != nil {
+		return nil, fmt.Errorf("decode execution %s graph snapshot: %w", executionID, err)
+	}
+	if snapshot.AgentGraph == nil {
+		return nil, fmt.Errorf("execution %s graph snapshot has no workflow", executionID)
+	}
+
+	return snapshot, nil
 }
 
 func orderWorkflowDocuments(documentIDs []uuid.UUID, rows []*dbmodels.Document, organizationID string) ([]*dbmodels.Document, error) {
@@ -41,8 +75,8 @@ func orderWorkflowDocuments(documentIDs []uuid.UUID, rows []*dbmodels.Document, 
 	return ordered, nil
 }
 
-func LoadWorkflowExecutionPayload(ctx context.Context, db *gorm.DB, documentIDs []uuid.UUID, agentGraphID uuid.UUID) (*WorkflowExecutionPayload, error) {
-	graphSnapshot, err := LoadAgentGraphSnapshot(ctx, db, agentGraphID)
+func LoadWorkflowExecutionPayload(ctx context.Context, db *gorm.DB, documentIDs []uuid.UUID, executionID uuid.UUID) (*WorkflowExecutionPayload, error) {
+	graphSnapshot, err := loadPinnedWorkflowSnapshot(ctx, db, executionID)
 	if err != nil {
 		return nil, err
 	}

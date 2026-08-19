@@ -67,6 +67,8 @@ async function waitForExecution(config: ServiceConfig, executionId: string) {
 		const execution = await requestJSON<{
 			status: string;
 			error: string | null;
+			finalState: Record<string, unknown> | null;
+			snapshotHash: string | null;
 		}>(config, `/service/workflow-executions/${executionId}`, {
 			method: "GET",
 		});
@@ -218,19 +220,25 @@ async function main() {
 	}
 	console.log(`Queued execution ${execution.executionId}`);
 
-	await waitForExecution(config, execution.executionId);
+	const completedExecution = await waitForExecution(
+		config,
+		execution.executionId,
+	);
 	console.log(`Execution ${execution.executionId} completed`);
-
-	const document = await requestJSON<{
-		description: string | null;
-		publicUrl: string | null;
-	}>(config, `/service/documents/${ack.documentId}`, {
-		method: "GET",
-	});
-	if (!document.description) {
-		throw new Error(
-			"The workflow completed without saving a document description",
-		);
+	if (!/^[0-9a-f]{64}$/.test(completedExecution.snapshotHash ?? "")) {
+		throw new Error("The workflow execution did not expose a snapshot hash");
+	}
+	const findingSummary = completedExecution.finalState?.finding_summary;
+	if (typeof findingSummary !== "string") {
+		throw new Error("The workflow completed without a finding summary");
+	}
+	const parsedFinding = JSON.parse(findingSummary) as unknown;
+	if (
+		!parsedFinding ||
+		typeof parsedFinding !== "object" ||
+		Array.isArray(parsedFinding)
+	) {
+		throw new Error("The workflow finding summary was not a JSON object");
 	}
 
 	await requestJSON(config, "/service/documents/visibility", {
@@ -276,7 +284,6 @@ async function main() {
 	}
 
 	console.log("Live service API test passed");
-	console.log(`Document description: ${document.description}`);
 	if (publicDocument.publicUrl) {
 		console.log(`Public URL: ${publicDocument.publicUrl}`);
 	}

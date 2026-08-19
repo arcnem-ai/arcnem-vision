@@ -138,6 +138,7 @@ export type ServiceWorkflowExecutionAccepted = z.infer<
 export const serviceWorkflowExecutionItemSchema = z.object({
 	executionId: z.string().min(1),
 	workflowId: z.string().min(1),
+	snapshotHash: z.string().length(64).nullable(),
 	status: z.enum(["running", "completed", "failed"]),
 	startedAt: z.string().nullable(),
 	finishedAt: z.string().nullable(),

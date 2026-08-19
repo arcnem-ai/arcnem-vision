@@ -26,10 +26,147 @@ function canonicalizeJSON(value: unknown): unknown {
 	return value;
 }
 
-export function createServiceIdempotencyRequestHash(input: unknown) {
+function createCanonicalJSONHash(input: unknown) {
 	return createHash("sha256")
 		.update(JSON.stringify(canonicalizeJSON(input)))
 		.digest("hex");
+}
+
+export function createServiceIdempotencyRequestHash(input: unknown) {
+	return createCanonicalJSONHash(input);
+}
+
+type WorkflowExecutionSnapshotSource = {
+	id: string;
+	name: string;
+	description: string | null;
+	entryNode: string;
+	stateSchema: unknown | null;
+	agentGraphTemplateId: string | null;
+	agentGraphTemplateVersionId: string | null;
+	organizationId: string;
+	agentGraphNodes: Array<{
+		id: string;
+		nodeKey: string;
+		nodeType: string;
+		inputKey: string | null;
+		outputKey: string | null;
+		config: unknown;
+		agentGraphId: string;
+		modelId: string | null;
+		models: {
+			id: string;
+			provider: string;
+			name: string;
+			type: string | null;
+			embeddingDim: number | null;
+			version: string;
+			inputSchema: unknown | null;
+			outputSchema: unknown | null;
+			config: unknown;
+		} | null;
+		agentGraphNodeTools: Array<{
+			tools: {
+				id: string;
+				name: string;
+				description: string;
+				inputSchema: unknown;
+				outputSchema: unknown;
+			};
+		}>;
+	}>;
+	agentGraphEdges: Array<{
+		id: string;
+		fromNode: string;
+		toNode: string;
+		agentGraphId: string;
+	}>;
+};
+
+function encodeJSONColumn(value: unknown) {
+	const encoded = JSON.stringify(value);
+	if (encoded === undefined) {
+		throw new Error("Workflow snapshot contains an invalid JSON value");
+	}
+	return encoded;
+}
+
+function encodeNullableJSONColumn(value: unknown | null) {
+	return value === null ? null : encodeJSONColumn(value);
+}
+
+export function buildWorkflowExecutionSnapshot(
+	workflow: WorkflowExecutionSnapshotSource,
+) {
+	return {
+		agent_graph: {
+			id: workflow.id,
+			name: workflow.name,
+			description: workflow.description,
+			entry_node: workflow.entryNode,
+			state_schema: encodeNullableJSONColumn(workflow.stateSchema),
+			agent_graph_template_id: workflow.agentGraphTemplateId,
+			agent_graph_template_version_id: workflow.agentGraphTemplateVersionId,
+			organization_id: workflow.organizationId,
+		},
+		nodes: [...workflow.agentGraphNodes]
+			.sort((left, right) => left.nodeKey.localeCompare(right.nodeKey))
+			.map((node) => ({
+				node: {
+					id: node.id,
+					node_key: node.nodeKey,
+					node_type: node.nodeType,
+					input_key: node.inputKey,
+					output_key: node.outputKey,
+					config: encodeJSONColumn(node.config),
+					agent_graph_id: node.agentGraphId,
+					model_id: node.modelId,
+				},
+				model: node.models
+					? {
+							id: node.models.id,
+							provider: node.models.provider,
+							name: node.models.name,
+							type: node.models.type,
+							embedding_dim: node.models.embeddingDim,
+							version: node.models.version,
+							input_schema: encodeNullableJSONColumn(node.models.inputSchema),
+							output_schema: encodeNullableJSONColumn(node.models.outputSchema),
+							config: encodeJSONColumn(node.models.config),
+						}
+					: null,
+				tools: [...node.agentGraphNodeTools]
+					.map(({ tools }) => tools)
+					.sort(
+						(left, right) =>
+							left.name.localeCompare(right.name) ||
+							left.id.localeCompare(right.id),
+					)
+					.map((tool) => ({
+						id: tool.id,
+						name: tool.name,
+						description: tool.description,
+						input_schema: encodeJSONColumn(tool.inputSchema),
+						output_schema: encodeJSONColumn(tool.outputSchema),
+					})),
+			})),
+		edges: [...workflow.agentGraphEdges]
+			.sort(
+				(left, right) =>
+					left.fromNode.localeCompare(right.fromNode) ||
+					left.toNode.localeCompare(right.toNode),
+			)
+			.map((edge) => ({
+				id: edge.id,
+				from_node: edge.fromNode,
+				to_node: edge.toNode,
+				agent_graph_id: edge.agentGraphId,
+			})),
+	};
+}
+
+export function createWorkflowExecutionSnapshotHash(snapshot: unknown) {
+	return createCanonicalJSONHash(snapshot);
 }
 
 export function parseCSVList(value: string | undefined) {
@@ -152,6 +289,7 @@ export function buildWorkflowExecutionEventData<
 >(
 	executionId: string,
 	workflowId: string,
+	organizationId: string,
 	documentIds: string[],
 	executionScope: ReturnType<typeof buildExecutionScope>,
 	initialState: T,
@@ -159,6 +297,7 @@ export function buildWorkflowExecutionEventData<
 	return {
 		execution_id: executionId,
 		workflow_id: workflowId,
+		organization_id: organizationId,
 		document_ids: documentIds,
 		scope: executionScope,
 		initial_state: initialState,

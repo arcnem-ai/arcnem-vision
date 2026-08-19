@@ -11,8 +11,8 @@ import (
 )
 
 type workerAgentConfig struct {
-	SystemMessage string
-	MaxIterations int
+	SystemMessage string              `json:"system_message"`
+	MaxIterations int                 `json:"max_iterations"`
 	OutputRetries int                 `json:"output_retries"`
 	OutputSchema  *workerOutputSchema `json:"output_schema"`
 }

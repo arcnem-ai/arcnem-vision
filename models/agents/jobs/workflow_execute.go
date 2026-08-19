@@ -3,8 +3,10 @@ package jobs
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
+	"github.com/arcnem-ai/arcnem-vision/models/agents/clients"
 	"github.com/arcnem-ai/arcnem-vision/models/agents/graphs"
 	"github.com/arcnem-ai/arcnem-vision/models/agents/inputs"
 	"github.com/arcnem-ai/arcnem-vision/models/agents/load"
@@ -18,11 +20,24 @@ type preparedWorkflowState struct {
 	Documents   []map[string]any `json:"documents"`
 }
 
-func ExecuteWorkflow(ctx context.Context, input inngestgo.Input[inputs.ExecuteWorkflowInput]) (any, error) {
+func ExecuteWorkflow(ctx context.Context, input inngestgo.Input[inputs.ExecuteWorkflowInput]) (result any, runErr error) {
 	db, ok := GetDBClient(ctx)
 	if !ok {
 		return nil, inngestgo.NoRetryError(fmt.Errorf("db not found in context"))
 	}
+	executionID := input.Event.Data.ExecutionID.String()
+	organizationID := input.Event.Data.OrganizationID.String()
+	finalizeFailure := func(runErr error) {
+		_, err := graphs.FinalizeRun(db, executionID, organizationID, "failed", nil, runErr)
+		if err != nil {
+			log.Printf("workflow run finalization failed run_id=%s err=%v", executionID, err)
+		}
+	}
+	defer func() {
+		if runErr != nil {
+			finalizeFailure(runErr)
+		}
+	}()
 	s3Client, ok := GetS3Client(ctx)
 	if !ok {
 		return nil, inngestgo.NoRetryError(fmt.Errorf("s3 not found in context"))
@@ -33,17 +48,21 @@ func ExecuteWorkflow(ctx context.Context, input inngestgo.Input[inputs.ExecuteWo
 	}
 
 	payload, err := step.Run(ctx, "load-documents-and-agent-graph", func(ctx context.Context) (*load.WorkflowExecutionPayload, error) {
-		return load.LoadWorkflowExecutionPayload(
+		payload, err := load.LoadWorkflowExecutionPayload(
 			ctx,
 			db,
 			input.Event.Data.DocumentIDs,
-			input.Event.Data.WorkflowID,
+			input.Event.Data.ExecutionID,
 		)
+		if err != nil {
+			err = fmt.Errorf("failed to load workflow execution payload: %w", err)
+			finalizeFailure(err)
+			return nil, inngestgo.NoRetryError(err)
+		}
+		return payload, nil
 	})
 	if err != nil {
-		return nil, inngestgo.NoRetryError(
-			fmt.Errorf("failed to load workflow execution payload: %w", err),
-		)
+		return nil, err
 	}
 	if payload == nil {
 		return nil, inngestgo.NoRetryError(fmt.Errorf("workflow execution payload was nil"))
@@ -51,6 +70,7 @@ func ExecuteWorkflow(ctx context.Context, input inngestgo.Input[inputs.ExecuteWo
 	if payload.GraphSnapshot == nil || payload.GraphSnapshot.AgentGraph == nil {
 		return nil, inngestgo.NoRetryError(fmt.Errorf("workflow payload had no graph snapshot"))
 	}
+	organizationID = payload.GraphSnapshot.AgentGraph.OrganizationID
 	if len(payload.Documents) == 0 {
 		return nil, inngestgo.NoRetryError(fmt.Errorf("workflow execution payload had no documents"))
 	}
@@ -67,11 +87,13 @@ func ExecuteWorkflow(ctx context.Context, input inngestgo.Input[inputs.ExecuteWo
 				15*time.Minute,
 			)
 			if err != nil {
-				return nil, fmt.Errorf(
+				err = fmt.Errorf(
 					"failed to produce temp url for document %s: %w",
 					document.ID,
 					err,
 				)
+				finalizeFailure(err)
+				return nil, inngestgo.NoRetryError(err)
 			}
 
 			documentIDs = append(documentIDs, document.ID)
@@ -96,15 +118,39 @@ func ExecuteWorkflow(ctx context.Context, input inngestgo.Input[inputs.ExecuteWo
 		}, nil
 	})
 	if err != nil {
-		return nil, inngestgo.NoRetryError(
-			fmt.Errorf("failed to prepare workflow runtime state: %w", err),
-		)
+		return nil, err
 	}
 	if preparedState == nil {
 		return nil, inngestgo.NoRetryError(fmt.Errorf("prepared workflow state was nil"))
 	}
 
-	graphResult, err := step.Run(ctx, "run-graph", func(ctx context.Context) (map[string]any, error) {
+	graphResult, err := step.Run(ctx, "run-graph", func(ctx context.Context) (graphState map[string]any, graphErr error) {
+		defer func() {
+			status := "failed"
+			if graphErr == nil {
+				status = "completed"
+			}
+			_, finalizeErr := graphs.FinalizeRun(
+				db,
+				executionID,
+				organizationID,
+				status,
+				graphState,
+				graphErr,
+			)
+			if finalizeErr != nil {
+				if graphErr == nil {
+					graphState = nil
+					graphErr = fmt.Errorf("failed to finalize workflow run: %w", finalizeErr)
+				} else {
+					log.Printf("workflow run finalization failed run_id=%s err=%v", executionID, finalizeErr)
+				}
+			}
+			if graphErr != nil {
+				graphErr = inngestgo.NoRetryError(fmt.Errorf("graph run failed: %w", graphErr))
+			}
+		}()
+
 		initialState := make(map[string]any, len(input.Event.Data.InitialState)+4)
 		for key, value := range input.Event.Data.InitialState {
 			initialState[key] = value
@@ -155,12 +201,10 @@ func ExecuteWorkflow(ctx context.Context, input inngestgo.Input[inputs.ExecuteWo
 		tracer := graph.NewTracer()
 		tracer.AddHook(tracker)
 		builtGraph.SetTracer(tracer)
-		return builtGraph.Invoke(ctx, initialState)
+		return builtGraph.Invoke(clients.ContextWithExecutionID(ctx, tracker.RunID()), initialState)
 	})
 	if err != nil {
-		return nil, inngestgo.NoRetryError(
-			fmt.Errorf("graph run failed: %w", err),
-		)
+		return nil, err
 	}
 
 	return graphResult, nil

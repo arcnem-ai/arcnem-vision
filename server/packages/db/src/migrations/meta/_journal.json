@@ -71,6 +71,13 @@
       "when": 1786827472552,
       "tag": "0009_overconfident_puppet_master",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787141863643,
+      "tag": "0010_pretty_mandrill",
+      "breakpoints": true
     }
   ]
 }

@@ -51,11 +51,10 @@ func BuildWorkerNode(snapshotNode *SnapshotNode, modelClient any, mcpClient *cli
 				}
 			}
 			log.Printf(
-				"graph worker start node=%s max_iterations=%d input_len=%d input_preview=%q",
+				"graph worker start node=%s max_iterations=%d input_len=%d",
 				snapshotNode.Node.NodeKey,
 				maxIterations,
 				len(input),
-				previewText(input),
 			)
 
 			humanMessage, err := buildHumanInputMessage(ctx, input, inputConfig, "Analyze this image and provide a detailed description.")
@@ -100,13 +99,13 @@ func BuildWorkerNode(snapshotNode *SnapshotNode, modelClient any, mcpClient *cli
 				messageCount = len(messages)
 				if isMaxIterationsMessage(output) {
 					log.Printf(
-						"graph worker iteration_limit node=%s max_iterations=%d input_preview=%q output_preview=%q",
+						"graph worker iteration_limit node=%s max_iterations=%d input_len=%d output_len=%d",
 						snapshotNode.Node.NodeKey,
 						maxIterations,
-						previewText(input),
-						previewText(output),
+						len(input),
+						len(output),
 					)
-					return nil, fmt.Errorf("worker node %q hit max iterations: %s", snapshotNode.Node.NodeKey, output)
+					return nil, fmt.Errorf("worker node %q hit max iterations", snapshotNode.Node.NodeKey)
 				}
 
 				normalizedOutput, validationErr := normalizeStructuredWorkerOutput(output, workerConfig.OutputSchema)
@@ -120,12 +119,12 @@ func BuildWorkerNode(snapshotNode *SnapshotNode, modelClient any, mcpClient *cli
 				}
 
 				log.Printf(
-					"graph worker output_retry node=%s attempt=%d/%d err=%v output_preview=%q",
+					"graph worker output_retry node=%s attempt=%d/%d err=%v output_len=%d",
 					snapshotNode.Node.NodeKey,
 					attempt,
 					outputRetries,
 					validationErr,
-					previewText(output),
+					len(output),
 				)
 				messages = append(messages, llms.TextParts(
 					llms.ChatMessageTypeHuman,
@@ -134,11 +133,10 @@ func BuildWorkerNode(snapshotNode *SnapshotNode, modelClient any, mcpClient *cli
 			}
 
 			log.Printf(
-				"graph worker end node=%s message_count=%d output_len=%d output_preview=%q",
+				"graph worker end node=%s message_count=%d output_len=%d",
 				snapshotNode.Node.NodeKey,
 				messageCount,
 				len(output),
-				previewText(output),
 			)
 
 			if outputKey != nil {
@@ -242,7 +240,7 @@ func BuildSupervisorMemberWorkerNode(snapshotNode *SnapshotNode, modelClient any
 						"graph supervisor_member_iteration_limit node=%s max_iterations=%d",
 						nodeKey, maxIterations,
 					)
-					return nil, fmt.Errorf("member worker %q hit max iterations: %s", nodeKey, lastOutput)
+					return nil, fmt.Errorf("member worker %q hit max iterations", nodeKey)
 				}
 
 				normalizedOutput, validationErr := normalizeStructuredWorkerOutput(lastOutput, workerConfig.OutputSchema)
@@ -269,12 +267,12 @@ func BuildSupervisorMemberWorkerNode(snapshotNode *SnapshotNode, modelClient any
 				}
 
 				log.Printf(
-					"graph supervisor_member_output_retry node=%s attempt=%d/%d err=%v output_preview=%q",
+					"graph supervisor_member_output_retry node=%s attempt=%d/%d err=%v output_len=%d",
 					nodeKey,
 					attempt,
 					outputRetries,
 					validationErr,
-					previewText(lastOutput),
+					len(lastOutput),
 				)
 
 				messages = append(resultMessages, llms.TextParts(
