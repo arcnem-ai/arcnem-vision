@@ -21,7 +21,7 @@ This file is written for AI coding agents. Human contributors should start with 
 - Requirements for local dev:
   - Docker + Docker Compose
   - Bun (server workspace)
-  - Go 1.25+ (agents, MCP, model introspection)
+  - Go 1.27+ (agents, MCP, model introspection)
   - Flutter SDK (client)
   - Tilt (recommended)
   - Inngest CLI (`npx inngest-cli@latest`)

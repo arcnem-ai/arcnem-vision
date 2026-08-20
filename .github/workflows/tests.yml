@@ -22,12 +22,12 @@ jobs:
         working-directory: server
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.3.14
 
       - name: Install Bun dependencies
         run: bun install --frozen-lockfile
@@ -48,10 +48,10 @@ jobs:
           - models/shared
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: models/go.work
           cache-dependency-path: |
