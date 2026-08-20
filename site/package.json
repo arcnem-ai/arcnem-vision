@@ -1,6 +1,6 @@
 {
 	"name": "arcnem-vision-docs",
-	"packageManager": "bun@1.3.14",
+	"packageManager": "bun@1.4.0",
 	"type": "module",
 	"version": "0.0.1",
 	"scripts": {

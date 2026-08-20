@@ -1,6 +1,6 @@
 {
 	"name": "arcnem-vision",
-	"packageManager": "bun@1.3.14",
+	"packageManager": "bun@1.4.0",
 	"private": true,
 	"version": "1.0.0",
 	"workspaces": [
