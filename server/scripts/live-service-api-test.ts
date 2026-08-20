@@ -244,6 +244,20 @@ async function main() {
 		);
 	}
 
+	const search = await requestJSON<{
+		matches: Array<{ documentId: string }>;
+	}>(config, "/service/documents/search", {
+		method: "POST",
+		body: JSON.stringify({
+			query: "mountain landscape",
+			documentIds: [ack.documentId],
+			limit: 1,
+		}),
+	});
+	if (!search.matches.some((match) => match.documentId === ack.documentId)) {
+		throw new Error("Document search did not return the uploaded document");
+	}
+
 	await requestJSON(config, "/service/documents/visibility", {
 		method: "POST",
 		body: JSON.stringify({

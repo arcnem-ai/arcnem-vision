@@ -10,22 +10,22 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ApiRealtimeDashboardRouteImport } from './routes/api/realtime/dashboard'
 import { Route as ApiDocumentsChatRouteImport } from './routes/api/documents/chat'
+import { Route as ApiRealtimeDashboardRouteImport } from './routes/api/realtime/dashboard'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiRealtimeDashboardRoute = ApiRealtimeDashboardRouteImport.update({
-  id: '/api/realtime/dashboard',
-  path: '/api/realtime/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiDocumentsChatRoute = ApiDocumentsChatRouteImport.update({
   id: '/api/documents/chat',
   path: '/api/documents/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRealtimeDashboardRoute = ApiRealtimeDashboardRouteImport.update({
+  id: '/api/realtime/dashboard',
+  path: '/api/realtime/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -68,18 +68,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/realtime/dashboard': {
-      id: '/api/realtime/dashboard'
-      path: '/api/realtime/dashboard'
-      fullPath: '/api/realtime/dashboard'
-      preLoaderRoute: typeof ApiRealtimeDashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/documents/chat': {
       id: '/api/documents/chat'
       path: '/api/documents/chat'
       fullPath: '/api/documents/chat'
       preLoaderRoute: typeof ApiDocumentsChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/realtime/dashboard': {
+      id: '/api/realtime/dashboard'
+      path: '/api/realtime/dashboard'
+      fullPath: '/api/realtime/dashboard'
+      preLoaderRoute: typeof ApiRealtimeDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
