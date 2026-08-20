@@ -9,6 +9,10 @@ export default defineConfig({
 	schema: `./src/schema/index.ts`,
 	dialect: `postgresql`,
 	casing: `snake_case`,
+	migrations: {
+		table: "__drizzle_migrations",
+		schema: "public",
+	},
 	dbCredentials: {
 		url: DATABASE_URL,
 	},
