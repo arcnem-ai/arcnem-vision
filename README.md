@@ -208,7 +208,7 @@ For workflow-key uploads, step 3 verifies the object, creates the document, and 
 
 - Docker + Docker Compose
 - Bun
-- Go 1.25+
+- Go 1.27+
 - CompileDaemon (`go install github.com/githubnemo/CompileDaemon@latest`)
 - Flutter SDK
 - Tilt

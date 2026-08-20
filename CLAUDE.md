@@ -93,13 +93,13 @@ cd client && flutter test                       # Flutter widget tests
 | Agents    | 3020      | —              |
 | MCP       | 3021      | —              |
 
-Postgres uses `pgvector/pgvector:pg18` image with logical replication enabled.
+Postgres uses `pgvector/pgvector:0.8.6-pg18` with logical replication enabled.
 
 ## Local Dev Prerequisites
 
 - Docker + Docker Compose
 - Bun
-- Go 1.25+
+- Go 1.27+
 - Flutter SDK
 - Tilt
 - Hosted S3-compatible storage (endpoint, bucket, credentials; S3 / R2 / Railway / etc.)
