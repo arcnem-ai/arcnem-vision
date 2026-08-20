@@ -1,10 +1,10 @@
 module github.com/arcnem-ai/arcnem-vision/models/db
 
-go 1.26.5
+go 1.27.0
 
 require (
 	github.com/arcnem-ai/arcnem-vision/models/shared v0.0.0-20260428042307-628c880a150f
-	gorm.io/driver/postgres v1.6.0
+	gorm.io/driver/postgres v1.6.2
 	gorm.io/gen v0.3.28
 	gorm.io/gorm v1.31.2
 	gorm.io/plugin/dbresolver v1.6.2

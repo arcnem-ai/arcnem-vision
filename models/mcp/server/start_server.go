@@ -40,6 +40,12 @@ func registerTools(server *mcp.Server) error {
 	return nil
 }
 
+func newStreamableHTTPHandler(server *mcp.Server) http.Handler {
+	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
+		return server
+	}, &mcp.StreamableHTTPOptions{Stateless: true})
+}
+
 func StartServer() error {
 	if err := env.LoadEnv(); err != nil {
 		return fmt.Errorf("load env: %w", err)
@@ -59,17 +65,13 @@ func StartServer() error {
 		return err
 	}
 
-	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
-		return server
-	}, nil)
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
-	mux.Handle("/", handler)
+	mux.Handle("/", newStreamableHTTPHandler(server))
 
 	port := os.Getenv("PORT")
 	if port == "" {
