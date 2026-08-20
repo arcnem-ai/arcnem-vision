@@ -26,9 +26,9 @@
 		"@arcnem-vision/shared": "workspace:*",
 		"drizzle-kit": "0.31.10",
 		"drizzle-orm": "0.45.2",
-		"pg": "^8.22.0"
+		"pg": "^8.23.0"
 	},
 	"devDependencies": {
-		"@types/pg": "^8.20.0"
+		"@types/pg": "^8.23.1"
 	}
 }

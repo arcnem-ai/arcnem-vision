@@ -2,9 +2,11 @@ import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, type ProxyOptions } from "vite";
 
-function createAuthProxy(target: string | undefined) {
+function createAuthProxy(
+	target: string | undefined,
+): Record<string, string | ProxyOptions> | undefined {
 	if (!target) {
 		return undefined;
 	}

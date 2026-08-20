@@ -1,5 +1,7 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import {
+	Client,
+	StreamableHTTPClientTransport,
+} from "@modelcontextprotocol/client";
 import { API_ENV_VAR } from "@/env/apiEnvVar";
 import { getAPIEnvVar } from "@/env/getAPIEnvVar";
 
@@ -11,6 +13,8 @@ export class ApiMcpClient {
 		},
 		{
 			capabilities: {},
+			supportedProtocolVersions: ["2026-07-28", "2025-11-25"],
+			versionNegotiation: { mode: "auto" },
 		},
 	);
 

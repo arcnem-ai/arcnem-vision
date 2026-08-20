@@ -9,6 +9,7 @@ import { getRedisClient } from "@/clients/redis";
 import { getAPIEnvVar } from "@/env/getAPIEnvVar";
 import { sendAuthOTPEmail } from "@/lib/auth-email";
 import { getTrustedOrigins } from "@/lib/auth-origins";
+import { incrementWithTTL } from "@/lib/auth-secondary-storage";
 
 const db = getDB();
 const redisClient = getRedisClient();
@@ -70,6 +71,8 @@ export const auth = betterAuth({
 	secret: getAPIEnvVar("BETTER_AUTH_SECRET"),
 	secondaryStorage: {
 		get: async (key) => await redisClient.get(key),
+		getAndDelete: async (key) => await redisClient.getdel(key),
+		increment: async (key, ttl) => incrementWithTTL(redisClient, key, ttl),
 		set: async (key, value, ttl) => {
 			if (ttl) await redisClient.set(key, value, "EX", ttl);
 			else await redisClient.set(key, value);
