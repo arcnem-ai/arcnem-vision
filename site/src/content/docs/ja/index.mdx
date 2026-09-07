@@ -37,7 +37,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
     元画像だけでなく、説明文、OCR結果、埋め込み、セグメンテーション、派生画像まで保存。あとから検索、確認、再利用できる解析コーパスが育ちます。
   </Card>
   <Card title="ダッシュボードが運用の中枢" icon="pencil">
-    プロジェクト、ワークフローキー、サービスキー、ワークフロー、AI下書き生成、アップロード、検索、チャット、実行状況の確認までを1つの画面に集約。Flutterを開かなくても、コア体験はここで完結します。
+    プロジェクト、ワークフローキー、サービスキー、ワークフロー、AI下書き生成、アップロード、検索、チャット、実行状況の確認までを1つの画面に集約。
   </Card>
   <Card title="状態遷移まで追える実行トレース" icon="bars">
     初期状態、各ステップの差分、最終状態、所要時間、エラーを実行ごとに保存。運用担当者が「どこで何が起きたか」を後から追跡できます。
@@ -56,4 +56,3 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 | **エージェント** | Go, Gin, LangGraph, LangChain, inngestgo | グラフ読み込み、エージェント実行、ステップ単位の実行追跡 |
 | **MCP** | Go, MCP go-sdk, replicate-go, GORM | OCR、説明文生成、埋め込み、セグメンテーション、類似検索、取得系ツール |
 | **ストレージ** | Postgres 18 + pgvector, S3互換, Redis | ドキュメント保存、派生データ、ベクター検索、セッション、リアルタイム配信 |
-| **クライアント** | Flutter, Dart, flutter_gemma, GenUI, fpdart | 撮影、プレビュー、GenUI実験用のデモクライアント |

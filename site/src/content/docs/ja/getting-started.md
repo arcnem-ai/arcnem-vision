@@ -4,7 +4,7 @@ description: コアサービスをローカルで起動し、ダッシュボー�
 ---
 
 :::tip[まずはコアサービスから触るのがおすすめです]
-Arcnem Vision には Flutter のデモクライアントも含まれていますが、プロダクトの価値が最も分かりやすいのはダッシュボードとサーバー側の処理基盤です。まずは「画像を取り込む → ワークフローを動かす → 結果と実行履歴を見る」という流れから試してください。
+ダッシュボードとサーバー側の処理基盤から Arcnem Vision を試してください。まずは「画像を取り込む → ワークフローを動かす → 結果と実行履歴を見る」という流れから試してください。
 :::
 
 ## 必要条件
@@ -13,10 +13,8 @@ Arcnem Vision には Flutter のデモクライアントも含まれています
 - Bun
 - Go 1.25+（エージェント、MCP）
 - CompileDaemon（`go install github.com/githubnemo/CompileDaemon@latest`）
-- Flutter SDK
 - Tilt
 
-`tilt up` では Flutter も一緒に起動するため Flutter SDK は必要ですが、評価の入口としてはダッシュボードとサーバー側を先に見るのが最短です。
 
 ## 1. クローンと設定
 
@@ -33,7 +31,6 @@ cp server/packages/db/.env.example  server/packages/db/.env
 cp server/packages/dashboard/.env.example server/packages/dashboard/.env
 cp models/agents/.env.example       models/agents/.env
 cp models/mcp/.env.example          models/mcp/.env
-cp client/.env.example              client/.env
 ```
 
 外部サービスで必要なキーは次の2つです。
@@ -50,7 +47,7 @@ cp client/.env.example              client/.env
 tilt up
 ```
 
-Tilt が依存サービスの起動、マイグレーション、各アプリの立ち上げまでまとめて面倒を見ます。API、ダッシュボード、エージェント、MCP、Inngest、ドキュメントサイト、Flutter デモクライアントが一緒に起動します。ログ確認や手動ジョブの実行は Tilt UI（`http://localhost:10350`）から行えます。
+Tilt が依存サービスの起動、マイグレーション、各アプリの立ち上げまでまとめて面倒を見ます。API、ダッシュボード、エージェント、MCP、Inngest、ドキュメントサイトが一緒に起動します。ログ確認や手動ジョブの実行は Tilt UI（`http://localhost:10350`）から行えます。
 
 ## 3. データベースをシード
 
@@ -66,7 +63,6 @@ Tilt UI で **seed-database** を実行します。
 
 `server/packages/api/.env.example` では `API_DEBUG=true` が有効になっているので、シード後はダッシュボードがローカル用セッションに入れる状態になります。
 
-Flutter 側でもシード済み API キーを使いたい場合は、`client/.env` に `DEBUG_SEED_API_KEY=...` を設定してください。
 
 ## 4. まず見るべきコア体験
 

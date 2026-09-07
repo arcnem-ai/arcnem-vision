@@ -26,11 +26,6 @@ local_resource('inngest',
 
 # Dependencies
 
-local_resource('client_deps',
-  cmd='cd client && dart pub get',
-  labels=['dependencies']
-)
-
 local_resource('server_deps',
   cmd='cd server && bun i',
   labels=['dependencies']
@@ -100,12 +95,6 @@ local_resource('server',
 local_resource('dashboard',
   serve_cmd='cd server/packages/dashboard && bun run dev',
   resource_deps=['server_deps', 'server'],
-  labels=['services']
-)
-
-local_resource('client',
-  serve_cmd='cd client && flutter run -d chrome',
-  resource_deps=['client_deps'],
   labels=['services']
 )
 

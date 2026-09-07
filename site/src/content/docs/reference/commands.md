@@ -36,13 +36,12 @@ Also available as a manual trigger in the Tilt UI.
 
 ```bash
 cd server && bunx biome check packages         # TypeScript lint/format
-cd client && flutter analyze                   # Dart static analysis
 ```
 
 ## Testing
 
 ```bash
-cd client && flutter test                      # Flutter widget tests
+cd server && bun test                          # API and shared contract tests
 ```
 
 ## Documentation Site

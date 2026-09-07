@@ -25,7 +25,7 @@
 
 Arcnem Visionは、画像を受け取り、設定可能なAIワークフローで処理し、その結果と実行履歴を運用画面で扱えるオープンソースの画像解析基盤です。ワークフローAPIキーは組織/プロジェクト単位で画像を送信でき、運用担当者はダッシュボードから単発アップロードして任意のワークフローを流せます。どちらの経路でも、最終的にはPostgres上に保存されたエージェントグラフが読み込まれ、Goのサービスが実行を担います。
 
-このリポジトリで本当に重要なのはサーバー側の仕組みです。Flutterアプリは撮影やGenUIの実験に便利なデモクライアントですが、主役ではありません。価値の中心にあるのは、ワークフロー定義、ワークフローキーへの割り当て、OCR・説明文・埋め込み・セグメンテーションの保存、そして各ステップの状態変化まで追える運用基盤です。
+このリポジトリの中心はサーバー側の仕組みです。価値の中心にあるのは、ワークフロー定義、ワークフローキーへの割り当て、OCR・説明文・埋め込み・セグメンテーションの保存、そして各ステップの状態変化まで追える運用基盤です。
 
 ## コアとなる機能
 
@@ -68,7 +68,6 @@ Arcnem Visionは、画像を受け取り、設定可能なAIワークフロー�
 | **エージェント** | Go, Gin, LangGraph, LangChain, inngestgo | DBからグラフを読み込み、worker/tool/supervisor/conditionを実行 |
 | **MCP** | Go, MCP go-sdk, replicate-go, GORM | OCR、説明文生成、埋め込み、セグメンテーション、取得系ツール |
 | **ストレージ** | Postgres 18 + pgvector, S3互換ストレージ, Redis | ドキュメント、派生データ、ベクター検索、セッション、リアルタイム配信 |
-| **クライアント** | Flutter, Dart, flutter_gemma, GenUI | 撮影、プレビュー、GenUI実験用のデモクライアント |
 
 ## アーキテクチャ
 
@@ -139,7 +138,6 @@ cp server/packages/db/.env.example  server/packages/db/.env
 cp server/packages/dashboard/.env.example server/packages/dashboard/.env
 cp models/agents/.env.example       models/agents/.env
 cp models/mcp/.env.example          models/mcp/.env
-cp client/.env.example              client/.env
 ```
 
 必要な外部サービスのキーは次の2つです。
@@ -156,7 +154,7 @@ cp client/.env.example              client/.env
 tilt up
 ```
 
-Tiltは、API、ダッシュボード、エージェント、MCP、Inngest、ドキュメントサイト、Flutterデモクライアントまでまとめて立ち上げます。コア機能を確認したい場合は、まず `http://localhost:3001` のダッシュボードを見るのがおすすめです。
+Tiltは、API、ダッシュボード、エージェント、MCP、Inngest、ドキュメントサイトまでまとめて立ち上げます。コア機能を確認したい場合は、まず `http://localhost:3001` のダッシュボードを見るのがおすすめです。
 
 ### 3. データベースをシード
 
@@ -209,7 +207,6 @@ curl -X POST http://localhost:3000/api/uploads/ack \
 - Bun
 - Go 1.25+
 - CompileDaemon（`go install github.com/githubnemo/CompileDaemon@latest`）
-- Flutter SDK
 - Tilt
 
 ## リポジトリ構成
@@ -221,12 +218,11 @@ arcnem-vision/
 │   ├── packages/db/        Drizzleスキーマ、マイグレーション、シード、テンプレート
 │   ├── packages/dashboard/ 運用用Reactダッシュボード
 │   └── packages/shared/    共通Envヘルパー
-├── models/                 Goワークスペース
-│   ├── agents/             ワークフロー読み込み、LangGraph実行、run tracker
-│   ├── mcp/                OCR・埋め込み・説明文・セグメンテーション・取得系ツール
-│   ├── db/                 GORMモデル生成
-│   └── shared/             S3やリアルタイム配信の共通処理
-└── client/                 Flutterデモクライアント
+└── models/                 Goワークスペース
+    ├── agents/             ワークフロー読み込み、LangGraph実行、run tracker
+    ├── mcp/                OCR・埋め込み・説明文・セグメンテーション・取得系ツール
+    ├── db/                 GORMモデル生成
+    └── shared/             S3やリアルタイム配信の共通処理
 ```
 
 ## ドキュメント

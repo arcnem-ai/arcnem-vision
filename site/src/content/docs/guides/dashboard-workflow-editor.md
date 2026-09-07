@@ -3,7 +3,7 @@ title: Dashboard Operations
 description: Use the dashboard as the control plane for projects, API keys, workflows, uploads, retrieval, and live runs.
 ---
 
-The dashboard (`server/packages/dashboard`) is the control plane for Arcnem Vision. If you never open the Flutter app, you still get the core platform experience here: create workflow keys and service keys, attach workflows, generate first-pass drafts with AI, upload images, inspect OCR and segmentation artifacts, search the corpus, and review step-by-step runs without redeploying code.
+The dashboard (`server/packages/dashboard`) is the control plane for Arcnem Vision. Use it to create workflow keys and service keys, attach workflows, generate first-pass drafts with AI, upload images, inspect OCR and segmentation artifacts, search the corpus, and review step-by-step runs without redeploying code.
 
 ![Dashboard — projects and API keys](/dashboard-projects.png)
 

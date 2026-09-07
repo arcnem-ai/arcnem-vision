@@ -25,7 +25,7 @@
 
 Arcnem Vision is an open-source image ingestion and orchestration platform. Workflow API keys can upload images with org/project-scoped credentials that bind directly to a default workflow, operators can upload images from the dashboard, and every document can be routed through a customizable agent graph stored in Postgres and executed by Go services.
 
-That core service is the product: a control plane for defining workflows, attaching them to workflow keys, running ad-hoc analyses from the dashboard, persisting OCR/descriptions/embeddings/segmentations, and inspecting every run with step-level state transitions. The Flutter app is included as a demo client for capture and GenUI experiments, but it is not the center of the system.
+That core service is the product: a control plane for defining workflows, attaching them to workflow keys, running ad-hoc analyses from the dashboard, persisting OCR/descriptions/embeddings/segmentations, and inspecting every run with step-level state transitions.
 
 ## Core Service
 
@@ -68,7 +68,6 @@ Behind those workflows, the MCP layer currently exposes document description, do
 | **Agents** | Go, Gin, LangGraph, LangChain, inngestgo | Loads graph snapshots from DB, executes worker/tool/supervisor/condition nodes |
 | **MCP** | Go, MCP go-sdk, replicate-go, GORM | OCR, descriptions, embeddings, segmentation, retrieval, grounded reads |
 | **Storage** | Postgres 18 + pgvector, S3-compatible storage, Redis | Documents, derived artifacts, vector indexes, sessions, realtime fan-out |
-| **Client** | Flutter, Dart, flutter_gemma, GenUI | Optional demo client for capture, preview, and UI experiments |
 
 ## Architecture
 
@@ -139,7 +138,6 @@ cp server/packages/db/.env.example  server/packages/db/.env
 cp server/packages/dashboard/.env.example server/packages/dashboard/.env
 cp models/agents/.env.example       models/agents/.env
 cp models/mcp/.env.example          models/mcp/.env
-cp client/.env.example              client/.env
 ```
 
 Add your provider keys:
@@ -156,7 +154,7 @@ Everything else is wired for local development. Postgres, Redis, and MinIO come 
 tilt up
 ```
 
-Tilt starts the whole repository, including the dashboard, API, agents, MCP server, Inngest, docs site, and the Flutter demo client. If you're evaluating the core service, your first stop should be the dashboard on `http://localhost:3001`.
+Tilt starts the whole repository, including the dashboard, API, agents, MCP server, Inngest, and docs site. If you're evaluating the core service, your first stop should be the dashboard on `http://localhost:3001`.
 
 ### 3. Seed the database
 
@@ -210,7 +208,6 @@ For workflow-key uploads, step 3 verifies the object, creates the document, and 
 - Bun
 - Go 1.27+
 - CompileDaemon (`go install github.com/githubnemo/CompileDaemon@latest`)
-- Flutter SDK
 - Tilt
 
 ## Repository Layout
@@ -222,12 +219,11 @@ arcnem-vision/
 │   ├── packages/db/        Drizzle schema, migrations, seed data, templates
 │   ├── packages/dashboard/ React control plane for operators
 │   └── packages/shared/    Shared env helpers
-├── models/                 Go workspace
-│   ├── agents/             Workflow loader, LangGraph execution, run tracker
-│   ├── mcp/                OCR, embeddings, descriptions, segmentation, retrieval
-│   ├── db/                 GORM model generation
-│   └── shared/             Shared env, S3, realtime utilities
-└── client/                 Optional Flutter demo client
+└── models/                 Go workspace
+    ├── agents/             Workflow loader, LangGraph execution, run tracker
+    ├── mcp/                OCR, embeddings, descriptions, segmentation, retrieval
+    ├── db/                 GORM model generation
+    └── shared/             Shared env, S3, realtime utilities
 ```
 
 ## Documentation

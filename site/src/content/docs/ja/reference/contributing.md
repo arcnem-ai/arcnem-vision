@@ -16,10 +16,6 @@ Arcnem Vision への貢献ありがとうございます。
 変更範囲に応じて実行してください。
 
 ```bash
-# client
-cd client && flutter analyze
-cd client && flutter test
-
 # server workspace
 cd server && bunx biome check packages
 

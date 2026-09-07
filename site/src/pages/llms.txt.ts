@@ -127,7 +127,7 @@ export function GET() {
 	const body = [
 		"# Arcnem Vision",
 		"",
-		"> Documentation for Arcnem Vision, a vision-native AI stack with a Flutter client, Bun API, React dashboard, Go agent services, and MCP tools.",
+		"> Documentation for Arcnem Vision, a vision-native AI stack with a Bun API, React dashboard, Go agent services, and MCP tools.",
 		"",
 		"Use the English docs for the primary product and implementation context. The optional section links to the Japanese mirror of the same documentation.",
 		"",

@@ -21,7 +21,6 @@ See [README.md](README.md) for setup and architecture. If you use AI coding agen
 ## Code Style
 
 - **TypeScript:** Biome (tabs, double quotes). Run `bunx biome check packages` from `server/`.
-- **Dart:** `flutter_lints`. Run `flutter analyze` from `client/`.
 - **Go:** `gofmt`.
 
 Please ensure your code passes linting before submitting a PR.
@@ -31,7 +30,7 @@ Please ensure your code passes linting before submitting a PR.
 - Keep PRs focused on a single change.
 - Write a clear description of what changed and why.
 - Link any related issues.
-- Make sure existing tests pass (`flutter test` for the client).
+- Run `cd server && bun test` and `go test ./...` in each affected Go module.
 
 ## Reporting Issues
 

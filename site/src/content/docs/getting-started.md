@@ -4,7 +4,7 @@ description: Run the core services locally and exercise image workflows from the
 ---
 
 :::tip[Start with the core service]
-Arcnem Vision ships a Flutter demo client, but the fastest way to understand the product is through the dashboard and upload API. The core loop is: ingest an image, run a workflow, inspect the results, and review the run trace.
+Use the dashboard and upload API to explore Arcnem Vision. The core loop is: ingest an image, run a workflow, inspect the results, and review the run trace.
 :::
 
 ## Prerequisites
@@ -13,10 +13,8 @@ Arcnem Vision ships a Flutter demo client, but the fastest way to understand the
 - Bun
 - Go 1.25+ (agents, MCP)
 - CompileDaemon (`go install github.com/githubnemo/CompileDaemon@latest`)
-- Flutter SDK
 - Tilt
 
-`tilt up` launches the Flutter demo client too, so the Flutter SDK is still part of the default local stack. If you are evaluating the platform, focus on the dashboard and server-side services first.
 
 ## 1. Clone and configure
 
@@ -33,7 +31,6 @@ cp server/packages/db/.env.example  server/packages/db/.env
 cp server/packages/dashboard/.env.example server/packages/dashboard/.env
 cp models/agents/.env.example       models/agents/.env
 cp models/mcp/.env.example          models/mcp/.env
-cp client/.env.example              client/.env
 ```
 
 Add your provider keys:
@@ -50,7 +47,7 @@ Everything else is already configured for local development. Postgres, Redis, an
 tilt up
 ```
 
-Tilt installs dependencies, starts infrastructure, runs migrations, and launches the API, dashboard, agents, MCP server, Inngest, docs site, and the Flutter demo client. Open the Tilt UI at `http://localhost:10350` for logs and manual resources like seed and introspection.
+Tilt installs dependencies, starts infrastructure, runs migrations, and launches the API, dashboard, agents, MCP server, Inngest, and docs site. Open the Tilt UI at `http://localhost:10350` for logs and manual resources like seed and introspection.
 
 ## 3. Seed the database
 
