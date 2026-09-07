@@ -1,3 +1,5 @@
+import "zod/compile";
+
 import { getDB } from "@arcnem-vision/db/server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
