@@ -48,7 +48,6 @@ const plainOCRSupervisorApiKey =
 	"seed_ocr_sup_G7n4Q1r8S5t2U9v6W3x0Y7z4A1b8C5d2E9f6G3h0J7k4";
 const plainServiceApiKey =
 	"seed_srv_J5m8Q2r6S9t3U7v1W4x8Y2z6A9b3C7d1E4f8G2h6J9k3L7m1P4";
-const seededRemoteSensingWorkflowId = "019d90bd-b369-7653-944e-a4832e34a16d";
 const seedDashboardSessionToken =
 	"seed_dashboard_session_s4M8xR2vJ7nK1qP5wL9cD3fH6tY0uB4";
 const seededDashboardUserEmail =
@@ -1174,116 +1173,6 @@ const seed = async () => {
 			.returning({ id: tools.id });
 		if (!findSimilarDescsTool)
 			throw new Error("Failed to create find_similar_descriptions tool");
-
-		// ── Agent Graph (workflow 0: remote sensing scene review) ──
-
-		const [remoteSensingGraph] = await tx
-			.insert(agentGraphs)
-			.values({
-				id: seededRemoteSensingWorkflowId,
-				name: "Remote Sensing Scene Review",
-				description:
-					"Reviews an Earth-observation scene for data center construction and power infrastructure, saves a concise analysis, and embeds the written review for retrieval.",
-				entryNode: "review_scene",
-				organizationId: organization.id,
-			})
-			.returning({ id: agentGraphs.id });
-		if (!remoteSensingGraph) {
-			throw new Error("Failed to create remote sensing agent graph");
-		}
-
-		const [reviewSceneNode] = await tx
-			.insert(agentGraphNodes)
-			.values({
-				nodeKey: "review_scene",
-				nodeType: "worker",
-				inputKey: "temp_url",
-				outputKey: "scene_review",
-				config: {
-					system_message:
-						"You analyze Earth-observation imagery for data center construction and related infrastructure. Review visible land clearing, grading, access roads, concrete pads, structural shells, roofing progress, cooling yards, substations, transmission tie-ins, staging areas, parking, and any obvious anomalies. Return a short caption-style plain-text review grounded only in what is visible. Use 1 sentence, never exceed 35 words or 240 characters, and avoid markdown or unsupported inference.",
-					max_iterations: 3,
-					input_mode: "image_url",
-					input_prompt:
-						"Review this satellite scene in exactly 1 sentence with at most 35 words and 240 characters. Focus on the most important visible data center construction and related utility signals. Keep it factual, caption-like, and avoid markdown.",
-				},
-				agentGraphId: remoteSensingGraph.id,
-				modelId: gpt41MiniModel.id,
-			})
-			.returning({ id: agentGraphNodes.id });
-		if (!reviewSceneNode) {
-			throw new Error("Failed to create review_scene node");
-		}
-
-		const [saveSceneReviewNode] = await tx
-			.insert(agentGraphNodes)
-			.values({
-				nodeKey: "save_scene_review",
-				nodeType: "tool",
-				config: {
-					input_mapping: {
-						text: "scene_review",
-						model_provider: "_const:OPENAI",
-						model_name: "_const:gpt-4.1-mini",
-						model_version: "_const:",
-					},
-					output_mapping: {
-						description_id: "document_description_id",
-					},
-				},
-				agentGraphId: remoteSensingGraph.id,
-			})
-			.returning({ id: agentGraphNodes.id });
-		if (!saveSceneReviewNode) {
-			throw new Error("Failed to create save_scene_review node");
-		}
-
-		const [embedSceneReviewNode] = await tx
-			.insert(agentGraphNodes)
-			.values({
-				nodeKey: "embed_scene_review",
-				nodeType: "tool",
-				config: {
-					input_mapping: {
-						text: "scene_review",
-						document_description_id: "document_description_id",
-					},
-				},
-				agentGraphId: remoteSensingGraph.id,
-			})
-			.returning({ id: agentGraphNodes.id });
-		if (!embedSceneReviewNode) {
-			throw new Error("Failed to create embed_scene_review node");
-		}
-
-		await tx.insert(agentGraphNodeTools).values([
-			{
-				agentGraphNodeId: saveSceneReviewNode.id,
-				toolId: createDocDescTool.id,
-			},
-			{
-				agentGraphNodeId: embedSceneReviewNode.id,
-				toolId: createDescEmbTool.id,
-			},
-		]);
-
-		await tx.insert(agentGraphEdges).values([
-			{
-				fromNode: "review_scene",
-				toNode: "save_scene_review",
-				agentGraphId: remoteSensingGraph.id,
-			},
-			{
-				fromNode: "save_scene_review",
-				toNode: "embed_scene_review",
-				agentGraphId: remoteSensingGraph.id,
-			},
-			{
-				fromNode: "embed_scene_review",
-				toNode: "END",
-				agentGraphId: remoteSensingGraph.id,
-			},
-		]);
 
 		const [serviceApiKey] = await tx
 			.insert(apikeys)
@@ -3362,10 +3251,6 @@ const seed = async () => {
 		// the intended sharing model in the dashboard.
 		const workflowTemplates = [
 			await cloneWorkflowToTemplate(tx, {
-				workflowId: remoteSensingGraph.id,
-				organizationId: organization.id,
-			}),
-			await cloneWorkflowToTemplate(tx, {
 				workflowId: pipelineGraph.id,
 				organizationId: organization.id,
 				visibility: "public",
@@ -3404,7 +3289,6 @@ const seed = async () => {
 			project,
 			secondaryProject,
 			serviceApiKey,
-			remoteSensingGraph,
 			pipelineApiKey,
 			pipelineGraph,
 			qualityReviewApiKey,
@@ -3520,9 +3404,6 @@ const seed = async () => {
 	console.log(`API Key (plain, workflow 5): ${plainOCRConditionApiKey}`);
 	console.log(`API Key ID (workflow 6): ${result.ocrSupervisorApiKey.id}`);
 	console.log(`API Key (plain, workflow 6): ${plainOCRSupervisorApiKey}`);
-	console.log(
-		`\nAgent Graph (workflow 0, remote sensing): ${result.remoteSensingGraph.id}`,
-	);
 	console.log(`Agent Graph (workflow 1): ${result.pipelineGraph.id}`);
 	console.log(`Agent Graph (workflow 2): ${result.qualityReviewGraph.id}`);
 	console.log(
