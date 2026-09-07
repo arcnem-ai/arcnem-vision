@@ -63,6 +63,8 @@
  *   bun run server.prod.ts
  */
 
+import "zod/compile";
+
 import * as path from "node:path";
 import Bun from "bun";
 
