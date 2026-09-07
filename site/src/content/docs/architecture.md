@@ -157,10 +157,6 @@ The dashboard is the main operating surface for the platform:
 - search and chat across the collection
 - inspect live and historical runs
 
-## Optional Client
-
-The Flutter app is a useful demo client for camera capture, preview, and GenUI experiments. It is not required for the core platform story. The core value is in the server-side workflow engine, dashboard control plane, and persistent analysis pipeline.
-
 ## Repository Layout
 
 ```text
@@ -170,12 +166,11 @@ arcnem-vision/
 │   ├── packages/db/        Drizzle schema, migrations, templates, seed data
 │   ├── packages/dashboard/ React operator UI
 │   └── packages/shared/    Shared env helpers
-├── models/                 Go workspace
-│   ├── agents/             Graph loader, execution, run tracker
-│   ├── mcp/                MCP tool server
-│   ├── db/                 GORM model generation
-│   └── shared/             Shared runtime utilities
-└── client/                 Optional Flutter demo client
+└── models/                 Go workspace
+    ├── agents/             Graph loader, execution, run tracker
+    ├── mcp/                MCP tool server
+    ├── db/                 GORM model generation
+    └── shared/             Shared runtime utilities
 ```
 
 ## Service Ports

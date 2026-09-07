@@ -4,7 +4,6 @@ What changed and why?
 
 ## Scope
 
-- [ ] `client`
 - [ ] `server`
 - [ ] `models`
 - [ ] `docs/site`
@@ -13,8 +12,6 @@ What changed and why?
 
 List commands run locally (include relevant output summaries):
 
-- [ ] `cd client && flutter analyze`
-- [ ] `cd client && flutter test`
 - [ ] `cd server && bunx biome check packages`
 - [ ] Other:
 

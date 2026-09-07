@@ -36,13 +36,12 @@ Tilt UIの手動トリガーとしても利用可能。
 
 ```bash
 cd server && bunx biome check packages         # TypeScriptリント/フォーマット
-cd client && flutter analyze                   # Dart静的解析
 ```
 
 ## テスト
 
 ```bash
-cd client && flutter test                      # Flutterウィジェットテスト
+cd server && bun test                          # API and shared contract tests
 ```
 
 ## ドキュメントサイト

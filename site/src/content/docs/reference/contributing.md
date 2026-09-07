@@ -16,10 +16,6 @@ Thanks for contributing to Arcnem Vision.
 Run what is relevant to your changes:
 
 ```bash
-# client
-cd client && flutter analyze
-cd client && flutter test
-
 # server workspace
 cd server && bunx biome check packages
 
