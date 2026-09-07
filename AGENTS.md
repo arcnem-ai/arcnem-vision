@@ -1,89 +1,68 @@
 # Repository Guidelines
 
-This file is written for AI coding agents. Human contributors should start with `README.md` and `CONTRIBUTING.md`.
+This is the canonical guidance for coding agents. `CLAUDE.md` points here. Human contributors should start with [README.md](README.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Project Structure & Module Organization
-- `client/` contains the Flutter app. Main code lives in `client/lib/` (screens, providers, services, models, enums, catalog, theme); widget tests live in `client/test/`.
-- `server/` is a Bun workspace with four packages:
-  - `server/packages/api/src/` hosts Hono routes/middleware (auth, uploads, documents, dashboard).
-  - `server/packages/db/src/` defines Drizzle schema/migrations. Schema is split into `authSchema.ts`, `projectSchema.ts`, and `agentGraphSchemas.ts` with relationships in `relationships.ts`.
-  - `server/packages/dashboard/` is a React admin UI built with TanStack Router, Tailwind, and shadcn/ui. Keep business logic in the API package when possible; the dashboard should mostly proxy/auth and render API-owned state.
-  - `server/packages/shared/src/` holds shared env helpers (`createEnvVarGetter` pattern).
-- `models/` is a Go workspace (`go.work`) with modules:
-  - `models/agents/` — Gin server with Inngest job handlers and LangGraph workflow execution. Organized by feature: `clients/`, `jobs/`, `graphs/`, `load/`, `tools/`, `server/`, `enums/`, `utils/`.
-  - `models/mcp/` — MCP server with 10 registered tools (OCR, descriptions, embeddings, segmentation, similarity search, scoped browse/search, grounded document reads). Organized: `server/`, `tools/`, `clients/`.
-  - `models/db/` — GORM gen introspection tool (`cmd/introspect/`) with generated models in `gen/models/` and queries in `gen/queries/`.
-  - `models/cli/` — Bubble Tea TUI (stub).
-  - `models/shared/` — Common env loading via godotenv.
-- Local infra and orchestration are defined in `docker-compose.yaml` and `Tiltfile`.
+## Product and architecture
 
-## Build, Test, and Development Commands
-- Requirements for local dev:
-  - Docker + Docker Compose
-  - Bun (server workspace)
-  - Go 1.27+ (agents, MCP, model introspection)
-  - Flutter SDK (client)
-  - Tilt (recommended)
-  - Inngest CLI (`npx inngest-cli@latest`)
-  - CompileDaemon (`go install github.com/githubnemo/CompileDaemon@latest`)
-  - Hosted S3-compatible bucket (S3 / R2 / Railway / etc.)
-- `docker compose up -d postgres redis`: start local dependencies.
-- `tilt up`: run full stack (deps, DB generation/migration, API, dashboard, Go services, Flutter web).
-- Tilt UI is typically available at `http://localhost:10350` (logs + manual resources like seed/introspection).
-- `cd client && flutter pub get && flutter run -d chrome`: run Flutter client.
-- `cd client && flutter analyze`: run Dart static analysis.
-- `cd server && bun i`: install server workspace dependencies.
-- `cd server/packages/api && bun run dev`: start API server (port 3000).
-- `cd server/packages/dashboard && bun run dev`: start dashboard UI on port 3001.
-- `cd server/packages/db && bun run db:generate && bun run db:migrate`: generate/apply DB migrations.
-- `cd server/packages/db && bun run db:seed`: seed local database.
-- `cd models/agents && CompileDaemon -build="go build -o tmp/main ." -command="./tmp/main"` / `cd models/mcp && CompileDaemon -build="go build -o tmp/main ." -command="./tmp/main"`: run Go services with hot compile.
-- `cd models/db && go run ./cmd/introspect`: regenerate GORM models from DB schema.
-- `npx inngest-cli@latest dev -u http://localhost:3020/api/inngest`: run Inngest locally.
+The API, configurable agent graphs, and operator dashboard are the core service. `client/` is the optional Flutter capture and GenUI demo.
 
-## Infrastructure Defaults
+- `server/packages/api/src/`: Hono routes and middleware for authentication, uploads, documents, service execution, dashboard operations, and realtime events.
+- `server/packages/dashboard/`: React/TanStack Start dashboard. Keep domain logic in the API; the dashboard proxies auth, chat, and realtime and renders API-owned state.
+- `server/packages/db/src/schema/`: canonical Drizzle schema (`authSchema.ts`, `projectSchema.ts`, `agentGraphSchemas.ts`, and `relationships.ts`). Migrations live in `server/packages/db/src/migrations/`.
+- `server/packages/shared/src/`: shared contracts, authorization helpers, workflow normalization, and environment access through `createEnvVarGetter`.
+- `models/agents/`: Gin/Inngest handlers, graph loading, LangGraph execution, and run tracking.
+- `models/mcp/`: internal Go MCP tools for OCR, descriptions, embeddings, segmentation, scoped search/browse, and grounded document reads.
+- `models/db/`: GORM introspection in `cmd/introspect/`; generated models and queries in `gen/`.
+- `models/shared/`: shared Go environment, storage, and realtime helpers. `models/go.work` lists the Go modules.
+- `site/`: documentation site. `docker-compose.yaml`, `Tiltfile`, and `Makefile` define local orchestration.
 
-| Service   | Host Port | Container Port |
-|-----------|-----------|----------------|
-| Postgres  | 5480      | 5432           |
-| Redis     | 6381      | 6379           |
-| API       | 3000      | —              |
-| Dashboard | 3001      | —              |
-| Agents    | 3020      | —              |
-| MCP       | 3021      | —              |
+Workflow-key ingestion follows presign, upload to S3, and acknowledgement. The API verifies the object and emits an Inngest event; Go agents load the graph, invoke workers/tools, and persist results and run history. Dashboard operators can upload documents and select workflows independently. The service API provides scoped uploads, explicit execution, status, search, and publication.
 
-## Environment
+Graphs use template/version and instance records. Worker, tool, supervisor, and condition nodes have distinct model/tool/routing requirements. Preserve graph validation and provenance; execution history lives in `agent_graph_runs` and `agent_graph_run_steps`.
 
-Each service has its own `.env` (copy from `.env.example`):
-- `server/packages/api/.env` — S3, Inngest, better-auth secrets, Redis, and OpenAI/MCP settings for dashboard chat
-- `server/packages/db/.env` — DATABASE_URL
-- `client/.env` — API_URL, CLIENT_ORIGIN, DEBUG_SEED_API_KEY
-- `models/agents/.env` — DATABASE_URL, S3, OPENAI_API_KEY, MCP_SERVER_URL, Inngest
-- `models/mcp/.env` — REPLICATE_API_TOKEN, DATABASE_URL, MCP server name/version
-- `models/db/.env` — DATABASE_URL
-- Use one canonical env var name per setting. Do not add alias fallbacks like `A ?? B`, repo-specific compatibility shims, or silent default lookups for critical config. Rename callers in one pass instead.
+## Authorization and data
 
-## Coding Style & Naming Conventions
-- TypeScript uses Biome (`server/biome.json`): tabs, double quotes, import organization. Run `cd server && bunx biome check packages`.
-- Dart follows `flutter_lints` (`client/analysis_options.yaml`); use `UpperCamelCase` for classes/widgets and `lowerCamelCase` for fields/methods. Error handling uses `fpdart` Either/TaskEither pattern.
-- Go should be formatted with `gofmt`; keep package names lowercase and organize by feature (`clients/`, `jobs/`, `graphs/`, `server/`, `tools/`).
-- For app-domain string fields like `kind`, `status`, and `visibility`, keep the database type as plain text and enforce allowed values in application logic. Do not add enum-style DB check constraints for those fields.
+- Better Auth provides dashboard sessions and API keys. Workflow keys bind to one graph; service keys remain project-scoped orchestration credentials. Preserve organization/project checks in shared domain operations.
+- API keys are stored as SHA-256 hashes. Never log raw keys, session tokens, provider credentials, or signed URLs.
+- Drizzle owns schema changes; regenerate Go database bindings after applying a migration to the intended local database. Do not hand-edit generated bindings.
+- Use UUIDv7 for new primary keys. Keep embedding dimensions consistent with model metadata and vector indexes; current CLIP embeddings use 768 dimensions with HNSW cosine indexes.
+- Keep application-domain values such as `kind`, `status`, and `visibility` as text in the database and validate allowed values in application code, not enum-style database check constraints.
+- Seeds are for disposable local data. Do not run seeds or destructive test setup against a shared or production database.
 
-## Testing Guidelines
-- Current automated tests are minimal (existing example: `client/test/widget_test.dart`).
-- For client changes, run `cd client && flutter test`.
-- For new TS/Go features, add colocated tests (`*.test.ts`, `*_test.go`) and run the relevant module test command before opening a PR.
-- Keep the default CI-safe suite deterministic.
-- For broader local assurance around the service API, use `cd server && bun test` for CI-safe coverage and `make live-service-test` for the fuller upload -> ack -> execute -> publish probe.
-- `make live-service-test` is the entrypoint for the local end-to-end probe. It reuses the existing `.env.docker` files, but boots an isolated Postgres/Redis/MinIO stack plus dedicated API/agents/MCP containers before running the probe.
+## Development
 
-## Commit & Pull Request Guidelines
-- Follow the existing commit style: short, imperative subjects (examples from history: `Upload ack`, `Align drizzle version`, `gemma gen ui`).
-- Keep commits focused on one concern.
-- PRs should include: purpose, impacted areas (`client`, `server`, `models`), setup/migration steps, and screenshots for UI changes.
-- Link related issues and call out new env vars, ports, or infrastructure changes.
+Use the Bun version pinned in `server/package.json` and the Go version in `models/go.work`. Docker/Compose, Tilt, and CompileDaemon support the full stack; Flutter is needed when running the demo client. Copy each service's `.env.example` to `.env`, or `.env.docker.example` to `.env.docker` for Makefile Docker workflows. Local Compose provides Postgres, Redis, and MinIO; hosted S3-compatible storage is also supported.
 
-## Security & Configuration Tips
-- Copy each module's `.env.example` to `.env`; do not commit secrets.
-- Keep local defaults aligned unless intentionally changing shared config (Postgres `5480`, Redis `6381`, API `3000`, Dashboard `3001`, Agents `3020`, MCP `3021`).
-- API keys are stored as SHA-256 hashes; never log or expose raw keys.
+| Task | Command from repository root |
+| --- | --- |
+| Full stack | `tilt up` |
+| Local infrastructure | `docker compose up -d postgres redis minio minio-init` |
+| Install server dependencies | `cd server && bun install --frozen-lockfile` |
+| API | `cd server/packages/api && bun run dev` |
+| Dashboard | `cd server/packages/dashboard && bun run dev` |
+| Dashboard build | `cd server/packages/dashboard && bun run build` |
+| Generate migrations | `cd server/packages/db && bun run db:generate` |
+| Apply migrations | `cd server/packages/db && bun run db:migrate` |
+| Seed disposable local data | `cd server/packages/db && bun run db:seed` |
+| Regenerate Go bindings | `cd models/db && go run ./cmd/introspect` |
+| Go services individually | `cd models/agents && go run .` or `cd models/mcp && go run .` |
+| Flutter demo | `cd client && flutter pub get && flutter run -d chrome` |
+
+Default host ports are Postgres `5480`, Redis `6381`, MinIO `9000`/`9001`, API `3000`, dashboard `3001`, agents `3020`, and MCP `3021`. Tilt's UI is normally on `10350`. Keep examples and callers aligned when changing these defaults.
+
+Each API, dashboard, database, agents, MCP, introspection, and Flutter service reads its own environment file. Use one canonical variable per setting; do not add alias fallbacks or silently default critical configuration. The dashboard's server-side API URL and the API's storage, auth, Redis, model, and MCP settings are separate concerns.
+
+## Style and verification
+
+- TypeScript uses `server/biome.json`: tabs, double quotes, and organized imports. Run `cd server && bunx biome check packages`.
+- Prefer canonical Tailwind utilities, including v4 variable syntax such as `text-(--ink)`.
+- Go uses `gofmt`, lowercase package names, and feature-oriented packages.
+- Dart uses `flutter_lints`, UpperCamelCase types, lowerCamelCase members, and the existing `fpdart` error-handling pattern.
+- Run `cd server && bun test` for deterministic TypeScript tests, including service contracts, authorization, and OpenAPI generation. Run `go test ./...` in each affected Go module; CI covers agents, db, MCP, and shared.
+- For Flutter changes, run `cd client && flutter analyze && flutter test`. For dashboard changes, also build the dashboard.
+- Add focused colocated tests (`*.test.ts`, `*_test.go`) for changed behavior. Keep external providers and live infrastructure out of the default suite.
+- `make live-service-test` runs the fuller upload/acknowledge/execute/publish probe. It uses the existing `.env.docker` files but starts isolated Postgres/Redis/MinIO and dedicated service containers. Use it when changing that lifecycle; `make live-service-stack-down` removes only that isolated stack and its volumes.
+
+## Changes and review
+
+Keep changes and commits focused, with short imperative subjects. Preserve unrelated work and never commit environment files or secrets. PR descriptions should explain behavior, validation, affected services, and any migration/configuration changes; include screenshots for UI changes. Verify current commands and paths before adding guidance rather than duplicating setup documentation here.
