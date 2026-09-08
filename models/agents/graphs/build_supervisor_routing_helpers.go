@@ -18,6 +18,9 @@ func parseSupervisorConfig(snapshotNode *SnapshotNode) (supervisorConfig, error)
 			err,
 		)
 	}
+	if err := cfg.GenerationConfig.Validate(); err != nil {
+		return supervisorConfig{}, fmt.Errorf("supervisor node %q: %w", snapshotNode.Node.NodeKey, err)
+	}
 	if len(cfg.Members) == 0 {
 		return supervisorConfig{}, fmt.Errorf(
 			"supervisor node %q: config must specify \"members\"",

@@ -876,6 +876,18 @@ const seed = async () => {
 			.returning({ id: models.id });
 		if (!gpt41MiniModel) throw new Error("Failed to create GPT-4.1-mini model");
 
+		const [gpt56LunaModel] = await tx
+			.insert(models)
+			.values({
+				provider: "OPENAI",
+				name: "gpt-5.6-luna",
+				version: "",
+				type: "chat",
+				config: {},
+			})
+			.returning({ id: models.id });
+		if (!gpt56LunaModel) throw new Error("Failed to create GPT-5.6 Luna model");
+
 		const [semanticSegmentationModel] = await tx
 			.insert(models)
 			.values({
@@ -2645,10 +2657,12 @@ const seed = async () => {
 				config: {
 					system_message:
 						"You are the billing OCR specialist. When the OCR text looks like an invoice, receipt, bill, or payment request, summarize the vendor, amount, due date, and next billing action in one concise paragraph.",
+					reasoning_effort: "low",
+					max_output_tokens: 4096,
 					max_iterations: 3,
 				},
 				agentGraphId: ocrSupervisorGraph.id,
-				modelId: gpt41MiniModel.id,
+				modelId: gpt56LunaModel.id,
 			})
 			.returning({ id: agentGraphNodes.id });
 		if (!billingOCRSpecialistNode) {
@@ -2663,10 +2677,12 @@ const seed = async () => {
 				config: {
 					system_message:
 						"You are the operations OCR specialist. When the OCR text looks like a memo, checklist, schedule, or facilities instruction, summarize the operational action items, timing, and owner in one concise paragraph.",
+					reasoning_effort: "low",
+					max_output_tokens: 4096,
 					max_iterations: 3,
 				},
 				agentGraphId: ocrSupervisorGraph.id,
-				modelId: gpt41MiniModel.id,
+				modelId: gpt56LunaModel.id,
 			})
 			.returning({ id: agentGraphNodes.id });
 		if (!operationsOCRSpecialistNode) {
@@ -2684,11 +2700,13 @@ const seed = async () => {
 					members: ["billing_ocr_specialist", "operations_ocr_specialist"],
 					input_prompt:
 						"Route this OCR text to exactly one specialist. After the specialist responds, finish and hand off to save_review_summary.",
+					reasoning_effort: "low",
+					max_output_tokens: 4096,
 					max_iterations: 6,
 					finish_target: "save_review_summary",
 				},
 				agentGraphId: ocrSupervisorGraph.id,
-				modelId: gpt41MiniModel.id,
+				modelId: gpt56LunaModel.id,
 			})
 			.returning({ id: agentGraphNodes.id });
 		if (!ocrReviewSupervisorNode) {
@@ -2704,7 +2722,7 @@ const seed = async () => {
 					input_mapping: {
 						text: "ocr_review_summary",
 						model_provider: "_const:OPENAI",
-						model_name: "_const:gpt-4.1-mini",
+						model_name: "_const:gpt-5.6-luna",
 						model_version: "_const:",
 					},
 				},
@@ -2845,7 +2863,7 @@ const seed = async () => {
 			.values(
 				supervisorOCRDocumentsWithIds.map((seedDocument) => ({
 					documentId: seedDocument.documentId,
-					modelId: gpt41MiniModel.id,
+					modelId: gpt56LunaModel.id,
 					text: seedDocument.savedSummary,
 				})),
 			)
@@ -3303,6 +3321,7 @@ const seed = async () => {
 			ocrSupervisorGraph,
 			clipModel,
 			gpt41MiniModel,
+			gpt56LunaModel,
 			semanticSegmentationModel,
 			langSegmentationModel,
 			deepseekOCRModel,
@@ -3426,6 +3445,7 @@ const seed = async () => {
 	}
 	console.log(`CLIP Model: ${result.clipModel.id}`);
 	console.log(`GPT-4.1 Mini Model: ${result.gpt41MiniModel.id}`);
+	console.log(`GPT-5.6 Luna Model: ${result.gpt56LunaModel.id}`);
 	console.log(
 		`Semantic segmentation model: ${result.semanticSegmentationModel.id}`,
 	);

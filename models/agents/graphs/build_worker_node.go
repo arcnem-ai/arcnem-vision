@@ -43,7 +43,9 @@ func BuildWorkerNode(snapshotNode *SnapshotNode, modelClient any, mcpClient *cli
 		Name:        snapshotNode.Node.NodeKey,
 		Description: snapshotNode.Node.NodeKey,
 		Fn: func(ctx context.Context, state map[string]any) (map[string]any, error) {
+			ctx = clients.WithGeneration(ctx, workerConfig.GenerationConfig)
 			var input string
+			var err error
 			if inputKey != nil {
 				input, err = loadStateString(state, *inputKey)
 				if err != nil {
@@ -181,6 +183,7 @@ func BuildSupervisorMemberWorkerNode(snapshotNode *SnapshotNode, modelClient any
 		Name:        nodeKey,
 		Description: fmt.Sprintf("Supervisor member worker: %s", nodeKey),
 		Fn: func(ctx context.Context, state map[string]any) (map[string]any, error) {
+			ctx = clients.WithGeneration(ctx, workerConfig.GenerationConfig)
 			inputMessages, err := loadStateMessages(state, "messages")
 			if err != nil {
 				return nil, fmt.Errorf("member worker %q: %w", nodeKey, err)

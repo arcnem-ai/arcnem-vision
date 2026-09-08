@@ -10,9 +10,9 @@ import (
 	"log"
 	"net"
 	"strconv"
-	"strings"
 	"time"
 
+	"github.com/sashabaranov/go-openai"
 	"github.com/tmc/langchaingo/llms"
 )
 
@@ -143,30 +143,20 @@ func classifyProviderError(ctx context.Context, err error) (string, bool) {
 	if errors.As(err, &netErr) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 		return "transport_error", true
 	}
-	message := err.Error()
-	if strings.HasPrefix(message, "network error: ") || strings.HasPrefix(message, "request timeout: ") {
-		return "transport_error", true
-	}
 
 	return "error", false
 }
 
 func providerHTTPStatus(err error) int {
-	const marker = "API returned unexpected status code: "
-	message := err.Error()
-	if !strings.HasPrefix(message, marker) {
-		return 0
+	var apiErr *openai.APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.HTTPStatusCode
 	}
-
-	statusText := message[len(marker):]
-	if len(statusText) < 3 || (len(statusText) > 3 && statusText[3] >= '0' && statusText[3] <= '9') {
-		return 0
+	var requestErr *openai.RequestError
+	if errors.As(err, &requestErr) {
+		return requestErr.HTTPStatusCode
 	}
-	status, err := strconv.Atoi(statusText[:3])
-	if err != nil || status < 100 || status > 599 {
-		return 0
-	}
-	return status
+	return 0
 }
 
 func isTransientProviderStatus(status int) bool {

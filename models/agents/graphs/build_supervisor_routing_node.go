@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/arcnem-ai/arcnem-vision/models/agents/clients"
 	"github.com/tmc/langchaingo/llms"
 )
 
@@ -19,6 +20,7 @@ const (
 )
 
 type supervisorConfig struct {
+	clients.GenerationConfig
 	Members        []string `json:"members"`
 	MaxIterations  int      `json:"max_iterations"`
 	InputMode      string   `json:"input_mode"`
