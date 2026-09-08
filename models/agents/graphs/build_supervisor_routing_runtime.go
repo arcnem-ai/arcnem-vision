@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/arcnem-ai/arcnem-vision/models/agents/clients"
 	"github.com/smallnest/langgraphgo/graph"
 	"github.com/tmc/langchaingo/llms"
 )
@@ -144,7 +145,7 @@ func (r supervisorRouter) buildInputMessages(
 
 func (r supervisorRouter) routeNext(ctx context.Context, inputMessages []llms.MessageContent) (string, error) {
 	resp, err := r.model.GenerateContent(
-		ctx,
+		clients.WithGeneration(ctx, r.cfg.GenerationConfig),
 		inputMessages,
 		llms.WithTools([]llms.Tool{r.routeTool}),
 		llms.WithToolChoice(r.toolChoice),

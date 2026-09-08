@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/arcnem-ai/arcnem-vision/models/agents/clients"
 	"github.com/smallnest/langgraphgo/graph"
 	"github.com/smallnest/langgraphgo/prebuilt"
 	"github.com/tmc/langchaingo/llms"
@@ -11,6 +12,7 @@ import (
 )
 
 type workerAgentConfig struct {
+	clients.GenerationConfig
 	SystemMessage string              `json:"system_message"`
 	MaxIterations int                 `json:"max_iterations"`
 	OutputRetries int                 `json:"output_retries"`
@@ -27,6 +29,9 @@ func parseWorkerConfig(snapshotNode *SnapshotNode) (workerAgentConfig, int, []pr
 		return workerAgentConfig{}, 0, nil, fmt.Errorf("worker node %q: invalid config json: %w", snapshotNode.Node.NodeKey, err)
 	}
 
+	if err := config.GenerationConfig.Validate(); err != nil {
+		return workerAgentConfig{}, 0, nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
+	}
 	maxIterations, opts := buildWorkerAgentOptions(config)
 	return config, maxIterations, opts, nil
 }

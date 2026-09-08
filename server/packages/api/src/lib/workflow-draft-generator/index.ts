@@ -9,6 +9,7 @@ import {
 import { ChatOpenAI } from "@langchain/openai";
 import { API_ENV_VAR } from "@/env/apiEnvVar";
 import { getAPIEnvVar } from "@/env/getAPIEnvVar";
+import { assertOpenAIResponseComplete } from "../openai-response";
 import {
 	buildExecutionModelLookup,
 	buildModelLookup,
@@ -554,14 +555,17 @@ export async function generateWorkflowDraftFromDescription(input: {
 	});
 
 	const model = new ChatOpenAI({
+		useResponsesApi: true,
+		zdrEnabled: true,
+		modelKwargs: { include: ["reasoning.encrypted_content"] },
 		apiKey: getAPIEnvVar(API_ENV_VAR.OPENAI_API_KEY),
 		model: getAPIEnvVar(API_ENV_VAR.OPENAI_MODEL),
-		temperature: 0.1,
 	});
 	const structuredModel = model.withStructuredOutput(
 		generatedWorkflowPlanSchema,
 		{
 			name: "workflow_draft",
+			includeRaw: true,
 		},
 	);
 
@@ -577,8 +581,9 @@ export async function generateWorkflowDraftFromDescription(input: {
 		},
 	]);
 
+	assertOpenAIResponseComplete(generated.raw);
 	return materializeGeneratedWorkflowDraft({
-		generated: generatedWorkflowPlanSchema.parse(generated),
+		generated: generatedWorkflowPlanSchema.parse(generated.parsed),
 		modelCatalog: input.catalog.modelCatalog,
 		toolCatalog: input.catalog.toolCatalog,
 		executionModelCatalog: input.catalog.executionModelCatalog,

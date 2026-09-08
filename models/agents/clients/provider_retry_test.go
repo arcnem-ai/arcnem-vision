@@ -5,9 +5,11 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net"
 	"strings"
 	"testing"
 
+	"github.com/sashabaranov/go-openai"
 	"github.com/tmc/langchaingo/llms"
 )
 
@@ -45,7 +47,7 @@ func TestProviderRetryHandles500ThenSuccessWithSafeDiagnostics(t *testing.T) {
 	model := WithProviderRetry(&providerTestModel{generate: func() (*llms.ContentResponse, error) {
 		calls++
 		if calls == 1 {
-			return nil, errors.New("API returned unexpected status code: 500: signed_url=https://secret.invalid/image?key=api-secret")
+			return nil, &openai.APIError{HTTPStatusCode: 500, Message: "signed_url=https://secret.invalid/image?key=api-secret"}
 		}
 		return &llms.ContentResponse{Choices: []*llms.ContentChoice{{Content: "ok"}}}, nil
 	}}, "inspect_image", "OPENAI", "gpt-test")
@@ -95,7 +97,7 @@ func TestProviderRetryHandles500ThenSuccessWithSafeDiagnostics(t *testing.T) {
 
 func TestProviderRetryReturnsSafeErrorAfterExhaustion(t *testing.T) {
 	calls := 0
-	providerErr := errors.New("API returned unexpected status code: 503: prompt=private-prompt")
+	providerErr := &openai.APIError{HTTPStatusCode: 503, Message: "prompt=private-prompt"}
 	model := WithProviderRetry(&providerTestModel{generate: func() (*llms.ContentResponse, error) {
 		calls++
 		return nil, providerErr
@@ -118,8 +120,8 @@ func TestProviderRetryDoesNotRetryNonRetryableFailures(t *testing.T) {
 		name string
 		err  error
 	}{
-		{name: "authentication", err: errors.New("API returned unexpected status code: 401: api-key=private")},
-		{name: "validation", err: errors.New("API returned unexpected status code: 400: prompt=private")},
+		{name: "authentication", err: &openai.APIError{HTTPStatusCode: 401, Message: "api-key=private"}},
+		{name: "validation", err: &openai.APIError{HTTPStatusCode: 400, Message: "prompt=private"}},
 		{name: "unclassified", err: errors.New("invalid request containing private input")},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -146,7 +148,7 @@ func TestProviderRetryDoesNotRetryNonRetryableFailures(t *testing.T) {
 func TestProviderRetryClassifiesTransportFailureAsRetryable(t *testing.T) {
 	status, retryable := classifyProviderError(
 		context.Background(),
-		errors.New("network error: failed to reach API server"),
+		&net.OpError{Op: "dial", Net: "tcp", Err: errors.New("failed to reach API server")},
 	)
 	if status != "transport_error" || !retryable {
 		t.Fatalf("expected retryable transport_error, got status=%q retryable=%t", status, retryable)

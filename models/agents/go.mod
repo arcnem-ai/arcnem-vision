@@ -8,7 +8,9 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/inngest/inngestgo v0.16.0
+	github.com/joho/godotenv v1.5.1
 	github.com/modelcontextprotocol/go-sdk v1.7.0
+	github.com/sashabaranov/go-openai v1.42.0
 	github.com/smallnest/langgraphgo v0.8.5
 	github.com/tmc/langchaingo v0.1.14
 	gorm.io/gorm v1.31.2
@@ -64,7 +66,6 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/json-iterator/go v1.1.13-0.20220915233716-71ac16282d12 // indirect
 	github.com/kataras/golog v0.1.15 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
@@ -80,7 +81,6 @@ require (
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.60.0 // indirect
 	github.com/redis/go-redis/v9 v9.22.0 // indirect
-	github.com/sashabaranov/go-openai v1.41.2 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/smallnest/goskills v0.6.1 // indirect

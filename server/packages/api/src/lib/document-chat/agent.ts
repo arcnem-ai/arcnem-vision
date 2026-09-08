@@ -164,9 +164,11 @@ export function createCitationSink(): CitationSink {
 
 function buildDocumentChatAgent() {
 	const model = new ChatOpenAI({
+		useResponsesApi: true,
+		zdrEnabled: true,
+		modelKwargs: { include: ["reasoning.encrypted_content"] },
 		apiKey: getAPIEnvVar(API_ENV_VAR.OPENAI_API_KEY),
 		model: getAPIEnvVar(API_ENV_VAR.OPENAI_MODEL),
-		temperature: 0.1,
 	});
 
 	return createAgent({

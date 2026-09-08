@@ -1,6 +1,7 @@
 import type { ChatScope } from "@arcnem-vision/shared";
 import type { BaseMessageLike } from "@langchain/core/messages";
 import { EventType, type StreamChunk } from "@tanstack/ai";
+import { assertOpenAIResponseComplete } from "../openai-response";
 import { createCitationSink, getDocumentChatAgent } from "./agent";
 import {
 	chunkAssistantText,
@@ -124,6 +125,7 @@ async function* streamDocumentChatResponse(
 			},
 		);
 
+		assertOpenAIResponseComplete(result.messages.at(-1));
 		const answer =
 			extractLastAssistantText(result.messages) ||
 			"I couldn't find enough grounded information in the current document collection to answer that confidently yet.";
