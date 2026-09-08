@@ -24,9 +24,12 @@ const preferredOrder = [
 
 export const prerender = true;
 
-const docModules = import.meta.glob<DocModule>("../content/docs/**/*.{md,mdx}", {
-	eager: true,
-});
+const docModules = import.meta.glob<DocModule>(
+	"../content/docs/**/*.{md,mdx}",
+	{
+		eager: true,
+	},
+);
 
 function toSlug(path: string) {
 	const relativePath = path
@@ -119,10 +122,14 @@ export function GET() {
 
 	const startHere = englishDocs.filter(
 		(doc) =>
-			doc.slug === "" || doc.slug === "getting-started" || doc.slug === "architecture",
+			doc.slug === "" ||
+			doc.slug === "getting-started" ||
+			doc.slug === "architecture",
 	);
 	const guides = englishDocs.filter((doc) => doc.slug.startsWith("guides/"));
-	const reference = englishDocs.filter((doc) => doc.slug.startsWith("reference/"));
+	const reference = englishDocs.filter((doc) =>
+		doc.slug.startsWith("reference/"),
+	);
 
 	const body = [
 		"# Arcnem Vision",

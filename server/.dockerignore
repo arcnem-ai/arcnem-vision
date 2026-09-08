@@ -7,3 +7,4 @@ packages/*/.tanstack
 packages/*/.vite
 packages/*/.cache
 **/.env
+packages/site

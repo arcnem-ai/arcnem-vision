@@ -99,6 +99,7 @@ local_resource('dashboard',
 )
 
 local_resource('docs',
-  serve_cmd='cd site && bun run dev',
+  serve_cmd='cd server/packages/site && bun run dev',
+  resource_deps=['server_deps'],
   labels=['tools']
 )

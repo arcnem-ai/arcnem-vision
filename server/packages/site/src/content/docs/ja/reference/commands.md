@@ -49,5 +49,7 @@ cd server && bun test                          # API and shared contract tests
 `tilt up`で自動起動、または単体で実行：
 
 ```bash
-cd site && bun run dev                         # ドキュメントサイト :4321
+cd server
+bun install --frozen-lockfile
+bun run --filter arcnem-vision-docs dev         # ドキュメントサイト :4321
 ```
