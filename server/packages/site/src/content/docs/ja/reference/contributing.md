@@ -32,7 +32,7 @@ cd models/db && go run ./cmd/introspect
 
 ## ドキュメント更新方針
 
-- オンボーディングに影響する変更は `/site` を更新
+- オンボーディングに影響する変更は `/server/packages/site` を更新
 - 詳細設計や実装方針の変更は `/docs` を更新
 - 可能な範囲で英語版と日本語版を同期
 

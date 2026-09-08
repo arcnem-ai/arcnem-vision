@@ -35,6 +35,9 @@ jobs:
       - name: Run Bun tests
         run: bun test
 
+      - name: Build documentation site
+        run: bun run --filter arcnem-vision-docs build
+
   go-tests:
     name: Go Tests (${{ matrix.module }})
     runs-on: ubuntu-latest

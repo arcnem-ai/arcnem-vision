@@ -14,7 +14,7 @@ The API, configurable agent graphs, and operator dashboard are the core service.
 - `models/mcp/`: internal Go MCP tools for OCR, descriptions, embeddings, segmentation, scoped search/browse, and grounded document reads.
 - `models/db/`: GORM introspection in `cmd/introspect/`; generated models and queries in `gen/`.
 - `models/shared/`: shared Go environment, storage, and realtime helpers. `models/go.work` lists the Go modules.
-- `site/`: documentation site. `docker-compose.yaml`, `Tiltfile`, and `Makefile` define local orchestration.
+- `server/packages/site/`: documentation site. `docker-compose.yaml`, `Tiltfile`, and `Makefile` define local orchestration.
 
 Workflow-key ingestion follows presign, upload to S3, and acknowledgement. The API verifies the object and emits an Inngest event; Go agents load the graph, invoke workers/tools, and persist results and run history. Dashboard operators can upload documents and select workflows independently. The service API provides scoped uploads, explicit execution, status, search, and publication.
 

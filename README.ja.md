@@ -18,7 +18,7 @@
   <a href="README.md">English</a> ·
   <a href="#クイックスタート">クイックスタート</a> ·
   <a href="#アーキテクチャ">アーキテクチャ</a> ·
-  <a href="site/">ドキュメントサイト</a>
+  <a href="server/packages/site/">ドキュメントサイト</a>
 </p>
 
 ---
@@ -111,15 +111,15 @@ Arcnem Visionは、画像を受け取り、設定可能なAIワークフロー�
 
 | プロジェクトとAPIキー | グラフ編集ペイン |
 |---|---|
-| ![ダッシュボード プロジェクト](site/public/dashboard-projects.png) | ![ワークフロー編集キャンバスとインスペクター](site/public/dashboard-workflow-editor.png) |
+| ![ダッシュボード プロジェクト](server/packages/site/public/dashboard-projects.png) | ![ワークフロー編集キャンバスとインスペクター](server/packages/site/public/dashboard-workflow-editor.png) |
 
 | Docs検索とコレクションチャット | 実行の詳細 |
 |---|---|
-| ![Docs検索とコレクションチャット](site/public/dashboard-docs-chat.png) | ![エージェント実行詳細](site/public/dashboard-run-detail.png) |
+| ![Docs検索とコレクションチャット](server/packages/site/public/dashboard-docs-chat.png) | ![エージェント実行詳細](server/packages/site/public/dashboard-run-detail.png) |
 
 | 画像詳細ワークスペース | AIワークフロー下書き |
 |---|---|
-| ![選択中のドキュメントと実行パネル](site/public/dashboard-docs-segmentation-detail.png) | ![AIワークフロー下書き生成](site/public/dashboard-workflow-ai-draft.png) |
+| ![選択中のドキュメントと実行パネル](server/packages/site/public/dashboard-docs-segmentation-detail.png) | ![AIワークフロー下書き生成](server/packages/site/public/dashboard-workflow-ai-draft.png) |
 
 ## クイックスタート
 
@@ -217,7 +217,8 @@ arcnem-vision/
 │   ├── packages/api/       アップロード/認証ルート、ダッシュボードAPI、Inngest連携
 │   ├── packages/db/        Drizzleスキーマ、マイグレーション、シード、テンプレート
 │   ├── packages/dashboard/ 運用用Reactダッシュボード
-│   └── packages/shared/    共通Envヘルパー
+│   ├── packages/shared/    共通Envヘルパー
+│   └── packages/site/      ドキュメントサイト
 └── models/                 Goワークスペース
     ├── agents/             ワークフロー読み込み、LangGraph実行、run tracker
     ├── mcp/                OCR・埋め込み・説明文・セグメンテーション・取得系ツール
@@ -229,10 +230,10 @@ arcnem-vision/
 
 | ドキュメント | 内容 |
 | --- | --- |
-| [site/](site/) | オンボーディング、アーキテクチャ、ガイド、API例をまとめたドキュメントサイト |
-| [site/src/content/docs/ja/architecture.md](site/src/content/docs/ja/architecture.md) | 取り込み経路、ワークフロー、保存データ、実行追跡の全体像 |
-| [site/src/content/docs/ja/guides/dashboard-workflow-editor.md](site/src/content/docs/ja/guides/dashboard-workflow-editor.md) | ダッシュボード運用、ワークフロー編集、Docsタブ、Runsタブ |
-| [site/src/content/docs/ja/reference/api.md](site/src/content/docs/ja/reference/api.md) | ワークフローキー経路、ダッシュボードアップロード、ワークフロー投入、リアルタイムAPI |
+| [server/packages/site/](server/packages/site/) | オンボーディング、アーキテクチャ、ガイド、API例をまとめたドキュメントサイト |
+| [server/packages/site/src/content/docs/ja/architecture.md](server/packages/site/src/content/docs/ja/architecture.md) | 取り込み経路、ワークフロー、保存データ、実行追跡の全体像 |
+| [server/packages/site/src/content/docs/ja/guides/dashboard-workflow-editor.md](server/packages/site/src/content/docs/ja/guides/dashboard-workflow-editor.md) | ダッシュボード運用、ワークフロー編集、Docsタブ、Runsタブ |
+| [server/packages/site/src/content/docs/ja/reference/api.md](server/packages/site/src/content/docs/ja/reference/api.md) | ワークフローキー経路、ダッシュボードアップロード、ワークフロー投入、リアルタイムAPI |
 
 ## コントリビューション
 

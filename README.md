@@ -18,7 +18,7 @@
   <a href="README.ja.md">日本語</a> ·
   <a href="#quickstart">Quickstart</a> ·
   <a href="#architecture">Architecture</a> ·
-  <a href="site/">Docs Site</a>
+  <a href="server/packages/site/">Docs Site</a>
 </p>
 
 ---
@@ -111,15 +111,15 @@ Behind those workflows, the MCP layer currently exposes document description, do
 
 | Projects & API Keys | Graph Editor & Inspector |
 |---|---|
-| ![Dashboard Projects](site/public/dashboard-projects.png) | ![Workflow Canvas Editor and Inspector](site/public/dashboard-workflow-editor.png) |
+| ![Dashboard Projects](server/packages/site/public/dashboard-projects.png) | ![Workflow Canvas Editor and Inspector](server/packages/site/public/dashboard-workflow-editor.png) |
 
 | Docs Search & Chat | Run Details |
 |---|---|
-| ![Docs Search and Chat](site/public/dashboard-docs-chat.png) | ![Agent Run Details](site/public/dashboard-run-detail.png) |
+| ![Docs Search and Chat](server/packages/site/public/dashboard-docs-chat.png) | ![Agent Run Details](server/packages/site/public/dashboard-run-detail.png) |
 
 | Image Detail Workspace | AI Workflow Drafting |
 |---|---|
-| ![Selected Document and Run Workflow Panel](site/public/dashboard-docs-segmentation-detail.png) | ![AI Workflow Draft Generation](site/public/dashboard-workflow-ai-draft.png) |
+| ![Selected Document and Run Workflow Panel](server/packages/site/public/dashboard-docs-segmentation-detail.png) | ![AI Workflow Draft Generation](server/packages/site/public/dashboard-workflow-ai-draft.png) |
 
 ## Quickstart
 
@@ -218,7 +218,8 @@ arcnem-vision/
 │   ├── packages/api/       Upload/auth routes, dashboard APIs, Inngest triggers
 │   ├── packages/db/        Drizzle schema, migrations, seed data, templates
 │   ├── packages/dashboard/ React control plane for operators
-│   └── packages/shared/    Shared env helpers
+│   ├── packages/shared/    Shared env helpers
+│   └── packages/site/      Documentation site
 └── models/                 Go workspace
     ├── agents/             Workflow loader, LangGraph execution, run tracker
     ├── mcp/                OCR, embeddings, descriptions, segmentation, retrieval
@@ -230,10 +231,10 @@ arcnem-vision/
 
 | Doc | What's in it |
 | --- | --- |
-| [site/](site/) | Docs site for onboarding, architecture, guides, and API examples |
-| [site/src/content/docs/architecture.md](site/src/content/docs/architecture.md) | Service architecture, ingestion paths, workflow model, persistence |
-| [site/src/content/docs/guides/dashboard-workflow-editor.md](site/src/content/docs/guides/dashboard-workflow-editor.md) | Dashboard operations, workflow canvas, docs tab, runs tab |
-| [site/src/content/docs/reference/api.md](site/src/content/docs/reference/api.md) | Workflow-key ingestion, dashboard uploads, run queueing, realtime feed |
+| [server/packages/site/](server/packages/site/) | Docs site for onboarding, architecture, guides, and API examples |
+| [server/packages/site/src/content/docs/architecture.md](server/packages/site/src/content/docs/architecture.md) | Service architecture, ingestion paths, workflow model, persistence |
+| [server/packages/site/src/content/docs/guides/dashboard-workflow-editor.md](server/packages/site/src/content/docs/guides/dashboard-workflow-editor.md) | Dashboard operations, workflow canvas, docs tab, runs tab |
+| [server/packages/site/src/content/docs/reference/api.md](server/packages/site/src/content/docs/reference/api.md) | Workflow-key ingestion, dashboard uploads, run queueing, realtime feed |
 
 ## Testing
 

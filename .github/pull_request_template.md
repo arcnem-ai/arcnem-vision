@@ -6,7 +6,7 @@ What changed and why?
 
 - [ ] `server`
 - [ ] `models`
-- [ ] `docs/site`
+- [ ] `server/packages/site`
 
 ## Validation
 
@@ -33,5 +33,5 @@ Notes:
 
 - [ ] No docs updates needed
 - [ ] Updated `/README.md`
-- [ ] Updated `/site`
+- [ ] Updated `/server/packages/site`
 - [ ] Updated `/docs` deep dives

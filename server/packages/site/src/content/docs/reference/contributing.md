@@ -32,7 +32,7 @@ cd models/db && go run ./cmd/introspect
 
 ## Documentation expectations
 
-- Update `/site` pages for onboarding-impacting changes.
+- Update `/server/packages/site` pages for onboarding-impacting changes.
 - Update `/docs` deep dives when behavior/design details change.
 - Keep English and Japanese docs aligned when possible.
 

@@ -8,5 +8,3 @@ node_modules
 bin
 tmp
 .make/
-site/dist
-site/.astro

@@ -49,5 +49,7 @@ cd server && bun test                          # API and shared contract tests
 Started automatically by `tilt up`, or run standalone:
 
 ```bash
-cd site && bun run dev                         # Docs site on :4321
+cd server
+bun install --frozen-lockfile
+bun run --filter arcnem-vision-docs dev         # Docs site on :4321
 ```
