@@ -214,6 +214,8 @@ async function proxyAPIRequest(
 		headers,
 		body,
 		redirect: "manual",
+		// Forward compressed bytes with their original encoding headers.
+		decompress: false,
 	});
 }
 

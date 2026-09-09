@@ -12,7 +12,7 @@ const TableNameVerification = "verifications"
 
 // Verification mapped from table <verifications>
 type Verification struct {
-	ID         string    `gorm:"column:id;type:uuid;primaryKey;default:uuidv7()" json:"id"`
+	ID         string    `gorm:"column:id;type:text;primaryKey;default:(uuidv7())" json:"id"`
 	Identifier string    `gorm:"column:identifier;type:text;not null" json:"identifier"`
 	Value      string    `gorm:"column:value;type:text;not null" json:"value"`
 	ExpiresAt  time.Time `gorm:"column:expires_at;type:timestamp without time zone;not null" json:"expires_at"`

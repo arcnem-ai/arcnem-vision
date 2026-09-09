@@ -80,6 +80,10 @@ Four node types are supported:
 
 State reducers can also be defined in the graph schema so keys append or overwrite predictably during execution.
 
+## External Agents through OAuth MCP
+
+The Bun API exposes `/api/mcp` for authenticated external agents. Its tools read project data and edit or execute workflow graphs through shared domain operations. OAuth permissions and current organization membership constrain access. The Go MCP service provides the internal analysis tools used during execution. See [OAuth MCP](/guides/oauth-mcp/) for connection and experiment steps.
+
 ## MCP-Backed Analysis
 
 The MCP service is the analysis layer behind both workflows and dashboard chat. The current server registers tools for:

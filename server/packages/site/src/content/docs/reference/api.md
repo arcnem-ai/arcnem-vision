@@ -9,6 +9,8 @@ Arcnem Vision exposes three primary operational APIs:
 - a **service/API-key orchestration path** for project-scoped service clients
 - a **dashboard/session path** for operator-driven uploads, browsing, and workflow queueing
 
+Agents can also connect through [OAuth MCP](/guides/oauth-mcp/) to edit workflows, run experiments, and read project documents with scoped permissions.
+
 ## Workflow-Key Ingestion
 
 This is the automated path used by workflow-key clients or external integrations.

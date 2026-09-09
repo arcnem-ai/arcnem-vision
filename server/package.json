@@ -8,7 +8,8 @@
 	],
 	"overrides": {
 		"drizzle-kit": "0.31.10",
-		"drizzle-orm": "0.45.2"
+		"drizzle-orm": "0.45.2",
+		"@better-auth/oauth-provider": "1.7.1"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.9",

@@ -10,12 +10,24 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as OauthConsentRouteImport } from './routes/oauth/consent'
+import { Route as OauthLoginRouteImport } from './routes/oauth/login'
 import { Route as ApiDocumentsChatRouteImport } from './routes/api/documents/chat'
 import { Route as ApiRealtimeDashboardRouteImport } from './routes/api/realtime/dashboard'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OauthConsentRoute = OauthConsentRouteImport.update({
+  id: '/oauth/consent',
+  path: '/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OauthLoginRoute = OauthLoginRouteImport.update({
+  id: '/oauth/login',
+  path: '/oauth/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDocumentsChatRoute = ApiDocumentsChatRouteImport.update({
@@ -31,30 +43,54 @@ const ApiRealtimeDashboardRoute = ApiRealtimeDashboardRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/oauth/consent': typeof OauthConsentRoute
+  '/oauth/login': typeof OauthLoginRoute
   '/api/documents/chat': typeof ApiDocumentsChatRoute
   '/api/realtime/dashboard': typeof ApiRealtimeDashboardRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/oauth/consent': typeof OauthConsentRoute
+  '/oauth/login': typeof OauthLoginRoute
   '/api/documents/chat': typeof ApiDocumentsChatRoute
   '/api/realtime/dashboard': typeof ApiRealtimeDashboardRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/oauth/consent': typeof OauthConsentRoute
+  '/oauth/login': typeof OauthLoginRoute
   '/api/documents/chat': typeof ApiDocumentsChatRoute
   '/api/realtime/dashboard': typeof ApiRealtimeDashboardRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/documents/chat' | '/api/realtime/dashboard'
+  fullPaths:
+    | '/'
+    | '/oauth/consent'
+    | '/oauth/login'
+    | '/api/documents/chat'
+    | '/api/realtime/dashboard'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/documents/chat' | '/api/realtime/dashboard'
-  id: '__root__' | '/' | '/api/documents/chat' | '/api/realtime/dashboard'
+  to:
+    | '/'
+    | '/oauth/consent'
+    | '/oauth/login'
+    | '/api/documents/chat'
+    | '/api/realtime/dashboard'
+  id:
+    | '__root__'
+    | '/'
+    | '/oauth/consent'
+    | '/oauth/login'
+    | '/api/documents/chat'
+    | '/api/realtime/dashboard'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  OauthConsentRoute: typeof OauthConsentRoute
+  OauthLoginRoute: typeof OauthLoginRoute
   ApiDocumentsChatRoute: typeof ApiDocumentsChatRoute
   ApiRealtimeDashboardRoute: typeof ApiRealtimeDashboardRoute
 }
@@ -66,6 +102,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth/consent': {
+      id: '/oauth/consent'
+      path: '/oauth/consent'
+      fullPath: '/oauth/consent'
+      preLoaderRoute: typeof OauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth/login': {
+      id: '/oauth/login'
+      path: '/oauth/login'
+      fullPath: '/oauth/login'
+      preLoaderRoute: typeof OauthLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/documents/chat': {
@@ -87,6 +137,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  OauthConsentRoute: OauthConsentRoute,
+  OauthLoginRoute: OauthLoginRoute,
   ApiDocumentsChatRoute: ApiDocumentsChatRoute,
   ApiRealtimeDashboardRoute: ApiRealtimeDashboardRoute,
 }

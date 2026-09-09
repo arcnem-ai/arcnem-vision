@@ -130,3 +130,36 @@ describe("shared workflow normalization", () => {
 		).toThrow(/two different targets/i);
 	});
 });
+
+test("rejects duplicate node keys and IDs, self edges, and multiple tools", () => {
+	const node = { nodeKey: "worker", nodeType: "worker", modelId, x: 0, y: 0 };
+	const graph = {
+		entryNode: "worker",
+		nodes: [node],
+		edges: [{ fromNode: "worker", toNode: "END" }],
+	};
+	expect(() => normalizeGraphData({ ...graph, nodes: [node, node] })).toThrow(
+		/unique node key/,
+	);
+	expect(() =>
+		normalizeGraphData({
+			...graph,
+			nodes: [
+				{ ...node, id: "one" },
+				{ ...node, id: "one", nodeKey: "second" },
+			],
+		}),
+	).toThrow(/ID can appear only once/);
+	expect(() =>
+		normalizeGraphData({
+			...graph,
+			edges: [{ fromNode: "worker", toNode: "worker" }],
+		}),
+	).toThrow(/itself/);
+	expect(() =>
+		normalizeGraphData({
+			...graph,
+			nodes: [{ ...node, nodeType: "tool", toolIds: ["tool-1", "tool-2"] }],
+		}),
+	).toThrow(/exactly one tool/);
+});

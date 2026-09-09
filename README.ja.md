@@ -226,6 +226,12 @@ arcnem-vision/
     └── shared/             S3やリアルタイム配信の共通処理
 ```
 
+## OAuth MCP
+
+外部エージェントを API ホストの `/api/mcp` に接続すると、プロジェクトの参照、グラフの編集、実験の実行、ドキュメントと実行結果の確認ができます。ブラウザーの OAuth 同意画面で参照・編集・実行の権限を許可します。クライアントには CIMD と PKCE を使う OAuth への対応が必要です。
+
+12 個のツール、接続設定、リビジョン確認、実験手順、接続の取り消しについては [OAuth MCP ガイド](server/packages/site/src/content/docs/ja/guides/oauth-mcp.md) を参照してください。
+
 ## ドキュメント
 
 | ドキュメント | 内容 |

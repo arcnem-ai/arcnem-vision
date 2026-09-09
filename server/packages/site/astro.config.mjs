@@ -62,6 +62,11 @@ export default defineConfig({
 							translations: { ja: "ダッシュボード ワークフローエディタ" },
 							slug: "guides/dashboard-workflow-editor",
 						},
+						{
+							label: "OAuth MCP",
+							translations: { ja: "OAuth MCP" },
+							slug: "guides/oauth-mcp",
+						},
 					],
 				},
 				{

@@ -201,6 +201,7 @@ func ExecuteWorkflow(ctx context.Context, input inngestgo.Input[inputs.ExecuteWo
 		tracer := graph.NewTracer()
 		tracer.AddHook(tracker)
 		builtGraph.SetTracer(tracer)
+		ctx = clients.ContextWithMCPExecutionScope(ctx, db, s3Client, payload.GraphSnapshot.AgentGraph.OrganizationID, projectID, preparedState.DocumentIDs)
 		return builtGraph.Invoke(clients.ContextWithExecutionID(ctx, tracker.RunID()), initialState)
 	})
 	if err != nil {

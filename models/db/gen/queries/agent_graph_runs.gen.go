@@ -42,6 +42,7 @@ func newAgentGraphRun(db *gorm.DB, opts ...gen.DOOption) agentGraphRun {
 	_agentGraphRun.IdempotencyResponse = field.NewString(tableName, "idempotency_response")
 	_agentGraphRun.GraphSnapshot = field.NewString(tableName, "graph_snapshot")
 	_agentGraphRun.GraphSnapshotHash = field.NewString(tableName, "graph_snapshot_hash")
+	_agentGraphRun.IdempotencyActor = field.NewString(tableName, "idempotency_actor")
 
 	_agentGraphRun.fillFieldMap()
 
@@ -67,6 +68,7 @@ type agentGraphRun struct {
 	IdempotencyResponse    field.String
 	GraphSnapshot          field.String
 	GraphSnapshotHash      field.String
+	IdempotencyActor       field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -98,6 +100,7 @@ func (a *agentGraphRun) updateTableName(table string) *agentGraphRun {
 	a.IdempotencyResponse = field.NewString(table, "idempotency_response")
 	a.GraphSnapshot = field.NewString(table, "graph_snapshot")
 	a.GraphSnapshotHash = field.NewString(table, "graph_snapshot_hash")
+	a.IdempotencyActor = field.NewString(table, "idempotency_actor")
 
 	a.fillFieldMap()
 
@@ -126,7 +129,7 @@ func (a *agentGraphRun) GetFieldByName(fieldName string) (field.OrderExpr, bool)
 }
 
 func (a *agentGraphRun) fillFieldMap() {
-	a.fieldMap = make(map[string]field.Expr, 15)
+	a.fieldMap = make(map[string]field.Expr, 16)
 	a.fieldMap["id"] = a.ID
 	a.fieldMap["agent_graph_id"] = a.AgentGraphID
 	a.fieldMap["status"] = a.Status
@@ -142,6 +145,7 @@ func (a *agentGraphRun) fillFieldMap() {
 	a.fieldMap["idempotency_response"] = a.IdempotencyResponse
 	a.fieldMap["graph_snapshot"] = a.GraphSnapshot
 	a.fieldMap["graph_snapshot_hash"] = a.GraphSnapshotHash
+	a.fieldMap["idempotency_actor"] = a.IdempotencyActor
 }
 
 func (a agentGraphRun) clone(db *gorm.DB) agentGraphRun {

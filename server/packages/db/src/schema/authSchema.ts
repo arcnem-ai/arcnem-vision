@@ -93,7 +93,9 @@ export const sessions = pgTable(
 export const verifications = pgTable(
 	"verifications",
 	{
-		id: uuid("id").primaryKey().default(sql`uuidv7()`),
+		// Better Auth reserves SHA-256 replay IDs, which cannot fit a UUID column.
+		// https://github.com/better-auth/better-auth/issues/10624
+		id: text("id").primaryKey().default(sql`uuidv7()::text`),
 		identifier: text("identifier").notNull(),
 		value: text("value").notNull(),
 		expiresAt: timestamp("expires_at").notNull(),

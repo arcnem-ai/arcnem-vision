@@ -17,6 +17,7 @@ import { isAPIDebugModeEnabled } from "./env/isAPIDebugModeEnabled";
 import { dashboardRouter } from "./routes/dashboard";
 import { dashboardDocumentsRouter } from "./routes/dashboardDocuments";
 import { documentsRouter } from "./routes/documents";
+import { mcpRouter } from "./routes/mcp";
 import { serviceRouter } from "./routes/service";
 import { uploadRouter } from "./routes/upload";
 import type { HonoServerContext } from "./types/serverContext";
@@ -35,8 +36,21 @@ app.use(
 			if (isTrustedOrigin(origin)) return origin;
 		},
 		allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-		allowHeaders: ["Content-Type", "Authorization", "x-api-key"],
-		exposeHeaders: ["Content-Length", "X-Request-Id"],
+		allowHeaders: [
+			"Content-Type",
+			"Authorization",
+			"x-api-key",
+			"MCP-Protocol-Version",
+			"MCP-Session-Id",
+			"DPoP",
+		],
+		exposeHeaders: [
+			"Content-Length",
+			"X-Request-Id",
+			"WWW-Authenticate",
+			"MCP-Protocol-Version",
+			"MCP-Session-Id",
+		],
 		maxAge: 600,
 		credentials: true,
 	}),
@@ -52,6 +66,7 @@ app.use(
 				'req.headers["x-api-key"]',
 				"req.headers.authorization",
 				"req.headers.cookie",
+				"req.headers.dpop",
 			],
 		},
 	}),
@@ -110,6 +125,7 @@ const routes = [
 	ackUploadRouter,
 	documentsRouter,
 	serviceRouter,
+	mcpRouter,
 	dashboardDocumentsRouter,
 	dashboardRouter,
 ];
@@ -117,6 +133,9 @@ const routes = [
 routes.forEach((route) => {
 	app.basePath("/api").route("/", route);
 });
+
+// OAuth discovery is rooted at the API origin, outside the /api route group.
+app.get("/.well-known/*", (c) => auth.handler(c.req.raw));
 
 app.get(
 	"/api/openapi.json",

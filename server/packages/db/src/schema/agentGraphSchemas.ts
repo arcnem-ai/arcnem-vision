@@ -221,6 +221,7 @@ export const agentGraphRuns = pgTable(
 			onDelete: "set null",
 		}),
 		apiKeyId: uuid("api_key_id").references(() => apikeys.id),
+		idempotencyActor: text("idempotency_actor"),
 		idempotencyKey: text("idempotency_key"),
 		idempotencyRequestHash: text("idempotency_request_hash"),
 		idempotencyResponse: jsonb("idempotency_response"),
@@ -240,16 +241,23 @@ export const agentGraphRuns = pgTable(
 		uniqueIndex("agent_graph_runs_api_key_idempotency_key_uidx")
 			.on(t.apiKeyId, t.idempotencyKey)
 			.where(sql`${t.idempotencyKey} is not null`),
+		uniqueIndex("agent_graph_runs_actor_project_idempotency_uidx")
+			.on(t.idempotencyActor, t.projectId, t.idempotencyKey)
+			.where(
+				sql`${t.idempotencyActor} is not null and ${t.idempotencyKey} is not null`,
+			),
 		check(
 			"agent_graph_runs_idempotency_fields_together",
 			sql`(
 				${t.idempotencyKey} is null and
 				${t.apiKeyId} is null and
+				${t.idempotencyActor} is null and
 				${t.idempotencyRequestHash} is null and
 				${t.idempotencyResponse} is null
 			) or (
 				${t.idempotencyKey} is not null and
-				${t.apiKeyId} is not null and
+				((${t.apiKeyId} is not null and ${t.idempotencyActor} is null) or
+				 (${t.apiKeyId} is null and ${t.idempotencyActor} is not null)) and
 				${t.idempotencyRequestHash} is not null and
 				${t.idempotencyResponse} is not null
 			)`,
