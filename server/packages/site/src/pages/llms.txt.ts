@@ -17,6 +17,7 @@ const preferredOrder = [
 	"getting-started",
 	"architecture",
 	"guides/dashboard-workflow-editor",
+	"guides/oauth-mcp",
 	"reference/api",
 	"reference/commands",
 	"reference/contributing",

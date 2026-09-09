@@ -29,6 +29,10 @@ func NewMCPClient() (*MCPClient, error) {
 }
 
 func (m *MCPClient) CallTool(ctx context.Context, toolName string, args map[string]any) (*mcp.CallToolResult, error) {
+	args, err := authorizeMCPToolCall(ctx, toolName, args)
+	if err != nil {
+		return nil, err
+	}
 	session, err := m.client.Connect(ctx, &mcp.StreamableClientTransport{
 		Endpoint: m.endpoint,
 	}, nil)

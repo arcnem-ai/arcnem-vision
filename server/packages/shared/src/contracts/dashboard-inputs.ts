@@ -25,6 +25,10 @@ const workflowEdgeInputSchema = z.object({
 export const workflowDraftSchema = z.object({
 	name: z.string().min(1),
 	description: z.string(),
+	stateSchema: z
+		.record(z.string(), z.enum(["append", "overwrite"]))
+		.nullable()
+		.optional(),
 	entryNode: z.string().min(1),
 	nodes: z.array(workflowNodeInputSchema),
 	edges: z.array(workflowEdgeInputSchema),
@@ -102,6 +106,7 @@ export const setWorkflowTemplateArchivedInputSchema = z.object({
 export const createWorkflowInputSchema = workflowDraftSchema;
 export const updateWorkflowInputSchema = workflowDraftSchema.extend({
 	workflowId: z.string().min(1),
+	expectedRevision: z.string().min(1).max(100).optional(),
 });
 
 export const generateWorkflowDraftInputSchema = z.object({

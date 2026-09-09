@@ -63,8 +63,8 @@ export function normalizeGraphData(input: {
 			}
 		}
 
-		if (nodeType === "tool" && toolIds.length === 0) {
-			throw new Error(`Tool node "${nodeKey}" must select at least one tool.`);
+		if (nodeType === "tool" && toolIds.length !== 1) {
+			throw new Error(`Tool node "${nodeKey}" must select exactly one tool.`);
 		}
 		if (nodeType !== "tool" && toolIds.length > 0) {
 			throw new Error(`Only tool nodes can reference tools.`);
@@ -179,6 +179,19 @@ export function normalizeGraphData(input: {
 		};
 	});
 
+	if (
+		new Set(normalizedNodes.map((node) => node.nodeKey)).size !==
+		normalizedNodes.length
+	) {
+		throw new Error("Each node must have a unique node key.");
+	}
+	const persistedIds = normalizedNodes.flatMap((node) =>
+		node.id ? [node.id] : [],
+	);
+	if (new Set(persistedIds).size !== persistedIds.length) {
+		throw new Error("Each existing node ID can appear only once.");
+	}
+
 	const nodeByKey = new Map(
 		normalizedNodes.map((node) => [node.nodeKey, node] as const),
 	);
@@ -228,6 +241,9 @@ export function normalizeGraphData(input: {
 		}
 		if (toNode !== "END" && !NODE_KEY_PATTERN.test(toNode)) {
 			throw new Error(`Edge toNode "${toNode}" is invalid.`);
+		}
+		if (fromNode === toNode) {
+			throw new Error(`Node "${fromNode}" cannot have an edge to itself.`);
 		}
 		if (!nodeByKey.has(fromNode)) {
 			throw new Error(`Edge references missing fromNode "${fromNode}".`);

@@ -6,5 +6,5 @@ packages/*/dist
 packages/*/.tanstack
 packages/*/.vite
 packages/*/.cache
-**/.env
+**/.env*
 packages/site

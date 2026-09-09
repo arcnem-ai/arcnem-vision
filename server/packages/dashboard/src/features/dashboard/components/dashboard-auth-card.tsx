@@ -29,10 +29,12 @@ export function DashboardAuthCard({
 	signUpEnabled,
 	organizationCreationEnabled,
 	debugSessionBootstrapEnabled,
+	onSignedIn,
 }: {
 	signUpEnabled: boolean;
 	organizationCreationEnabled: boolean;
 	debugSessionBootstrapEnabled: boolean;
+	onSignedIn?: (data: unknown) => void;
 }) {
 	const [email, setEmail] = useState("");
 	const [otp, setOtp] = useState("");
@@ -136,7 +138,7 @@ export function DashboardAuthCard({
 		setMessage(null);
 
 		try {
-			const { error: signInError } = await signIn.emailOtp({
+			const { data, error: signInError } = await signIn.emailOtp({
 				email: normalizedEmail,
 				otp: otp.trim(),
 			});
@@ -145,6 +147,10 @@ export function DashboardAuthCard({
 				throw signInError;
 			}
 
+			if (onSignedIn) {
+				onSignedIn(data);
+				return;
+			}
 			setMessage("Signed in. Loading your dashboard…");
 			if (typeof window !== "undefined") {
 				window.location.replace("/");

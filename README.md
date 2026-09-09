@@ -280,6 +280,12 @@ The service API is the project-scoped orchestration surface for service integrat
 Upload acknowledgement and workflow execution accept an optional `idempotencyKey`. Repeating the same request with
 the same service key returns the original document or execution. Reusing that key with different input returns `409`.
 
+## OAuth MCP
+
+Connect an external agent to `/api/mcp` on the API host to discover projects, edit workflow graphs, run experiments, and inspect documents and execution results. Browser-based OAuth consent grants separate read, write, and execution permissions. The client must support CIMD and OAuth with PKCE.
+
+See the [OAuth MCP guide](server/packages/site/src/content/docs/guides/oauth-mcp.md) for the 12 tools, connection setup, revision checks, experiment loop, and revocation.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor workflow. If you use AI coding agents, also read [AGENTS.md](AGENTS.md).

@@ -37,6 +37,13 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		Invitation:                   newInvitation(db, opts...),
 		Member:                       newMember(db, opts...),
 		Model:                        newModel(db, opts...),
+		OauthAccessToken:             newOauthAccessToken(db, opts...),
+		OauthClient:                  newOauthClient(db, opts...),
+		OauthClientAssertion:         newOauthClientAssertion(db, opts...),
+		OauthClientResource:          newOauthClientResource(db, opts...),
+		OauthConsent:                 newOauthConsent(db, opts...),
+		OauthRefreshToken:            newOauthRefreshToken(db, opts...),
+		OauthResource:                newOauthResource(db, opts...),
 		Organization:                 newOrganization(db, opts...),
 		PresignedUpload:              newPresignedUpload(db, opts...),
 		Project:                      newProject(db, opts...),
@@ -69,6 +76,13 @@ type Query struct {
 	Invitation                   invitation
 	Member                       member
 	Model                        model
+	OauthAccessToken             oauthAccessToken
+	OauthClient                  oauthClient
+	OauthClientAssertion         oauthClientAssertion
+	OauthClientResource          oauthClientResource
+	OauthConsent                 oauthConsent
+	OauthRefreshToken            oauthRefreshToken
+	OauthResource                oauthResource
 	Organization                 organization
 	PresignedUpload              presignedUpload
 	Project                      project
@@ -79,6 +93,8 @@ type Query struct {
 }
 
 func (q *Query) Available() bool { return q.db != nil }
+
+func (q *Query) UnderlyingDB() *gorm.DB { return q.db }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
@@ -102,6 +118,13 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		Invitation:                   q.Invitation.clone(db),
 		Member:                       q.Member.clone(db),
 		Model:                        q.Model.clone(db),
+		OauthAccessToken:             q.OauthAccessToken.clone(db),
+		OauthClient:                  q.OauthClient.clone(db),
+		OauthClientAssertion:         q.OauthClientAssertion.clone(db),
+		OauthClientResource:          q.OauthClientResource.clone(db),
+		OauthConsent:                 q.OauthConsent.clone(db),
+		OauthRefreshToken:            q.OauthRefreshToken.clone(db),
+		OauthResource:                q.OauthResource.clone(db),
 		Organization:                 q.Organization.clone(db),
 		PresignedUpload:              q.PresignedUpload.clone(db),
 		Project:                      q.Project.clone(db),
@@ -113,11 +136,11 @@ func (q *Query) clone(db *gorm.DB) *Query {
 }
 
 func (q *Query) ReadDB() *Query {
-	return q.ReplaceDB(q.db.Clauses(dbresolver.Read))
+	return q.clone(q.db.Clauses(dbresolver.Read))
 }
 
 func (q *Query) WriteDB() *Query {
-	return q.ReplaceDB(q.db.Clauses(dbresolver.Write))
+	return q.clone(q.db.Clauses(dbresolver.Write))
 }
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
@@ -142,6 +165,13 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		Invitation:                   q.Invitation.replaceDB(db),
 		Member:                       q.Member.replaceDB(db),
 		Model:                        q.Model.replaceDB(db),
+		OauthAccessToken:             q.OauthAccessToken.replaceDB(db),
+		OauthClient:                  q.OauthClient.replaceDB(db),
+		OauthClientAssertion:         q.OauthClientAssertion.replaceDB(db),
+		OauthClientResource:          q.OauthClientResource.replaceDB(db),
+		OauthConsent:                 q.OauthConsent.replaceDB(db),
+		OauthRefreshToken:            q.OauthRefreshToken.replaceDB(db),
+		OauthResource:                q.OauthResource.replaceDB(db),
 		Organization:                 q.Organization.replaceDB(db),
 		PresignedUpload:              q.PresignedUpload.replaceDB(db),
 		Project:                      q.Project.replaceDB(db),
@@ -172,6 +202,13 @@ type queryCtx struct {
 	Invitation                   *invitationDo
 	Member                       *memberDo
 	Model                        *modelDo
+	OauthAccessToken             *oauthAccessTokenDo
+	OauthClient                  *oauthClientDo
+	OauthClientAssertion         *oauthClientAssertionDo
+	OauthClientResource          *oauthClientResourceDo
+	OauthConsent                 *oauthConsentDo
+	OauthRefreshToken            *oauthRefreshTokenDo
+	OauthResource                *oauthResourceDo
 	Organization                 *organizationDo
 	PresignedUpload              *presignedUploadDo
 	Project                      *projectDo
@@ -202,6 +239,13 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		Invitation:                   q.Invitation.WithContext(ctx),
 		Member:                       q.Member.WithContext(ctx),
 		Model:                        q.Model.WithContext(ctx),
+		OauthAccessToken:             q.OauthAccessToken.WithContext(ctx),
+		OauthClient:                  q.OauthClient.WithContext(ctx),
+		OauthClientAssertion:         q.OauthClientAssertion.WithContext(ctx),
+		OauthClientResource:          q.OauthClientResource.WithContext(ctx),
+		OauthConsent:                 q.OauthConsent.WithContext(ctx),
+		OauthRefreshToken:            q.OauthRefreshToken.WithContext(ctx),
+		OauthResource:                q.OauthResource.WithContext(ctx),
 		Organization:                 q.Organization.WithContext(ctx),
 		PresignedUpload:              q.PresignedUpload.WithContext(ctx),
 		Project:                      q.Project.WithContext(ctx),

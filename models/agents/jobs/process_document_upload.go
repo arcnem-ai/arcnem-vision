@@ -137,6 +137,7 @@ func ProcessDocumentUpload(ctx context.Context, input inngestgo.Input[inputs.Pro
 		tracer.AddHook(tracker)
 		// Attach tracer directly to the compiled runnable so node-level events fire.
 		builtGraph.SetTracer(tracer)
+		ctx = clients.ContextWithMCPExecutionScope(ctx, db, s3Client, result.Document.OrganizationID, result.Document.ProjectID, []string{result.Document.ID})
 		return builtGraph.Invoke(clients.ContextWithExecutionID(ctx, tracker.RunID()), initialState)
 	})
 	if err != nil {

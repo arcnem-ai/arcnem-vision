@@ -1,5 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import {
+	copyFile,
+	mkdir,
+	mkdtemp,
+	rm,
+	symlink,
+	writeFile,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
 	createProxyRequestHeaders,
 	createProxyResponse,
 	sanitizeProxyResponseHeaders,
@@ -85,3 +95,103 @@ describe("createProxyResponse", () => {
 		expect(await response.text()).toBe("chunk-1chunk-2");
 	});
 });
+
+test("production proxy preserves compressed auth responses, cookies, and redirects", async () => {
+	const payload = {
+		redirect: true,
+		url: `https://app.example.com/oauth/consent?${"a".repeat(2000)}`,
+	};
+	const compressed = Bun.gzipSync(JSON.stringify(payload));
+	const receivedOrigins: (string | null)[] = [];
+	let followedRedirect = false;
+	const upstream = Bun.serve({
+		port: 0,
+		fetch(request) {
+			const pathname = new URL(request.url).pathname;
+			if (pathname === "/redirect-target") followedRedirect = true;
+			if (pathname === "/api/auth/redirect") {
+				return new Response(null, {
+					status: 302,
+					headers: { location: "/redirect-target" },
+				});
+			}
+			receivedOrigins.push(request.headers.get("origin"));
+			const headers = new Headers({
+				"content-type": "application/json",
+				"content-encoding": "gzip",
+				"content-length": String(compressed.length),
+			});
+			headers.append("set-cookie", "session=synthetic; HttpOnly; Path=/");
+			headers.append("set-cookie", "flow=synthetic; HttpOnly; Path=/");
+			return new Response(compressed, { headers });
+		},
+	});
+	const fixture = await mkdtemp(join(tmpdir(), "dashboard-proxy-"));
+	let child: ReturnType<typeof Bun.spawn> | undefined;
+	let startupTimeout: ReturnType<typeof setTimeout> | undefined;
+	try {
+		await mkdir(join(fixture, "dist/server"), { recursive: true });
+		await mkdir(join(fixture, "dist/client"), { recursive: true });
+		await writeFile(
+			join(fixture, "dist/server/server.js"),
+			'export default { fetch: () => new Response("Not found", { status: 404 }) };',
+		);
+		await copyFile(
+			new URL("../../server.prod.ts", import.meta.url),
+			join(fixture, "server.prod.ts"),
+		);
+		await symlink(
+			new URL("../../node_modules", import.meta.url).pathname,
+			join(fixture, "node_modules"),
+			"dir",
+		);
+		child = Bun.spawn([process.execPath, join(fixture, "server.prod.ts")], {
+			cwd: fixture,
+			env: { ...process.env, PORT: "0", API_URL: upstream.url.toString() },
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+		startupTimeout = setTimeout(() => child?.kill(), 5000);
+		const reader = (child.stdout as ReadableStream<Uint8Array>).getReader();
+		let output = "";
+		let proxyURL: string | undefined;
+		try {
+			while (!proxyURL) {
+				const { done, value } = await reader.read();
+				if (done) throw new Error(`Production proxy did not start: ${output}`);
+				output += new TextDecoder().decode(value);
+				proxyURL = output.match(
+					/Server listening on (http:\/\/localhost:\d+)/,
+				)?.[1];
+			}
+		} finally {
+			reader.releaseLock();
+			clearTimeout(startupTimeout);
+		}
+		for (const prefix of ["/api/auth", "/api/dashboard"]) {
+			const response = await fetch(`${proxyURL}${prefix}/compressed`, {
+				headers: { origin: "https://app.example.com" },
+			});
+			expect(response.status).toBe(200);
+			expect(response.headers.get("content-encoding")).toBe("gzip");
+			expect(response.headers.getSetCookie()).toEqual([
+				"session=synthetic; HttpOnly; Path=/",
+				"flow=synthetic; HttpOnly; Path=/",
+			]);
+			expect(await response.json()).toEqual(payload);
+		}
+		expect(receivedOrigins).toEqual(["https://app.example.com", null]);
+		const redirect = await fetch(`${proxyURL}/api/auth/redirect`, {
+			redirect: "manual",
+		});
+		expect(redirect.status).toBe(302);
+		expect(redirect.headers.get("location")).toBe("/redirect-target");
+		expect(followedRedirect).toBe(false);
+	} finally {
+		clearTimeout(startupTimeout);
+		child?.kill();
+		if (child) await child.exited;
+		upstream.stop(true);
+		await rm(fixture, { recursive: true, force: true });
+	}
+}, 10000);

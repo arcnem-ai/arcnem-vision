@@ -1,3 +1,4 @@
+import { oauthProviderClient } from "@better-auth/oauth-provider/client";
 import { emailOTPClient, organizationClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
@@ -24,7 +25,7 @@ function getDashboardOrigin() {
 export const authClient = createAuthClient({
 	baseURL: getDashboardOrigin(),
 	basePath: dashboardAuthBasePath,
-	plugins: [emailOTPClient(), organizationClient()],
+	plugins: [emailOTPClient(), organizationClient(), oauthProviderClient()],
 });
 
 export const { signIn, signOut } = authClient;

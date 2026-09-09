@@ -27,6 +27,7 @@ type AgentGraphRun struct {
 	IdempotencyResponse    *string    `gorm:"column:idempotency_response;type:jsonb" json:"idempotency_response"`
 	GraphSnapshot          *string    `gorm:"column:graph_snapshot;type:jsonb" json:"graph_snapshot"`
 	GraphSnapshotHash      *string    `gorm:"column:graph_snapshot_hash;type:text" json:"graph_snapshot_hash"`
+	IdempotencyActor       *string    `gorm:"column:idempotency_actor;type:text" json:"idempotency_actor"`
 }
 
 // TableName AgentGraphRun's table name

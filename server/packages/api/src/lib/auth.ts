@@ -1,6 +1,7 @@
 import { schema } from "@arcnem-vision/db";
 import { getDB } from "@arcnem-vision/db/server";
 import { getAuthFeatureFlags } from "@arcnem-vision/shared";
+import { cimd } from "@better-auth/cimd";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
@@ -10,6 +11,13 @@ import { getAPIEnvVar } from "@/env/getAPIEnvVar";
 import { sendAuthOTPEmail } from "@/lib/auth-email";
 import { getTrustedOrigins } from "@/lib/auth-origins";
 import { incrementWithTTL } from "@/lib/auth-secondary-storage";
+import { createMcpAuthPlugins } from "@/lib/mcp-auth-plugin";
+import { fetchOAuthClientMetadata } from "@/lib/oauth-metadata-fetch";
+
+export const mcpResourceUrl = new URL(
+	"/api/mcp",
+	getAPIEnvVar("BETTER_AUTH_BASE_URL"),
+).href;
 
 const db = getDB();
 const redisClient = getRedisClient();
@@ -18,6 +26,7 @@ const authFeatureFlags = getAuthFeatureFlags();
 export const auth = betterAuth({
 	baseURL: getAPIEnvVar("BETTER_AUTH_BASE_URL"),
 	experimental: { joins: true },
+	verification: { storeInDatabase: true },
 	session: {
 		storeSessionInDatabase: true,
 		cookieCache: {
@@ -82,6 +91,16 @@ export const auth = betterAuth({
 		},
 	},
 	plugins: [
+		...createMcpAuthPlugins({
+			resource: mcpResourceUrl,
+			loginPage: new URL("/oauth/login", getAPIEnvVar("DASHBOARD_ORIGIN")).href,
+			consentPage: new URL("/oauth/consent", getAPIEnvVar("DASHBOARD_ORIGIN"))
+				.href,
+		}),
+		cimd({
+			fetchClientMetadataResource: fetchOAuthClientMetadata,
+			metadataProfile: "mcp-2026-07-28",
+		}),
 		emailOTP({
 			disableSignUp: !authFeatureFlags.signUpEnabled,
 			async sendVerificationOTP({ email, otp, type }) {

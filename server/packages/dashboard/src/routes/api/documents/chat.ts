@@ -27,6 +27,7 @@ export const Route = createFileRoute("/api/documents/chat")({
 					{
 						method: "POST",
 						headers,
+						decompress: false,
 						body: requestBody.length > 0 ? requestBody : undefined,
 					},
 				);
