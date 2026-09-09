@@ -74,7 +74,7 @@ async function validateWorkflowCatalog(
 		if (node.modelId && !modelIds.has(node.modelId)) {
 			throw new ServiceError(
 				400,
-				`Node "${node.nodeKey}" must select a compatible worker model from get_workflow_catalog.`,
+				`Node "${node.nodeKey}" must select a compatible worker model from the model catalog.`,
 			);
 		}
 		for (const toolId of node.toolIds) {
@@ -252,7 +252,7 @@ export async function updateWorkflow(
 		) {
 			throw new ServiceError(
 				409,
-				"Workflow changed since it was read. Read get_workflow again, then reapply your edits using the new revision.",
+				"Workflow changed since it was read. Reload the workflow, then reapply your edits.",
 			);
 		}
 		const existingNodes = await tx.query.agentGraphNodes.findMany({

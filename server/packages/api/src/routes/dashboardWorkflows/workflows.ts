@@ -10,9 +10,11 @@ import {
 } from "@arcnem-vision/shared";
 import { eq, isNull } from "drizzle-orm";
 import { Hono } from "hono";
+import { z } from "zod";
 import { requireDashboardOrganizationContext } from "@/lib/dashboard-auth";
 import { loadDashboardCatalog } from "@/lib/dashboard-state/catalog";
 import { readValidatedBody } from "@/lib/request-validation";
+import { ServiceError } from "@/lib/service-error";
 import { generateWorkflowDraftFromDescription } from "@/lib/workflow-draft-generator";
 import { insertWorkflowGraphFromSnapshot } from "@/lib/workflow-graph-persistence";
 import { createWorkflow, updateWorkflow } from "@/lib/workflow-operations";
@@ -21,6 +23,17 @@ import type { HonoServerContext } from "@/types/serverContext";
 
 export const dashboardWorkflowRecordsRouter = new Hono<HonoServerContext>({
 	strict: false,
+});
+
+dashboardWorkflowRecordsRouter.onError((error, c) => {
+	if (error instanceof ServiceError)
+		return c.json({ message: error.message }, error.status);
+	if (error instanceof z.ZodError)
+		return c.json(
+			{ message: error.issues[0]?.message ?? "Invalid workflow definition." },
+			400,
+		);
+	throw error;
 });
 
 dashboardWorkflowRecordsRouter.post(
