@@ -16,6 +16,7 @@ import {
 	isNotNull,
 	isNull,
 	lt,
+	sql,
 } from "drizzle-orm";
 import { getApiMcpClient } from "@/clients/apiMcpClient";
 import { toAPIDocumentItem } from "./document-api";
@@ -201,6 +202,20 @@ export async function listServiceExecutions(
 	input: { workflowId?: string; cursor?: string; limit?: number },
 ) {
 	const limit = input.limit ?? 20;
+	const filters = and(
+		eq(agentGraphs.organizationId, scope.organizationId),
+		eq(agentGraphRuns.projectId, scope.projectId),
+		input.workflowId
+			? eq(agentGraphRuns.agentGraphId, input.workflowId)
+			: undefined,
+	);
+	const cursor = input.cursor
+		? db
+				.select({ startedAt: agentGraphRuns.startedAt, id: agentGraphRuns.id })
+				.from(agentGraphRuns)
+				.innerJoin(agentGraphs, eq(agentGraphRuns.agentGraphId, agentGraphs.id))
+				.where(and(filters, eq(agentGraphRuns.id, input.cursor)))
+		: undefined;
 	const rows = await db
 		.select({
 			executionId: agentGraphRuns.id,
@@ -215,15 +230,13 @@ export async function listServiceExecutions(
 		.innerJoin(agentGraphs, eq(agentGraphRuns.agentGraphId, agentGraphs.id))
 		.where(
 			and(
-				eq(agentGraphs.organizationId, scope.organizationId),
-				eq(agentGraphRuns.projectId, scope.projectId),
-				input.workflowId
-					? eq(agentGraphRuns.agentGraphId, input.workflowId)
+				filters,
+				cursor
+					? sql`(${agentGraphRuns.startedAt}, ${agentGraphRuns.id}) < ${cursor}`
 					: undefined,
-				input.cursor ? lt(agentGraphRuns.id, input.cursor) : undefined,
 			),
 		)
-		.orderBy(desc(agentGraphRuns.id))
+		.orderBy(desc(agentGraphRuns.startedAt), desc(agentGraphRuns.id))
 		.limit(limit + 1);
 	const page = rows.slice(0, limit);
 	return {

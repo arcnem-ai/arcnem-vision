@@ -257,7 +257,7 @@ export const agentGraphRuns = pgTable(
 			) or (
 				${t.idempotencyKey} is not null and
 				((${t.apiKeyId} is not null and ${t.idempotencyActor} is null) or
-				 (${t.apiKeyId} is null and ${t.idempotencyActor} is not null and ${t.projectId} is not null)) and
+				 (${t.apiKeyId} is null and ${t.idempotencyActor} is not null)) and
 				${t.idempotencyRequestHash} is not null and
 				${t.idempotencyResponse} is not null
 			)`,
