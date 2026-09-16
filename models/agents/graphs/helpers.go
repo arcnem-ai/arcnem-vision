@@ -13,10 +13,11 @@ import (
 
 type workerAgentConfig struct {
 	clients.GenerationConfig
-	SystemMessage string              `json:"system_message"`
-	MaxIterations int                 `json:"max_iterations"`
-	OutputRetries int                 `json:"output_retries"`
-	OutputSchema  *workerOutputSchema `json:"output_schema"`
+	SystemMessage        string              `json:"system_message"`
+	MaxIterations        int                 `json:"max_iterations"`
+	OutputRetries        int                 `json:"output_retries"`
+	OutputSchema         *workerOutputSchema `json:"output_schema"`
+	ProviderStrictOutput bool                `json:"provider_strict_output"`
 }
 
 const defaultWorkerMaxIterations = 10
@@ -31,6 +32,16 @@ func parseWorkerConfig(snapshotNode *SnapshotNode) (workerAgentConfig, int, []pr
 
 	if err := config.GenerationConfig.Validate(); err != nil {
 		return workerAgentConfig{}, 0, nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
+	}
+	if config.ProviderStrictOutput {
+		schema, err := providerStrictWorkerOutputSchema(config.OutputSchema)
+		if err != nil {
+			return workerAgentConfig{}, 0, nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
+		}
+		config.GenerationConfig.StructuredOutput = &clients.StructuredOutputConfig{
+			Name:   "worker_output",
+			Schema: schema,
+		}
 	}
 	maxIterations, opts := buildWorkerAgentOptions(config)
 	return config, maxIterations, opts, nil

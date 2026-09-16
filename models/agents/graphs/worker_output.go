@@ -50,6 +50,114 @@ func (schema *workerOutputSchema) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func providerStrictWorkerOutputSchema(schema *workerOutputSchema) (map[string]any, error) {
+	if schema == nil {
+		return nil, fmt.Errorf("provider_strict_output requires output_schema")
+	}
+	if schema.Type != "object" {
+		return nil, fmt.Errorf("provider strict output schema must declare type object")
+	}
+	if err := validateProviderStrictObject("", schema.Properties, schema.Required, schema.AdditionalProperties); err != nil {
+		return nil, err
+	}
+
+	encoded, err := json.Marshal(schema)
+	if err != nil {
+		return nil, fmt.Errorf("encode provider strict output schema: %w", err)
+	}
+	var prepared map[string]any
+	if err := json.Unmarshal(encoded, &prepared); err != nil {
+		return nil, fmt.Errorf("decode provider strict output schema: %w", err)
+	}
+	prepareProviderStrictSchemaNode(prepared)
+	return prepared, nil
+}
+
+func validateProviderStrictObject(field string, properties map[string]workerOutputProperty, required []string, additionalProperties *bool) error {
+	if additionalProperties == nil || *additionalProperties {
+		return fmt.Errorf("provider strict output object %q must set additionalProperties to false", field)
+	}
+	requiredFields := make(map[string]bool, len(required))
+	for _, name := range required {
+		if _, ok := properties[name]; !ok {
+			return fmt.Errorf("provider strict output object %q requires unknown field %q", field, name)
+		}
+		requiredFields[name] = true
+	}
+	for name, property := range properties {
+		if !requiredFields[name] {
+			return fmt.Errorf("provider strict output object %q must require field %q", field, name)
+		}
+		if err := validateProviderStrictProperty(joinWorkerOutputField(field, name), property); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateProviderStrictProperty(field string, property workerOutputProperty) error {
+	types, err := workerOutputTypes(property.Type)
+	if err != nil {
+		return fmt.Errorf("provider strict output field %q has invalid type: %w", field, err)
+	}
+	if types["object"] {
+		if err := validateProviderStrictObject(field, property.Properties, property.Required, property.AdditionalProperties); err != nil {
+			return err
+		}
+	}
+	if types["array"] && property.Items == nil {
+		return fmt.Errorf("provider strict output array %q must define items", field)
+	}
+	if property.Items != nil {
+		return validateProviderStrictProperty(field+"[]", *property.Items)
+	}
+	return nil
+}
+
+func prepareProviderStrictSchemaNode(schema map[string]any) {
+	delete(schema, "uniqueItems")
+
+	if providerSchemaIncludesType(schema["type"], "null") {
+		if values, ok := schema["enum"].([]any); ok {
+			schema["enum"] = append(values, nil)
+		}
+	}
+
+	if providerSchemaIncludesType(schema["type"], "object") {
+		properties, ok := schema["properties"].(map[string]any)
+		if !ok {
+			properties = map[string]any{}
+			schema["properties"] = properties
+		}
+		if _, ok := schema["required"].([]any); !ok {
+			schema["required"] = []any{}
+		}
+		for _, value := range properties {
+			if property, ok := value.(map[string]any); ok {
+				prepareProviderStrictSchemaNode(property)
+			}
+		}
+	}
+
+	if items, ok := schema["items"].(map[string]any); ok {
+		prepareProviderStrictSchemaNode(items)
+	}
+}
+
+func providerSchemaIncludesType(value any, target string) bool {
+	if value == target {
+		return true
+	}
+	if values, ok := value.([]any); ok {
+		for _, value := range values {
+			if value == target {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func normalizeStructuredWorkerOutput(output string, schema *workerOutputSchema) (string, error) {
 	if schema == nil {
 		return output, nil

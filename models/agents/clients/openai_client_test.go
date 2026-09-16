@@ -159,3 +159,41 @@ func TestResponsesAssistantHistory(t *testing.T) {
 		t.Fatalf("assistant history must use output_text: %s", data)
 	}
 }
+
+func TestResponsesStrictOutput(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		format := body["text"].(map[string]any)["format"].(map[string]any)
+		if format["type"] != "json_schema" || format["name"] != "worker_output" || format["strict"] != true {
+			t.Fatalf("strict response schema missing: %v", format)
+		}
+		schema := format["schema"].(map[string]any)
+		if schema["additionalProperties"] != false {
+			t.Fatalf("response schema changed: %v", schema)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"id":"r1","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"{\"answer\":\"yes\"}"}]}]}`)
+	}))
+	defer server.Close()
+
+	cfg := openai.DefaultConfig("test-key")
+	cfg.BaseURL = server.URL
+	model := &OpenAIClient{client: openai.NewClientWithConfig(cfg), model: "gpt-5.6-luna"}
+	schema := map[string]any{
+		"type":                 "object",
+		"properties":           map[string]any{"answer": map[string]any{"type": "string"}},
+		"required":             []string{"answer"},
+		"additionalProperties": false,
+	}
+	ctx := WithGeneration(context.Background(), GenerationConfig{StructuredOutput: &StructuredOutputConfig{Name: "worker_output", Schema: schema}})
+	response, err := model.GenerateContent(ctx, []llms.MessageContent{llms.TextParts(llms.ChatMessageTypeHuman, "Answer yes.")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Choices[0].Content != `{"answer":"yes"}` {
+		t.Fatalf("unexpected response: %s", response.Choices[0].Content)
+	}
+}
