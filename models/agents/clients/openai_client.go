@@ -32,8 +32,14 @@ func NewOpenAIClient(modelName string) (*OpenAIClient, error) {
 
 // GenerationConfig lives in worker/supervisor node config, not shared clients.
 type GenerationConfig struct {
-	ReasoningEffort string `json:"reasoning_effort"`
-	MaxOutputTokens int    `json:"max_output_tokens"`
+	ReasoningEffort  string                  `json:"reasoning_effort"`
+	MaxOutputTokens  int                     `json:"max_output_tokens"`
+	StructuredOutput *StructuredOutputConfig `json:"-"`
+}
+
+type StructuredOutputConfig struct {
+	Name   string
+	Schema any
 }
 
 func (c GenerationConfig) Validate() error {
@@ -44,6 +50,9 @@ func (c GenerationConfig) Validate() error {
 	}
 	if c.MaxOutputTokens < 0 {
 		return fmt.Errorf("max_output_tokens must be positive when set")
+	}
+	if c.StructuredOutput != nil && (c.StructuredOutput.Name == "" || c.StructuredOutput.Schema == nil) {
+		return fmt.Errorf("structured output requires a name and schema")
 	}
 	return nil
 }
@@ -120,7 +129,14 @@ func (m *OpenAIClient) GenerateContent(ctx context.Context, messages []llms.Mess
 		v := float32(opts.TopP)
 		req.TopP = &v
 	}
-	if opts.JSONMode {
+	if s.config.StructuredOutput != nil {
+		req.Text = &openai.ResponseTextConfig{Format: &openai.ResponseTextFormat{
+			Type:   "json_schema",
+			Name:   s.config.StructuredOutput.Name,
+			Schema: s.config.StructuredOutput.Schema,
+			Strict: true,
+		}}
+	} else if opts.JSONMode {
 		req.Text = &openai.ResponseTextConfig{Format: &openai.ResponseTextFormat{Type: "json_object"}}
 	}
 	for _, tool := range opts.Tools {

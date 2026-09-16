@@ -1,6 +1,7 @@
 package graphs
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 func TestParseWorkerConfigAcceptsSupportedOutputSchemaProfile(t *testing.T) {
 	snapshotNode := &SnapshotNode{Node: &dbmodels.AgentGraphNode{
 		NodeKey: "extract",
-		Config:  `{"output_schema":{"type":"object","required":["contract_version","items"],"additionalProperties":false,"properties":{"contract_version":{"type":"string","minLength":1,"pattern":"^v2$"},"items":{"type":"array","maxItems":2,"uniqueItems":true,"items":{"type":"object","required":["label","score"],"additionalProperties":false,"properties":{"label":{"type":"string","enum":["match"]},"score":{"type":"number","minimum":0,"maximum":1,"exclusiveMinimum":0}}}}}}}`,
+		Config:  `{"provider_strict_output":true,"output_schema":{"type":"object","required":["contract_version","items"],"additionalProperties":false,"properties":{"contract_version":{"type":"string","minLength":1,"pattern":"^v2$"},"items":{"type":"array","maxItems":2,"uniqueItems":true,"items":{"type":"object","required":["label","score"],"additionalProperties":false,"properties":{"label":{"type":"string","enum":["match"]},"score":{"type":"number","minimum":0,"maximum":1,"exclusiveMinimum":0}}}}}}}`,
 	}}
 
 	config, _, _, err := parseWorkerConfig(snapshotNode)
@@ -20,8 +21,128 @@ func TestParseWorkerConfigAcceptsSupportedOutputSchemaProfile(t *testing.T) {
 	if config.OutputSchema == nil {
 		t.Fatal("expected output schema")
 	}
+	if config.GenerationConfig.StructuredOutput == nil || config.GenerationConfig.StructuredOutput.Name != "worker_output" {
+		t.Fatal("expected provider strict output schema")
+	}
+	providerSchema, err := json.Marshal(config.GenerationConfig.StructuredOutput.Schema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(providerSchema), "uniqueItems") {
+		t.Fatalf("provider schema retained unsupported uniqueItems: %s", providerSchema)
+	}
+	if _, err := normalizeStructuredWorkerOutput(`{"contract_version":"v2","items":[{"label":"match","score":0.5},{"label":"match","score":0.5}]}`, config.OutputSchema); err == nil || !strings.Contains(err.Error(), "must contain unique items") {
+		t.Fatalf("local schema lost uniqueItems validation: %v", err)
+	}
 	if _, err := normalizeStructuredWorkerOutput(`{"contract_version":"v2","items":[{"label":"match","score":0.5}]}`, config.OutputSchema); err != nil {
 		t.Fatalf("expected supported output schema to validate: %v", err)
+	}
+}
+
+func TestProviderStrictWorkerOutputSchemaPreparesProviderCopy(t *testing.T) {
+	additionalProperties := false
+	schema := &workerOutputSchema{
+		Type:                 "object",
+		Required:             []string{"status", "uniqueItems", "details"},
+		AdditionalProperties: &additionalProperties,
+		Properties: map[string]workerOutputProperty{
+			"status": {
+				Type: []any{"string", "null"},
+				Enum: []string{"ready"},
+			},
+			"uniqueItems": {Type: "string"},
+			"details": {
+				Type:                 "object",
+				AdditionalProperties: &additionalProperties,
+			},
+		},
+	}
+
+	prepared, err := providerStrictWorkerOutputSchema(schema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := json.Marshal(prepared)
+	if err != nil {
+		t.Fatal(err)
+	}
+	providerJSON := string(encoded)
+	for _, want := range []string{
+		`"status":{"enum":["ready",null],"type":["string","null"]}`,
+		`"uniqueItems":{"type":"string"}`,
+		`"details":{"additionalProperties":false,"properties":{},"required":[],"type":"object"}`,
+	} {
+		if !strings.Contains(providerJSON, want) {
+			t.Fatalf("provider schema %s does not contain %s", providerJSON, want)
+		}
+	}
+	if len(schema.Properties["status"].Enum) != 1 {
+		t.Fatalf("local schema enum was mutated: %#v", schema.Properties["status"].Enum)
+	}
+
+	empty, err := providerStrictWorkerOutputSchema(&workerOutputSchema{
+		Type:                 "object",
+		AdditionalProperties: &additionalProperties,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if emptyJSON, _ := json.Marshal(empty); !strings.Contains(string(emptyJSON), `"properties":{},"required":[]`) {
+		t.Fatalf("empty provider object was not normalized: %s", emptyJSON)
+	}
+}
+
+func TestParseWorkerConfigRejectsNonStrictProviderSchema(t *testing.T) {
+	tests := []struct {
+		name   string
+		config string
+		want   string
+	}{
+		{
+			name:   "missing output schema",
+			config: `{"provider_strict_output":true}`,
+			want:   "provider_strict_output requires output_schema",
+		},
+		{
+			name:   "root type",
+			config: `{"provider_strict_output":true,"output_schema":{"type":"array","required":[],"additionalProperties":false,"properties":{}}}`,
+			want:   "must declare type object",
+		},
+		{
+			name:   "root additional properties",
+			config: `{"provider_strict_output":true,"output_schema":{"type":"object","required":[],"properties":{}}}`,
+			want:   "must set additionalProperties to false",
+		},
+		{
+			name:   "missing required field",
+			config: `{"provider_strict_output":true,"output_schema":{"type":"object","required":[],"additionalProperties":false,"properties":{"answer":{"type":"string"}}}}`,
+			want:   `must require field "answer"`,
+		},
+		{
+			name:   "unknown required field",
+			config: `{"provider_strict_output":true,"output_schema":{"type":"object","required":["missing"],"additionalProperties":false,"properties":{}}}`,
+			want:   `requires unknown field "missing"`,
+		},
+		{
+			name:   "nested object",
+			config: `{"provider_strict_output":true,"output_schema":{"type":"object","required":["item"],"additionalProperties":false,"properties":{"item":{"type":"object","required":[],"additionalProperties":true,"properties":{"answer":{"type":"string"}}}}}}`,
+			want:   `object "item" must set additionalProperties to false`,
+		},
+		{
+			name:   "nested array without items",
+			config: `{"provider_strict_output":true,"output_schema":{"type":"object","required":["items"],"additionalProperties":false,"properties":{"items":{"type":"array","items":{"type":"array"}}}}}`,
+			want:   `array "items[]" must define items`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			snapshotNode := &SnapshotNode{Node: &dbmodels.AgentGraphNode{NodeKey: "extract", Config: test.config}}
+			_, _, _, err := parseWorkerConfig(snapshotNode)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected %q, got %v", test.want, err)
+			}
+		})
 	}
 }
 
