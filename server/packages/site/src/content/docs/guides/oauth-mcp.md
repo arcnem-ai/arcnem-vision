@@ -64,6 +64,8 @@ Edits to a saved graph affect future executions, including other clients that us
 
 Use `get_workflow_catalog` for supported worker models and each node type's configuration schema. Worker and supervisor nodes require a model. A tool node calls exactly one processing tool; its input and output schemas are in the catalog. Condition nodes branch with `equals` or `contains`.
 
+A worker's `output_schema` always validates its final JSON locally. `provider_strict_output` is optional. When it is `true`, the selected provider receives the schema in strict structured-output mode, so the provider, model, and schema profile must support that mode. When it is `false` or omitted, only local validation applies. A schema-invalid final response fails the node. Transient provider or network failures use a separate bounded retry policy.
+
 `stateSchema` configures state reducers. It maps state keys to `append` or `overwrite`; it is not a JSON Schema for validating outputs. For example:
 
 ```json

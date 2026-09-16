@@ -179,19 +179,6 @@ func normalizeStructuredWorkerOutput(output string, schema *workerOutputSchema) 
 	return string(normalized), nil
 }
 
-func buildWorkerOutputRepairPrompt(err error, schema *workerOutputSchema) string {
-	schemaJSON, marshalErr := json.Marshal(schema)
-	if marshalErr != nil {
-		return fmt.Sprintf("Your previous response was invalid: %v. Return only a corrected JSON object.", err)
-	}
-
-	return fmt.Sprintf(
-		"Your previous response was invalid: %v. Return only a corrected JSON object that satisfies this schema: %s",
-		err,
-		string(schemaJSON),
-	)
-}
-
 func parseStructuredWorkerOutput(output string) (map[string]any, error) {
 	trimmed := stripWorkerOutputCodeFence(output)
 

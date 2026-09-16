@@ -129,7 +129,7 @@ func TestBuildGraphSupervisorRoutesWorkerAndFinishTarget(t *testing.T) {
 	}
 }
 
-func TestBuildGraphSupervisorMemberRepairsStructuredOutputBeforeFinishing(t *testing.T) {
+func TestBuildGraphSupervisorMemberFailsInvalidStructuredOutputWithoutRetry(t *testing.T) {
 	callCount := 0
 	runnable, err := buildGraphWithModelFactory(structuredSupervisorSnapshot(), nil, func(provider string, modelName string, modelVersion string) (any, error) {
 		switch modelName {
@@ -146,52 +146,6 @@ func TestBuildGraphSupervisorMemberRepairsStructuredOutputBeforeFinishing(t *tes
 			return &scriptedLLM{
 				generate: func(ctx context.Context, messages []llms.MessageContent, options ...llms.CallOption) (*llms.ContentResponse, error) {
 					callCount++
-					if callCount == 1 {
-						return textResponse(`{"inspection_photo_status":"retake required"}`), nil
-					}
-
-					if !strings.Contains(lastHumanInput(messages), "invalid") {
-						t.Fatalf("expected repair prompt in follow-up human message, got %q", lastHumanInput(messages))
-					}
-
-					return textResponse(`{"finding_type":"needs_better_image","observation_text":"Retake with a closer, unobstructed view.","scene_description":"Close-up of a weld seam.","severity":"low","confidence":"low","manual_review_reason":null,"retake_recommendation":"Retake with better framing and even lighting."}`), nil
-				},
-			}, nil
-		default:
-			return nil, fmt.Errorf("unexpected model request %s/%s@%s", provider, modelName, modelVersion)
-		}
-	})
-	if err != nil {
-		t.Fatalf("buildGraphWithModelFactory returned error: %v", err)
-	}
-
-	result, err := runnable.Invoke(context.Background(), map[string]any{
-		"inspection_input": "Review this inspection image.",
-	})
-	if err != nil {
-		t.Fatalf("runnable.Invoke returned error: %v", err)
-	}
-
-	if callCount != 2 {
-		t.Fatalf("expected 2 model calls, got %d", callCount)
-	}
-	if got := result["finding_summary"]; got != `{"confidence":"low","finding_type":"needs_better_image","manual_review_reason":null,"observation_text":"Retake with a closer, unobstructed view.","retake_recommendation":"Retake with better framing and even lighting.","scene_description":"Close-up of a weld seam.","severity":"low"}` {
-		t.Fatalf("expected normalized finding summary, got %#v", got)
-	}
-}
-
-func TestBuildGraphSupervisorMemberFailsWhenStructuredOutputNeverValidates(t *testing.T) {
-	runnable, err := buildGraphWithModelFactory(structuredSupervisorSnapshot(), nil, func(provider string, modelName string, modelVersion string) (any, error) {
-		switch modelName {
-		case "router-model":
-			return &scriptedLLM{
-				generate: func(ctx context.Context, messages []llms.MessageContent, options ...llms.CallOption) (*llms.ContentResponse, error) {
-					return toolCallResponse("inspection_worker"), nil
-				},
-			}, nil
-		case "inspection-model":
-			return &scriptedLLM{
-				generate: func(ctx context.Context, messages []llms.MessageContent, options ...llms.CallOption) (*llms.ContentResponse, error) {
 					return textResponse(`{"inspection_photo_status":"retake required"}`), nil
 				},
 			}, nil
@@ -206,56 +160,21 @@ func TestBuildGraphSupervisorMemberFailsWhenStructuredOutputNeverValidates(t *te
 	_, err = runnable.Invoke(context.Background(), map[string]any{
 		"inspection_input": "Review this inspection image.",
 	})
-	if err == nil {
-		t.Fatal("expected structured output validation to fail")
-	}
-	if !strings.Contains(err.Error(), "invalid structured output") {
+	if err == nil || !strings.Contains(err.Error(), "invalid structured output") {
 		t.Fatalf("expected invalid structured output error, got %v", err)
+	}
+	if callCount != 1 {
+		t.Fatalf("expected 1 model call, got %d", callCount)
 	}
 }
 
-func TestBuildGraphWorkerRepairsStructuredOutputBeforeCompleting(t *testing.T) {
+func TestBuildGraphWorkerFailsInvalidStructuredOutputWithoutRetry(t *testing.T) {
 	callCount := 0
 	runnable, err := buildGraphWithModelFactory(structuredWorkerSnapshot(), nil, func(provider string, modelName string, modelVersion string) (any, error) {
 		return &scriptedLLM{
 			generate: func(ctx context.Context, messages []llms.MessageContent, options ...llms.CallOption) (*llms.ContentResponse, error) {
 				callCount++
-				if callCount == 1 {
-					return textResponse("```json\n{\"inspection_photo_status\":\"retake required\"}\n```"), nil
-				}
-
-				if !strings.Contains(lastHumanInput(messages), "invalid") {
-					t.Fatalf("expected repair prompt in follow-up human message, got %q", lastHumanInput(messages))
-				}
-
-				return textResponse(`{"finding_type":"needs_better_image","observation_text":"Retake with a closer, unobstructed view.","scene_description":"Close-up of a weld seam.","severity":"low","confidence":"low","manual_review_reason":null,"retake_recommendation":"Retake with better framing and even lighting."}`), nil
-			},
-		}, nil
-	})
-	if err != nil {
-		t.Fatalf("buildGraphWithModelFactory returned error: %v", err)
-	}
-
-	result, err := runnable.Invoke(context.Background(), map[string]any{
-		"finding_draft": "The weld is partially blocked and needs a retake.",
-	})
-	if err != nil {
-		t.Fatalf("runnable.Invoke returned error: %v", err)
-	}
-
-	if callCount != 2 {
-		t.Fatalf("expected 2 model calls, got %d", callCount)
-	}
-	if got := result["finding_summary"]; got != `{"confidence":"low","finding_type":"needs_better_image","manual_review_reason":null,"observation_text":"Retake with a closer, unobstructed view.","retake_recommendation":"Retake with better framing and even lighting.","scene_description":"Close-up of a weld seam.","severity":"low"}` {
-		t.Fatalf("expected normalized finding summary, got %#v", got)
-	}
-}
-
-func TestBuildGraphWorkerFailsWhenStructuredOutputNeverValidates(t *testing.T) {
-	runnable, err := buildGraphWithModelFactory(structuredWorkerSnapshot(), nil, func(provider string, modelName string, modelVersion string) (any, error) {
-		return &scriptedLLM{
-			generate: func(ctx context.Context, messages []llms.MessageContent, options ...llms.CallOption) (*llms.ContentResponse, error) {
-				return textResponse(`{"inspection_photo_status":"retake required"}`), nil
+				return textResponse("```json\n{\"inspection_photo_status\":\"retake required\"}\n```"), nil
 			},
 		}, nil
 	})
@@ -266,11 +185,11 @@ func TestBuildGraphWorkerFailsWhenStructuredOutputNeverValidates(t *testing.T) {
 	_, err = runnable.Invoke(context.Background(), map[string]any{
 		"finding_draft": "The weld is partially blocked and needs a retake.",
 	})
-	if err == nil {
-		t.Fatal("expected structured output validation to fail")
-	}
-	if !strings.Contains(err.Error(), "invalid structured output") {
+	if err == nil || !strings.Contains(err.Error(), "invalid structured output") {
 		t.Fatalf("expected invalid structured output error, got %v", err)
+	}
+	if callCount != 1 {
+		t.Fatalf("expected 1 model call, got %d", callCount)
 	}
 }
 
@@ -387,7 +306,7 @@ func structuredWorkerSnapshot() *Snapshot {
 					NodeType:  "worker",
 					InputKey:  stringPtr("finding_draft"),
 					OutputKey: stringPtr("finding_summary"),
-					Config:    `{"system_message":"Normalize the finding.","max_iterations":1,"output_retries":2,"output_schema":{"type":"object","additionalProperties":false,"required":["finding_type","observation_text","scene_description","severity","confidence","manual_review_reason","retake_recommendation"],"properties":{"finding_type":{"type":"string","enum":["acceptable_visual_condition","possible_weld_issue","possible_corrosion","needs_better_image","manual_review_required"]},"observation_text":{"type":"string"},"scene_description":{"type":["string","null"]},"severity":{"type":["string","null"],"enum":["low","medium","high"]},"confidence":{"type":["string","null"],"enum":["low","medium","high"]},"manual_review_reason":{"type":["string","null"]},"retake_recommendation":{"type":["string","null"]}}}}`,
+					Config:    `{"system_message":"Normalize the finding.","max_iterations":1,"output_schema":{"type":"object","additionalProperties":false,"required":["finding_type","observation_text","scene_description","severity","confidence","manual_review_reason","retake_recommendation"],"properties":{"finding_type":{"type":"string","enum":["acceptable_visual_condition","possible_weld_issue","possible_corrosion","needs_better_image","manual_review_required"]},"observation_text":{"type":"string"},"scene_description":{"type":["string","null"]},"severity":{"type":["string","null"],"enum":["low","medium","high"]},"confidence":{"type":["string","null"],"enum":["low","medium","high"]},"manual_review_reason":{"type":["string","null"]},"retake_recommendation":{"type":["string","null"]}}}}`,
 				},
 				Model: fakeModel("OPENAI", "normalize-model"),
 			},
@@ -421,7 +340,7 @@ func structuredSupervisorSnapshot() *Snapshot {
 				Node: &dbmodels.AgentGraphNode{
 					NodeKey:  "inspection_worker",
 					NodeType: "worker",
-					Config:   `{"system_message":"inspection specialist","max_iterations":1,"output_retries":2,"output_schema":{"type":"object","additionalProperties":false,"required":["finding_type","observation_text","scene_description","severity","confidence","manual_review_reason","retake_recommendation"],"properties":{"finding_type":{"type":"string","enum":["acceptable_visual_condition","possible_weld_issue","possible_corrosion","needs_better_image","manual_review_required"]},"observation_text":{"type":"string"},"scene_description":{"type":["string","null"]},"severity":{"type":["string","null"],"enum":["low","medium","high"]},"confidence":{"type":["string","null"],"enum":["low","medium","high"]},"manual_review_reason":{"type":["string","null"]},"retake_recommendation":{"type":["string","null"]}}}}`,
+					Config:   `{"system_message":"inspection specialist","max_iterations":1,"output_schema":{"type":"object","additionalProperties":false,"required":["finding_type","observation_text","scene_description","severity","confidence","manual_review_reason","retake_recommendation"],"properties":{"finding_type":{"type":"string","enum":["acceptable_visual_condition","possible_weld_issue","possible_corrosion","needs_better_image","manual_review_required"]},"observation_text":{"type":"string"},"scene_description":{"type":["string","null"]},"severity":{"type":["string","null"],"enum":["low","medium","high"]},"confidence":{"type":["string","null"],"enum":["low","medium","high"]},"manual_review_reason":{"type":["string","null"]},"retake_recommendation":{"type":["string","null"]}}}}`,
 				},
 				Model: fakeModel("OPENAI", "inspection-model"),
 			},

@@ -272,5 +272,17 @@ describe("workflow operations", () => {
 		expect(catalog.nodeTypes[0]?.configSchema).toHaveProperty(
 			"properties.reasoning_effort",
 		);
+		expect(catalog.nodeTypes[0]?.configSchema).toHaveProperty(
+			"properties.provider_strict_output.type",
+			"boolean",
+		);
+		expect(catalog.nodeTypes[0]?.configSchema).toHaveProperty(
+			"properties.provider_strict_output.description",
+			"Ask the selected provider to enforce output_schema as strict structured output.",
+		);
+		expect(catalog.nodeTypes[0]?.configSchema).toHaveProperty(
+			"properties.output_schema.description",
+			"Validate the worker's final JSON output against this schema.",
+		);
 	});
 });
