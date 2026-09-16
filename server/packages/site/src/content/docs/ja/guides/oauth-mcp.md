@@ -54,6 +54,8 @@ MCP クライアントの接続管理から OAuth トークンを失効させま
 
 `definition` には `name`、`description`、`entryNode`、`stateSchema`、`nodes`、`edges` が入ります。同じグラフを更新するときは既存ノード ID を維持してください。モデルやノード設定は `get_workflow_catalog` で確認できます。worker と supervisor はモデルを必要とし、tool ノードは処理ツールをちょうど 1 つ呼び出します。
 
+worker の `output_schema` は最終 JSON を常にローカルで検証します。`provider_strict_output` は任意です。`true` の場合、選択した provider に strict structured output モードでスキーマを送るため、その provider、model、schema profile がこのモードに対応している必要があります。`false` または省略時はローカル検証だけを行います。最終出力がスキーマに違反した場合、そのノードを失敗させます。一時的な provider エラーやネットワークエラーには、別の上限付き再試行ポリシーを適用します。
+
 `stateSchema` は状態キーごとの結合方法を指定するマップです。出力検証用の JSON Schema ではありません。例えば `{"messages":"append","review":"overwrite"}` と指定します。
 
 ツールの `input_mapping` は引数名を状態キーに対応させます。文字列の定数は `_const:` を付け、例として `"provider":"_const:OPENAI"` と書きます。入れ子のオブジェクトや配列の文字列にも同じ規則が適用されます。`output_mapping` は結果フィールドを保存先の状態キーに対応させます。

@@ -25,7 +25,6 @@ func BuildWorkerNode(snapshotNode *SnapshotNode, modelClient any, mcpClient *cli
 	if err != nil {
 		return nil, err
 	}
-	outputRetries := outputRetryCount(workerConfig)
 	inputConfig, err := parseNodeInputConfig(snapshotNode.Node.Config)
 	if err != nil {
 		return nil, fmt.Errorf("worker node %q: invalid input config json: %w", snapshotNode.Node.NodeKey, err)
@@ -70,74 +69,49 @@ func BuildWorkerNode(snapshotNode *SnapshotNode, modelClient any, mcpClient *cli
 			}
 
 			messages := []llms.MessageContent{humanMessage}
-			var output string
-			var messageCount int
-			for attempt := 1; attempt <= outputRetries; attempt++ {
-				result, err := agent.Invoke(ctx, map[string]any{
-					"messages": messages,
-				})
-				if err != nil {
-					log.Printf(
-						"graph worker error node=%s max_iterations=%d attempt=%d/%d err=%v",
-						snapshotNode.Node.NodeKey,
-						maxIterations,
-						attempt,
-						outputRetries,
-						err,
-					)
-					return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
-				}
-
-				messages, err = loadResultMessages(result)
-				if err != nil {
-					return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
-				}
-
-				output, err = extractLastAIMessage(messages)
-				if err != nil {
-					return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
-				}
-
-				messageCount = len(messages)
-				if isMaxIterationsMessage(output) {
-					log.Printf(
-						"graph worker iteration_limit node=%s max_iterations=%d input_len=%d output_len=%d",
-						snapshotNode.Node.NodeKey,
-						maxIterations,
-						len(input),
-						len(output),
-					)
-					return nil, fmt.Errorf("worker node %q hit max iterations", snapshotNode.Node.NodeKey)
-				}
-
-				normalizedOutput, validationErr := normalizeStructuredWorkerOutput(output, workerConfig.OutputSchema)
-				if validationErr == nil {
-					output = normalizedOutput
-					break
-				}
-
-				if attempt == outputRetries {
-					return nil, fmt.Errorf("worker node %q: invalid structured output: %w", snapshotNode.Node.NodeKey, validationErr)
-				}
-
+			result, err := agent.Invoke(ctx, map[string]any{
+				"messages": messages,
+			})
+			if err != nil {
 				log.Printf(
-					"graph worker output_retry node=%s attempt=%d/%d err=%v output_len=%d",
+					"graph worker error node=%s max_iterations=%d err=%v",
 					snapshotNode.Node.NodeKey,
-					attempt,
-					outputRetries,
-					validationErr,
+					maxIterations,
+					err,
+				)
+				return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
+			}
+
+			messages, err = loadResultMessages(result)
+			if err != nil {
+				return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
+			}
+
+			output, err := extractLastAIMessage(messages)
+			if err != nil {
+				return nil, fmt.Errorf("worker node %q: %w", snapshotNode.Node.NodeKey, err)
+			}
+
+			if isMaxIterationsMessage(output) {
+				log.Printf(
+					"graph worker iteration_limit node=%s max_iterations=%d input_len=%d output_len=%d",
+					snapshotNode.Node.NodeKey,
+					maxIterations,
+					len(input),
 					len(output),
 				)
-				messages = append(messages, llms.TextParts(
-					llms.ChatMessageTypeHuman,
-					buildWorkerOutputRepairPrompt(validationErr, workerConfig.OutputSchema),
-				))
+				return nil, fmt.Errorf("worker node %q hit max iterations", snapshotNode.Node.NodeKey)
+			}
+
+			output, err = normalizeStructuredWorkerOutput(output, workerConfig.OutputSchema)
+			if err != nil {
+				return nil, fmt.Errorf("worker node %q: invalid structured output: %w", snapshotNode.Node.NodeKey, err)
 			}
 
 			log.Printf(
 				"graph worker end node=%s message_count=%d output_len=%d",
 				snapshotNode.Node.NodeKey,
-				messageCount,
+				len(messages),
 				len(output),
 			)
 
@@ -170,8 +144,6 @@ func BuildSupervisorMemberWorkerNode(snapshotNode *SnapshotNode, modelClient any
 	if err != nil {
 		return nil, err
 	}
-	outputRetries := outputRetryCount(workerConfig)
-
 	baseAgent, err := buildAgentMap(model, graphTools, maxIterations, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("member worker %q: failed to create agent: %w", snapshotNode.Node.NodeKey, err)
@@ -194,97 +166,68 @@ func BuildSupervisorMemberWorkerNode(snapshotNode *SnapshotNode, modelClient any
 				nodeKey, maxIterations, len(inputMessages),
 			)
 
-			messages := inputMessages
-			var outputMessages []llms.MessageContent
-			for attempt := 1; attempt <= outputRetries; attempt++ {
-				result, err := baseAgent.Invoke(ctx, map[string]any{
-					"messages": messages,
-				})
-				if err != nil {
-					log.Printf(
-						"graph supervisor_member_error node=%s attempt=%d/%d err=%v",
-						nodeKey, attempt, outputRetries, err,
-					)
-					return nil, fmt.Errorf("member worker %q: %w", nodeKey, err)
-				}
-
-				resultMessages, err := loadResultMessages(result)
-				if err != nil {
-					return nil, fmt.Errorf("member worker %q: %w", nodeKey, err)
-				}
-				if len(resultMessages) == 0 {
-					log.Printf(
-						"graph supervisor_member_end node=%s message_count=0",
-						nodeKey,
-					)
-					return map[string]any{}, nil
-				}
-
-				// CreateAgentMap returns full conversation history. Keep only the delta
-				// (newly generated messages) to prevent duplication with AppendReducer.
-				outputMessages = resultMessages
-				if len(messages) > 0 && len(resultMessages) >= len(messages) {
-					outputMessages = resultMessages[len(messages):]
-				}
-				if len(outputMessages) == 0 {
-					log.Printf(
-						"graph supervisor_member_end node=%s message_count=0",
-						nodeKey,
-					)
-					return map[string]any{}, nil
-				}
-
-				lastOutput, err := extractLastAIMessage(outputMessages)
-				if err != nil {
-					return nil, fmt.Errorf("member worker %q: %w", nodeKey, err)
-				}
-				if isMaxIterationsMessage(lastOutput) {
-					log.Printf(
-						"graph supervisor_member_iteration_limit node=%s max_iterations=%d",
-						nodeKey, maxIterations,
-					)
-					return nil, fmt.Errorf("member worker %q hit max iterations", nodeKey)
-				}
-
-				normalizedOutput, validationErr := normalizeStructuredWorkerOutput(lastOutput, workerConfig.OutputSchema)
-				if validationErr == nil {
-					if workerConfig.OutputSchema != nil {
-						outputMessages, err = replaceLastAIMessage(outputMessages, normalizedOutput)
-						if err != nil {
-							return nil, fmt.Errorf("member worker %q: %w", nodeKey, err)
-						}
-					}
-
-					log.Printf(
-						"graph supervisor_member_end node=%s message_count=%d",
-						nodeKey, len(outputMessages),
-					)
-
-					return map[string]any{
-						"messages": outputMessages,
-					}, nil
-				}
-
-				if attempt == outputRetries {
-					return nil, fmt.Errorf("member worker %q: invalid structured output: %w", nodeKey, validationErr)
-				}
-
+			result, err := baseAgent.Invoke(ctx, map[string]any{
+				"messages": inputMessages,
+			})
+			if err != nil {
 				log.Printf(
-					"graph supervisor_member_output_retry node=%s attempt=%d/%d err=%v output_len=%d",
-					nodeKey,
-					attempt,
-					outputRetries,
-					validationErr,
-					len(lastOutput),
+					"graph supervisor_member_error node=%s err=%v",
+					nodeKey, err,
 				)
-
-				messages = append(resultMessages, llms.TextParts(
-					llms.ChatMessageTypeHuman,
-					buildWorkerOutputRepairPrompt(validationErr, workerConfig.OutputSchema),
-				))
+				return nil, fmt.Errorf("member worker %q: %w", nodeKey, err)
 			}
 
-			return map[string]any{}, nil
+			resultMessages, err := loadResultMessages(result)
+			if err != nil {
+				return nil, fmt.Errorf("member worker %q: %w", nodeKey, err)
+			}
+			if len(resultMessages) == 0 {
+				log.Printf("graph supervisor_member_end node=%s message_count=0", nodeKey)
+				return map[string]any{}, nil
+			}
+
+			// CreateAgentMap returns full conversation history. Keep only the delta
+			// (newly generated messages) to prevent duplication with AppendReducer.
+			outputMessages := resultMessages
+			if len(inputMessages) > 0 && len(resultMessages) >= len(inputMessages) {
+				outputMessages = resultMessages[len(inputMessages):]
+			}
+			if len(outputMessages) == 0 {
+				log.Printf("graph supervisor_member_end node=%s message_count=0", nodeKey)
+				return map[string]any{}, nil
+			}
+
+			lastOutput, err := extractLastAIMessage(outputMessages)
+			if err != nil {
+				return nil, fmt.Errorf("member worker %q: %w", nodeKey, err)
+			}
+			if isMaxIterationsMessage(lastOutput) {
+				log.Printf(
+					"graph supervisor_member_iteration_limit node=%s max_iterations=%d",
+					nodeKey, maxIterations,
+				)
+				return nil, fmt.Errorf("member worker %q hit max iterations", nodeKey)
+			}
+
+			normalizedOutput, err := normalizeStructuredWorkerOutput(lastOutput, workerConfig.OutputSchema)
+			if err != nil {
+				return nil, fmt.Errorf("member worker %q: invalid structured output: %w", nodeKey, err)
+			}
+			if workerConfig.OutputSchema != nil {
+				outputMessages, err = replaceLastAIMessage(outputMessages, normalizedOutput)
+				if err != nil {
+					return nil, fmt.Errorf("member worker %q: %w", nodeKey, err)
+				}
+			}
+
+			log.Printf(
+				"graph supervisor_member_end node=%s message_count=%d",
+				nodeKey, len(outputMessages),
+			)
+
+			return map[string]any{
+				"messages": outputMessages,
+			}, nil
 		},
 	}, nil
 }

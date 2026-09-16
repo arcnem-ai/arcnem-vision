@@ -15,13 +15,11 @@ type workerAgentConfig struct {
 	clients.GenerationConfig
 	SystemMessage        string              `json:"system_message"`
 	MaxIterations        int                 `json:"max_iterations"`
-	OutputRetries        int                 `json:"output_retries"`
 	OutputSchema         *workerOutputSchema `json:"output_schema"`
 	ProviderStrictOutput bool                `json:"provider_strict_output"`
 }
 
 const defaultWorkerMaxIterations = 10
-const defaultWorkerOutputRetries = 3
 
 // parseWorkerConfig extracts worker runtime settings from a node's config jsonb.
 func parseWorkerConfig(snapshotNode *SnapshotNode) (workerAgentConfig, int, []prebuilt.CreateAgentOption, error) {
@@ -144,16 +142,6 @@ func buildWorkerAgentOptions(config workerAgentConfig) (int, []prebuilt.CreateAg
 	}
 
 	return maxIterations, opts
-}
-
-func outputRetryCount(config workerAgentConfig) int {
-	if config.OutputSchema == nil {
-		return 1
-	}
-	if config.OutputRetries > 0 {
-		return config.OutputRetries
-	}
-	return defaultWorkerOutputRetries
 }
 
 // buildAgentMap creates a ReAct agent StateRunnable via the prebuilt package.

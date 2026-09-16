@@ -407,8 +407,16 @@ const workflowNodeConfigSchemas = {
 	worker: z.looseObject({
 		...generationConfig,
 		system_message: z.string().optional(),
-		output_retries: z.number().int().nonnegative().optional(),
-		output_schema: z.record(z.string(), z.unknown()).optional(),
+		provider_strict_output: z
+			.boolean()
+			.optional()
+			.describe(
+				"Ask the selected provider to enforce output_schema as strict structured output.",
+			),
+		output_schema: z
+			.record(z.string(), z.unknown())
+			.optional()
+			.describe("Validate the worker's final JSON output against this schema."),
 	}),
 	supervisor: z.looseObject({
 		...generationConfig,
