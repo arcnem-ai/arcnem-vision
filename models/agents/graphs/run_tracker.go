@@ -198,12 +198,6 @@ func (t *RunTracker) OnEvent(_ context.Context, span *graph.TraceSpan) {
 				)
 			}
 		}
-		runErr := span.Error
-		if span.Error != nil {
-			runErr = span.Error
-		} else {
-			runErr = fmt.Errorf("node %s failed", span.NodeName)
-		}
 		stepOrder := int32(0)
 		if ok {
 			stepOrder = step.StepOrder
@@ -215,34 +209,33 @@ func (t *RunTracker) OnEvent(_ context.Context, span *graph.TraceSpan) {
 			span.NodeName,
 			span.Duration.Milliseconds(),
 		)
+		// The failing node's error returns through Invoke; the job's finalize step
+		// records the terminal status.
 		if ok {
 			t.publish(realtime.DashboardReasonRunStepChanged)
-		}
-		if _, err := FinalizeRun(t.db, t.run.ID, t.organizationID, "failed", span.State, runErr); err != nil {
-			log.Printf("graph run failed db_write_failed run_id=%s err=%v", t.run.ID, err)
 		}
 
 	}
 }
 
-func terminalRunUpdates(status string, finalState any, runErr error) (map[string]any, error) {
-	if status != "completed" && status != "failed" {
-		return nil, fmt.Errorf("invalid terminal run status %q", status)
+func terminalRunUpdates(outcome RunOutcome) (map[string]any, error) {
+	if outcome.Status != "completed" && outcome.Status != "failed" {
+		return nil, fmt.Errorf("invalid terminal run status %q", outcome.Status)
 	}
-	if status == "failed" && runErr == nil {
+	if outcome.Status == "failed" && outcome.Error == "" {
 		return nil, fmt.Errorf("failed run requires an error")
 	}
 
 	updates := map[string]any{
-		"status":      status,
+		"status":      outcome.Status,
 		"finished_at": time.Now(),
 		"error":       nil,
 	}
-	if runErr != nil {
-		updates["error"] = runErr.Error()
+	if outcome.Error != "" {
+		updates["error"] = outcome.Error
 	}
-	if finalState != nil {
-		stateJSON, err := json.Marshal(finalState)
+	if outcome.FinalState != nil {
+		stateJSON, err := json.Marshal(outcome.FinalState)
 		if err == nil {
 			updates["final_state"] = string(stateJSON)
 		}
@@ -258,8 +251,9 @@ func updateRunningRun(db *gorm.DB, runID string, updates map[string]any) *gorm.D
 }
 
 // FinalizeRun atomically transitions a running run once and publishes its terminal event.
-func FinalizeRun(db *gorm.DB, runID string, organizationID string, status string, finalState any, runErr error) (bool, error) {
-	updates, err := terminalRunUpdates(status, finalState, runErr)
+// A run that is already terminal keeps its first outcome.
+func FinalizeRun(db *gorm.DB, runID string, organizationID string, outcome RunOutcome) (bool, error) {
+	updates, err := terminalRunUpdates(outcome)
 	if err != nil {
 		return false, err
 	}
