@@ -35,6 +35,14 @@ MCP クライアントの接続管理から OAuth トークンを失効させま
 | `list_documents` | プロジェクトのドキュメントを一覧で取得する。 | `documents:list` |
 | `search_documents` | プロジェクト内で選択したドキュメントを検索する。 | `documents:search` |
 | `get_document` | ドキュメントの詳細と抽出済みコンテンツを読む。 | `documents:read` |
+| `list_service_keys` | Webhookエンドポイントを持つサービスキーを一覧で取得する（IDと名前のみ）。 | `webhooks:read` |
+| `list_webhook_endpoints` | サービスキーのWebhookエンドポイントを一覧で取得する。 | `webhooks:read` |
+| `list_webhook_deliveries` | Webhookの配信履歴と各試行を読む。 | `webhooks:read` |
+| `create_webhook_endpoint` | エンドポイントを登録する。署名シークレットは一度だけ返る。 | `webhooks:manage` |
+| `revoke_webhook_endpoint` | エンドポイントへの配信を止める（履歴は残る）。 | `webhooks:manage` |
+| `resend_webhook_delivery` | 配信と同じイベントを元のエンドポイントに再送する。 | `webhooks:manage` |
+
+`webhooks:manage` はエージェントに署名シークレットを渡すため、受信側の設定を任せる場合にだけ許可してください。サービスキー、エンドポイント、配信を確認するため、`webhooks:read` と一緒に要求してください。詳しくは [ワークフローのWebhookを受け取る](/ja/guides/workflow-webhooks/) を参照してください。
 
 継続接続には `offline_access` でトークン更新を要求できます。必要な権限だけを要求してください。スコープを許可しても、ユーザーが所属していない組織やプロジェクトにはアクセスできません。一覧にはページ分割があり、詳しい内容は個別の取得ツールで読みます。
 

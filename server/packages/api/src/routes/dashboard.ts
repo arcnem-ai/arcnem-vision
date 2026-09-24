@@ -6,6 +6,7 @@ import { dashboardProjectsRouter } from "./dashboardProjects";
 import { dashboardRealtimeRouter } from "./dashboardRealtime";
 import { dashboardRunsRouter } from "./dashboardRuns";
 import { dashboardStateRouter } from "./dashboardState";
+import { dashboardWebhooksRouter } from "./dashboardWebhooks";
 import { dashboardWorkflowsRouter } from "./dashboardWorkflows";
 
 export const dashboardRouter = new Hono<HonoServerContext>({
@@ -17,6 +18,7 @@ export const dashboardRouter = new Hono<HonoServerContext>({
 	dashboardRunsRouter,
 	dashboardOrganizationsRouter,
 	dashboardProjectsRouter,
+	dashboardWebhooksRouter,
 	dashboardWorkflowsRouter,
 	dashboardChatRouter,
 	dashboardRealtimeRouter,

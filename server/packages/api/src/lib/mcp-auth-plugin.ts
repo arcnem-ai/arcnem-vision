@@ -16,6 +16,8 @@ export const MCP_SCOPES = [
 	"documents:list",
 	"documents:search",
 	"documents:read",
+	"webhooks:read",
+	"webhooks:manage",
 ] as const;
 
 export type McpPrincipal = {

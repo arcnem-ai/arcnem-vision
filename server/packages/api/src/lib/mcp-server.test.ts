@@ -22,7 +22,12 @@ async function withClient<T>(
 	run: (client: Client) => Promise<T>,
 ) {
 	const server = createVisionMcpServer(
-		{ db, s3: {} as S3Client, inngest: {} as Inngest },
+		{
+			db,
+			s3: {} as S3Client,
+			inngest: {} as Inngest,
+			webhookDestinations: { allowPrivateHttp: false },
+		},
 		principal,
 	);
 	const client = new Client({ name: "vision-mcp-test", version: "1.0.0" });
@@ -39,7 +44,7 @@ async function withClient<T>(
 }
 
 describe("Vision MCP tools", () => {
-	test("exposes the twelve agreed tools, and read-only tokens cannot call writes", async () => {
+	test("exposes the agreed tools, and read-only tokens cannot call writes", async () => {
 		const principal = {
 			userId: "reader",
 			clientId: "test",
@@ -49,6 +54,7 @@ describe("Vision MCP tools", () => {
 			expect(
 				(await client.listTools()).tools.map((tool) => tool.name).sort(),
 			).toEqual([
+				"create_webhook_endpoint",
 				"create_workflow",
 				"execute_workflow",
 				"get_document",
@@ -58,7 +64,12 @@ describe("Vision MCP tools", () => {
 				"list_documents",
 				"list_executions",
 				"list_projects",
+				"list_service_keys",
+				"list_webhook_deliveries",
+				"list_webhook_endpoints",
 				"list_workflows",
+				"resend_webhook_delivery",
+				"revoke_webhook_endpoint",
 				"search_documents",
 				"update_workflow",
 			]);
@@ -75,6 +86,37 @@ describe("Vision MCP tools", () => {
 				await expect(
 					client.callTool({ name: "execute_workflow", arguments: {} }),
 				).rejects.toThrow("not found");
+			},
+		);
+	});
+
+	test("separates webhook reads from webhook management", async () => {
+		await withClient(
+			{} as PGDB,
+			{ userId: "reader", clientId: "test", scopes: ["webhooks:read"] },
+			async (client) => {
+				const tools = (await client.listTools()).tools;
+				expect(tools.map((tool) => tool.name).sort()).toEqual([
+					"list_service_keys",
+					"list_webhook_deliveries",
+					"list_webhook_endpoints",
+				]);
+				expect(tools.every((tool) => tool.annotations?.readOnlyHint)).toBe(
+					true,
+				);
+				await expect(
+					client.callTool({ name: "create_webhook_endpoint", arguments: {} }),
+				).rejects.toThrow("not found");
+			},
+		);
+		await withClient(
+			{} as PGDB,
+			{ userId: "manager", clientId: "test", scopes: ["webhooks:manage"] },
+			async (client) => {
+				const revoke = (await client.listTools()).tools.find(
+					(tool) => tool.name === "revoke_webhook_endpoint",
+				);
+				expect(revoke?.annotations?.destructiveHint).toBe(true);
 			},
 		);
 	});

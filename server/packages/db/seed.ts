@@ -1,3 +1,4 @@
+import { createCipheriv, randomBytes } from "node:crypto";
 import { extname } from "node:path";
 import {
 	createEnvVarGetter,
@@ -28,6 +29,9 @@ import {
 	sessions,
 	tools,
 	users,
+	webhookDeliveries,
+	webhookDeliveryAttempts,
+	webhookEndpoints,
 } from "./src/schema";
 import { getDB } from "./src/server";
 
@@ -48,6 +52,14 @@ const plainOCRSupervisorApiKey =
 	"seed_ocr_sup_G7n4Q1r8S5t2U9v6W3x0Y7z4A1b8C5d2E9f6G3h0J7k4";
 const plainServiceApiKey =
 	"seed_srv_J5m8Q2r6S9t3U7v1W4x8Y2z6A9b3C7d1E4f8G2h6J9k3L7m1P4";
+// Local demo receiver. Run any Standard Webhooks receiver on this URL with the
+// secret below to watch deliveries; API_DEBUG allows local http destinations.
+// Docker setups point it at host.docker.internal so the API container can reach it.
+const seedWebhookReceiverURL =
+	process.env.SEED_WEBHOOK_RECEIVER_URL?.trim() ||
+	"http://localhost:3999/webhooks/vision";
+const seedWebhookSigningSecret =
+	"whsec_c2VlZC13ZWJob29rLXNpZ25pbmctc2VjcmV0LTMyYnk=";
 const seedDashboardSessionToken =
 	"seed_dashboard_session_s4M8xR2vJ7nK1qP5wL9cD3fH6tY0uB4";
 const seededDashboardUserEmail =
@@ -77,6 +89,13 @@ const S3_ENV_VAR = {
 } as const;
 
 const getS3EnvVar = createEnvVarGetter(S3_ENV_VAR);
+
+// Must match the API's value so the API can decrypt the seeded signing secret.
+const WEBHOOK_ENV_VAR = {
+	WEBHOOK_SECRET_ENCRYPTION_KEY: "WEBHOOK_SECRET_ENCRYPTION_KEY",
+} as const;
+
+const getWebhookEnvVar = createEnvVarGetter(WEBHOOK_ENV_VAR);
 
 type SeedDocumentInput = {
 	slug: string;
@@ -342,6 +361,48 @@ const getSeedImageContentType = (fileName: string): string => {
 			throw new Error(`Unsupported seed image extension: ${fileName}`);
 	}
 };
+
+// Same v1 format as the API's encryptSigningSecret (AES-256-GCM, iv:tag:ciphertext).
+const encryptSeedSigningSecret = (secret: string, keyValue: string) => {
+	const key = Buffer.from(keyValue, "base64");
+	if (key.byteLength !== 32)
+		throw new Error(
+			"WEBHOOK_SECRET_ENCRYPTION_KEY must be 32 bytes encoded as base64",
+		);
+	const iv = randomBytes(12);
+	const cipher = createCipheriv("aes-256-gcm", key, iv);
+	const ciphertext = Buffer.concat([
+		cipher.update(secret, "utf8"),
+		cipher.final(),
+	]);
+	return [
+		"v1",
+		iv.toString("base64"),
+		cipher.getAuthTag().toString("base64"),
+		ciphertext.toString("base64"),
+	].join(":");
+};
+
+// Same frozen body the Go finalizer writes for a terminal run.
+const seedWebhookBody = (run: {
+	id: string;
+	workflowId: string;
+	projectId: string;
+	status: "completed" | "failed";
+	finishedAt: Date;
+}) =>
+	JSON.stringify({
+		type: `workflow.${run.status}`,
+		timestamp: run.finishedAt.toISOString(),
+		data: {
+			executionId: run.id,
+			workflowId: run.workflowId,
+			projectId: run.projectId,
+			status: run.status,
+			finishedAt: run.finishedAt.toISOString(),
+			execution: `/service/workflow-executions/${run.id}`,
+		},
+	});
 
 const hashApiKey = async (key: string): Promise<string> => {
 	const digest = await crypto.subtle.digest(
@@ -633,6 +694,10 @@ const seed = async () => {
 	const hashedOCRSupervisorApiKey = await hashApiKey(plainOCRSupervisorApiKey);
 	const hashedServiceApiKey = await hashApiKey(plainServiceApiKey);
 	const { bucket, client: s3Client } = getSeedS3Client();
+	const seedWebhookSigningSecretCiphertext = encryptSeedSigningSecret(
+		seedWebhookSigningSecret,
+		getWebhookEnvVar("WEBHOOK_SECRET_ENCRYPTION_KEY"),
+	);
 	const uploadedSeedDocuments = await uploadSeedDocumentsToS3(
 		s3Client,
 		seedDocumentInputs,
@@ -667,6 +732,9 @@ const seed = async () => {
 	const result = await db.transaction(async (tx) => {
 		await tx.execute(sql`
 			TRUNCATE TABLE
+				"webhook_delivery_attempts",
+				"webhook_deliveries",
+				"webhook_endpoints",
 				"agent_graph_run_steps",
 				"agent_graph_runs",
 				"agent_graph_template_versions",
@@ -3298,7 +3366,129 @@ const seed = async () => {
 			}),
 		];
 
+		// ── Workflow webhooks: service-key executions with delivery history ──
+
+		const minutesAgo = (minutes: number) =>
+			new Date(now.getTime() - minutes * 60_000);
+		const serviceRunInputs = [
+			{ status: "completed", minutes: 95, verdict: "GOOD" },
+			{ status: "completed", minutes: 40, verdict: "BAD" },
+			{ status: "failed", minutes: 12, verdict: null },
+		] as const;
+		const serviceRuns = await tx
+			.insert(agentGraphRuns)
+			.values(
+				serviceRunInputs.map((run) => ({
+					agentGraphId: qualityReviewGraph.id,
+					projectId: project.id,
+					apiKeyId: serviceApiKey.id,
+					status: run.status,
+					initialState: { source: "seed service integration" },
+					finalState: run.verdict
+						? { quality_review: `Verdict: ${run.verdict}` }
+						: null,
+					error:
+						run.status === "failed"
+							? "error in node quality_review_supervisor: model provider unavailable"
+							: null,
+					startedAt: minutesAgo(run.minutes + 1),
+					finishedAt: minutesAgo(run.minutes),
+				})),
+			)
+			.returning({
+				id: agentGraphRuns.id,
+				status: agentGraphRuns.status,
+				finishedAt: agentGraphRuns.finishedAt,
+			});
+
+		const [revokedEndpoint, endpoint] = await tx
+			.insert(webhookEndpoints)
+			.values([
+				{
+					apiKeyId: serviceApiKey.id,
+					projectId: project.id,
+					url: "https://old-receiver.example.com/webhooks/vision",
+					signingSecretCiphertext: seedWebhookSigningSecretCiphertext,
+					status: "revoked",
+					createdAt: minutesAgo(180),
+					revokedAt: minutesAgo(120),
+				},
+				{
+					apiKeyId: serviceApiKey.id,
+					projectId: project.id,
+					url: seedWebhookReceiverURL,
+					signingSecretCiphertext: seedWebhookSigningSecretCiphertext,
+					createdAt: minutesAgo(110),
+				},
+			])
+			.returning({ id: webhookEndpoints.id });
+		if (!revokedEndpoint || !endpoint) {
+			throw new Error("Failed to create seed webhook endpoints");
+		}
+
+		// Oldest first, so UUIDv7 order matches delivery time.
+		const deliveryStatuses = ["delivered", "delivered", "failed"] as const;
+		const deliveries = await tx
+			.insert(webhookDeliveries)
+			.values(
+				serviceRuns.map((run, index) => {
+					const status = run.status === "failed" ? "failed" : "completed";
+					const finishedAt = run.finishedAt ?? now;
+					return {
+						endpointId: endpoint.id,
+						runId: run.id,
+						eventId: `evt_${run.id}`,
+						eventType: `workflow.${status}`,
+						body: seedWebhookBody({
+							id: run.id,
+							workflowId: qualityReviewGraph.id,
+							projectId: project.id,
+							status,
+							finishedAt,
+						}),
+						status: deliveryStatuses[index],
+						createdAt: finishedAt,
+						updatedAt: finishedAt,
+					};
+				}),
+			)
+			.returning({ id: webhookDeliveries.id });
+
+		const attemptsByDelivery = [
+			[{ outcome: "succeeded", httpStatus: 204, errorCategory: null }],
+			[
+				{ outcome: "retryable", httpStatus: 502, errorCategory: null },
+				{ outcome: "succeeded", httpStatus: 200, errorCategory: null },
+			],
+			[
+				{ outcome: "retryable", httpStatus: 503, errorCategory: null },
+				{ outcome: "retryable", httpStatus: null, errorCategory: "timeout" },
+				{ outcome: "retryable", httpStatus: 503, errorCategory: null },
+				{ outcome: "retryable", httpStatus: 503, errorCategory: null },
+			],
+		];
+		await tx.insert(webhookDeliveryAttempts).values(
+			deliveries.flatMap((delivery, index) => {
+				const finishedAt = serviceRuns[index]?.finishedAt ?? now;
+				return (attemptsByDelivery[index] ?? []).map((attempt, n) => {
+					const at = new Date(finishedAt.getTime() + n * 90_000);
+					return {
+						deliveryId: delivery.id,
+						attemptNumber: n + 1,
+						...attempt,
+						startedAt: at,
+						finishedAt: at,
+					};
+				});
+			}),
+		);
+		const webhookDemo = {
+			endpointId: endpoint.id,
+			deliveries: deliveries.length,
+		};
+
 		return {
+			webhookDemo,
 			user,
 			seededLoginUser,
 			dashboardSession,
@@ -3407,6 +3597,12 @@ const seed = async () => {
 	}
 	console.log(`Service API Key ID: ${result.serviceApiKey.id}`);
 	console.log(`Service API Key (plain): ${plainServiceApiKey}`);
+	console.log(
+		`Webhook endpoint (service key): ${seedWebhookReceiverURL} (${result.webhookDemo.endpointId}), with ${result.webhookDemo.deliveries} sample deliveries and one revoked endpoint`,
+	);
+	console.log(
+		`Webhook signing secret (local demo): ${seedWebhookSigningSecret}`,
+	);
 	console.log(`API Key ID (workflow 1): ${result.pipelineApiKey.id}`);
 	console.log(`API Key (plain, workflow 1): ${plainPipelineApiKey}`);
 	console.log(`API Key ID (workflow 2): ${result.qualityReviewApiKey.id}`);

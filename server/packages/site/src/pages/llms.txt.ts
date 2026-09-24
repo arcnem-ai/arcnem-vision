@@ -18,6 +18,7 @@ const preferredOrder = [
 	"architecture",
 	"guides/dashboard-workflow-editor",
 	"guides/oauth-mcp",
+	"guides/workflow-webhooks",
 	"reference/api",
 	"reference/commands",
 	"reference/contributing",

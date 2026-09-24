@@ -14,9 +14,11 @@ import {
 } from "./deliver";
 import {
 	createWebhookEndpoint,
+	listProjectServiceKeys,
 	listWebhookDeliveries,
 	listWebhookEndpoints,
 	MAX_ENABLED_WEBHOOK_ENDPOINTS_PER_KEY,
+	requireServiceKeyOwner,
 	resendWebhookDelivery,
 	revokeWebhookEndpoint,
 	type WebhookOwner,
@@ -97,7 +99,14 @@ async function seedServiceKey(db: PGDB) {
 		})
 		.returning();
 	const owner: WebhookOwner = { projectId: project.id, apiKeyId: key.id };
-	return { owner, run, newKey, projectId: project.id };
+	return {
+		owner,
+		run,
+		newKey,
+		projectId: project.id,
+		organizationId: organization.id,
+		userId: user.id,
+	};
 }
 
 async function queueDelivery(db: PGDB, endpointId: string, runId: string) {
@@ -374,6 +383,77 @@ describePostgres("workflow webhooks (PostgreSQL)", () => {
 					fakePoster({ kind: "response", status: 200 }).post,
 				),
 			).toEqual({ outcome: "delivered" });
+		});
+	});
+
+	test("dashboard and MCP callers manage only service keys in their organization and project", async () => {
+		await withRollback(async (db) => {
+			const { owner, organizationId, projectId, userId } =
+				await seedServiceKey(db);
+			const other = await seedServiceKey(db);
+			const [workflowKey] = await db
+				.insert(schema.apikeys)
+				.values({
+					key: randomUUID(),
+					userId,
+					organizationId,
+					projectId,
+					kind: "workflow",
+				})
+				.returning();
+
+			expect(
+				await requireServiceKeyOwner(db, {
+					organizationId,
+					projectId,
+					apiKeyId: owner.apiKeyId,
+				}),
+			).toEqual(owner);
+			for (const input of [
+				{ organizationId: other.organizationId, apiKeyId: owner.apiKeyId },
+				{
+					organizationId,
+					projectId: other.projectId,
+					apiKeyId: owner.apiKeyId,
+				},
+				{ organizationId, apiKeyId: workflowKey.id },
+				{ organizationId, apiKeyId: "not-a-uuid" },
+			])
+				await expect(requireServiceKeyOwner(db, input)).rejects.toThrow(
+					"Service API key not found",
+				);
+
+			const { serviceKeys } = await listProjectServiceKeys(db, projectId);
+			expect(serviceKeys.map((key) => key.id)).toEqual([owner.apiKeyId]);
+			expect(Object.keys(serviceKeys[0]).sort()).toEqual([
+				"enabled",
+				"id",
+				"name",
+			]);
+		});
+	});
+
+	test("archived projects keep webhook history readable but refuse changes", async () => {
+		await withRollback(async (db) => {
+			const { owner, organizationId, projectId } = await seedServiceKey(db);
+			await db
+				.update(schema.projects)
+				.set({ archivedAt: new Date() })
+				.where(eq(schema.projects.id, projectId));
+
+			expect(
+				await requireServiceKeyOwner(db, {
+					organizationId,
+					apiKeyId: owner.apiKeyId,
+				}),
+			).toEqual(owner);
+			await expect(
+				requireServiceKeyOwner(db, {
+					organizationId,
+					apiKeyId: owner.apiKeyId,
+					forChange: true,
+				}),
+			).rejects.toThrow("Restore the project");
 		});
 	});
 });

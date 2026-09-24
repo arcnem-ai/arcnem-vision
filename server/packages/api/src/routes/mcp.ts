@@ -5,6 +5,7 @@ import {
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { getAPIEnvVar } from "@/env/getAPIEnvVar";
+import { isAPIDebugModeEnabled } from "@/env/isAPIDebugModeEnabled";
 import { mcpResourceUrl } from "@/lib/auth";
 import { protectMcpRequest } from "@/lib/mcp-auth";
 import { createVisionMcpServer } from "@/lib/mcp-server";
@@ -40,6 +41,7 @@ mcpRouter.all("/mcp", async (c) => {
 						db: c.get("dbClient"),
 						s3: c.get("s3Client"),
 						inngest: c.get("inngestClient"),
+						webhookDestinations: { allowPrivateHttp: isAPIDebugModeEnabled() },
 					},
 					principal,
 				),

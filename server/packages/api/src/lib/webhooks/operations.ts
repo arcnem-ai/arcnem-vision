@@ -16,7 +16,13 @@ import {
 	generateSigningSecret,
 } from "@/lib/webhooks/signing";
 
-const { webhookDeliveries, webhookDeliveryAttempts, webhookEndpoints } = schema;
+const {
+	apikeys,
+	projects,
+	webhookDeliveries,
+	webhookDeliveryAttempts,
+	webhookEndpoints,
+} = schema;
 
 export const WEBHOOK_DELIVERY_REQUESTED_EVENT = "webhook/delivery.requested";
 export const MAX_ENABLED_WEBHOOK_ENDPOINTS_PER_KEY = 5;
@@ -27,6 +33,59 @@ export type WebhookOwner = {
 	projectId: string;
 	apiKeyId: string;
 };
+
+// Dashboard members and MCP users manage webhooks for a service key in an
+// organization they belong to. The caller has already verified that membership.
+// Changes are refused for archived projects, as for their service keys.
+export async function requireServiceKeyOwner(
+	dbClient: PGDB,
+	input: {
+		organizationId: string;
+		apiKeyId: string;
+		projectId?: string;
+		forChange?: boolean;
+	},
+): Promise<WebhookOwner> {
+	if (!isUUID(input.apiKeyId))
+		throw new ServiceError(404, "Service API key not found");
+	const [key] = await dbClient
+		.select({
+			apiKeyId: apikeys.id,
+			projectId: apikeys.projectId,
+			projectArchivedAt: projects.archivedAt,
+		})
+		.from(apikeys)
+		.innerJoin(projects, eq(projects.id, apikeys.projectId))
+		.where(
+			and(
+				eq(apikeys.id, input.apiKeyId),
+				eq(apikeys.organizationId, input.organizationId),
+				eq(apikeys.kind, "service"),
+				input.projectId ? eq(apikeys.projectId, input.projectId) : undefined,
+			),
+		)
+		.limit(1);
+	if (!key) throw new ServiceError(404, "Service API key not found");
+	if (input.forChange && key.projectArchivedAt)
+		throw new ServiceError(
+			409,
+			"Restore the project before changing its webhooks.",
+		);
+	return { apiKeyId: key.apiKeyId, projectId: key.projectId };
+}
+
+// Service keys that can own webhook endpoints. Never includes key material.
+export async function listProjectServiceKeys(
+	dbClient: PGDB,
+	projectId: string,
+) {
+	const keys = await dbClient
+		.select({ id: apikeys.id, name: apikeys.name, enabled: apikeys.enabled })
+		.from(apikeys)
+		.where(and(eq(apikeys.projectId, projectId), eq(apikeys.kind, "service")))
+		.orderBy(desc(apikeys.id));
+	return { serviceKeys: keys };
+}
 
 export type WebhookDestinationPolicy = {
 	// Local development only: allow http:// and private addresses.

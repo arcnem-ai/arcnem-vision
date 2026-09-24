@@ -64,6 +64,7 @@ import type {
 } from "@/features/dashboard/types";
 import { useDashboardRealtime } from "@/features/realtime/dashboard-realtime-provider";
 import { cn } from "@/lib/utils";
+import { ServiceKeyWebhooks } from "./service-key-webhooks";
 
 type WorkflowKeyDraft = {
 	name: string;
@@ -1378,6 +1379,11 @@ export function ProjectAPIKeysPanel({
 														{formatDateTime(apiKey.updatedAt)}.
 													</p>
 												</div>
+
+												<ServiceKeyWebhooks
+													apiKeyId={apiKey.id}
+													readOnly={isSelectedProjectArchived}
+												/>
 											</div>
 										);
 									})}
