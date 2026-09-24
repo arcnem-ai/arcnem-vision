@@ -43,7 +43,10 @@ import {
 	requireServiceAPIKey,
 } from "@/middleware/requireAPIKey";
 import type { HonoServerContext } from "@/types/serverContext";
-import { parseServiceDocumentListQuery } from "./service.helpers";
+import {
+	parseServiceDocumentListQuery,
+	serviceJSONBodyValidation,
+} from "./service.helpers";
 
 const {
 	agentGraphs,
@@ -164,21 +167,6 @@ async function getServiceUploadTarget(c: HonoContext<HonoServerContext>) {
 		objectKeySource: "service-api",
 	};
 }
-
-const serviceJSONBodyValidation = (
-	result: {
-		success: boolean;
-		error?: readonly { message: string }[];
-	},
-	c: Pick<HonoContext, "json">,
-) => {
-	if (!result.success) {
-		return c.json(
-			{ message: result.error?.[0]?.message ?? "Invalid request body" },
-			400,
-		);
-	}
-};
 
 serviceRouter.post(
 	"/service/uploads/presign",

@@ -1,33 +1,7 @@
-import { lookup } from "node:dns/promises";
 import { request } from "node:https";
-import { isIP } from "node:net";
 import { Readable } from "node:stream";
-import { isPublicRoutableHost } from "@better-auth/core/utils/host";
 import type { ClientMetadataResourceFetch } from "@better-auth/oauth-provider";
-
-export function pinnedMetadataDestination(
-	url: URL,
-	addresses: { address: string; family: number }[],
-) {
-	if (url.protocol !== "https:" || url.username || url.password || url.hash)
-		throw new TypeError(
-			"Client metadata requires an HTTPS URL without credentials or fragment",
-		);
-	if (
-		!addresses.length ||
-		addresses.some(({ address }) => !isPublicRoutableHost(address))
-	)
-		throw new TypeError(
-			"Client metadata must resolve only to public addresses",
-		);
-	const hostname = url.hostname.replace(/^\[|\]$/g, "");
-	return {
-		hostname: addresses[0].address,
-		port: url.port || 443,
-		servername: isIP(hostname) ? undefined : hostname,
-		path: `${url.pathname}${url.search}`,
-	};
-}
+import { resolvePublicHttpsDestination } from "@/lib/public-https";
 
 // Bun's HTTPS adapter receives the approved IP directly, with the original TLS
 // identity and Host preserved. No second DNS lookup and no redirect following.
@@ -41,11 +15,7 @@ export const fetchOAuthClientMetadata: ClientMetadataResourceFetch = async (
 		throw new TypeError("Client metadata requires HTTPS");
 	if (!["GET", "HEAD"].includes(webRequest.method))
 		throw new TypeError("Unsupported metadata method");
-	const addresses = await lookup(url.hostname.replace(/^\[|\]$/g, ""), {
-		all: true,
-		verbatim: true,
-	});
-	const destination = pinnedMetadataDestination(url, addresses);
+	const destination = await resolvePublicHttpsDestination(url);
 	return new Promise((resolve, reject) => {
 		const outgoing = request(
 			{

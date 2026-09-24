@@ -56,6 +56,9 @@ export const webhookDeliveries = pgTable(
 		body: text("body").notNull(),
 		// pending | delivered | failed | cancelled
 		status: text("status").notNull().default("pending"),
+		// Changes on every send request (initial or resend). Only the Inngest run
+		// carrying the current dispatch may record the delivery's outcome.
+		dispatchId: uuid("dispatch_id").notNull().default(sql`uuidv7()`),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},
@@ -79,7 +82,7 @@ export const webhookDeliveryAttempts = pgTable(
 		// pending | succeeded | retryable | rejected
 		outcome: text("outcome").notNull().default("pending"),
 		httpStatus: integer("http_status"),
-		// dns | blocked_destination | connect | tls | timeout | response_too_large
+		// dns | blocked_destination | timeout | network
 		errorCategory: text("error_category"),
 		startedAt: timestamp("started_at").defaultNow().notNull(),
 		finishedAt: timestamp("finished_at"),

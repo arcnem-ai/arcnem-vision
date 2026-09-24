@@ -20,6 +20,11 @@ describe("API key permissions", () => {
 			"read",
 		]);
 		expect(DEFAULT_SERVICE_API_KEY_PERMISSIONS.documents).toContain("search");
+		expect(DEFAULT_WORKFLOW_API_KEY_PERMISSIONS.webhooks).toBeUndefined();
+		expect(DEFAULT_SERVICE_API_KEY_PERMISSIONS.webhooks).toEqual([
+			"manage",
+			"read",
+		]);
 	});
 
 	test("falls back to defaults when the stored payload is missing or malformed", () => {
@@ -61,6 +66,7 @@ describe("API key permissions", () => {
 			uploads: ["presign", "ack"],
 			documents: ["read", "visibility"],
 			workflows: ["execute", "read"],
+			webhooks: ["manage", "read"],
 		});
 	});
 });

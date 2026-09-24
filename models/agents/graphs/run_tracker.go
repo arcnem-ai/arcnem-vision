@@ -250,32 +250,44 @@ func updateRunningRun(db *gorm.DB, runID string, updates map[string]any) *gorm.D
 		Updates(updates)
 }
 
+// FinalizeResult reports whether this call made the terminal transition and which
+// webhook deliveries still need a send request.
+type FinalizeResult struct {
+	Transitioned bool
+	Deliveries   []WebhookDispatch
+}
+
 // FinalizeRun atomically transitions a running run once, queues its webhook
 // deliveries in the same transaction, and publishes its terminal event.
 // A run that is already terminal keeps its first outcome.
-func FinalizeRun(db *gorm.DB, runID string, organizationID string, outcome RunOutcome) (bool, error) {
+func FinalizeRun(db *gorm.DB, runID string, organizationID string, outcome RunOutcome) (FinalizeResult, error) {
 	updates, err := terminalRunUpdates(outcome)
 	if err != nil {
-		return false, err
+		return FinalizeResult{}, err
 	}
 	finishedAt := updates["finished_at"].(time.Time)
 
-	transitioned := false
+	var result FinalizeResult
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		result := updateRunningRun(tx, runID, updates)
-		if result.Error != nil {
-			return result.Error
+		update := updateRunningRun(tx, runID, updates)
+		if update.Error != nil {
+			return update.Error
 		}
-		if result.RowsAffected == 0 {
+		if update.RowsAffected == 0 {
 			return nil
 		}
-		transitioned = true
-		return queueWebhookDeliveries(tx, runID, outcome.Status, finishedAt)
+		deliveries, err := queueWebhookDeliveries(tx, runID, outcome.Status, finishedAt)
+		if err != nil {
+			return err
+		}
+		result = FinalizeResult{Transitioned: true, Deliveries: deliveries}
+		return nil
 	}); err != nil {
-		return false, err
+		return FinalizeResult{}, err
 	}
-	if !transitioned {
-		return false, nil
+	if !result.Transitioned {
+		deliveries, err := pendingWebhookDispatches(db, runID)
+		return FinalizeResult{Deliveries: deliveries}, err
 	}
 
 	event := realtime.NewDashboardEvent(realtime.DashboardReasonRunFinished, organizationID)
@@ -289,7 +301,7 @@ func FinalizeRun(db *gorm.DB, runID string, organizationID string, outcome RunOu
 		)
 	}
 
-	return true, nil
+	return result, nil
 }
 
 // RunID returns the ID of the tracked run.

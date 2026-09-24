@@ -25,6 +25,13 @@ type workflowWebhookEventData struct {
 	Execution   string `json:"execution"`
 }
 
+// WebhookDispatch identifies one send request for a delivery. A resend gets a new
+// dispatch ID, and only the current dispatch may record the delivery's outcome.
+type WebhookDispatch struct {
+	DeliveryID string `json:"delivery_id"`
+	DispatchID string `json:"dispatch_id"`
+}
+
 type webhookRunSource struct {
 	AgentGraphID string
 	ProjectID    *string
@@ -59,26 +66,27 @@ func buildWorkflowWebhookBody(runID string, workflowID string, projectID string,
 }
 
 // queueWebhookDeliveries inserts one pending delivery per eligible endpoint of the
-// service key that started the run. It must run in the terminal-transition
-// transaction so a finished run and its deliveries commit together.
-func queueWebhookDeliveries(tx *gorm.DB, runID string, status string, finishedAt time.Time) error {
+// service key that started the run and returns their dispatches. It must run in the
+// terminal-transition transaction so a finished run and its deliveries commit together.
+func queueWebhookDeliveries(tx *gorm.DB, runID string, status string, finishedAt time.Time) ([]WebhookDispatch, error) {
 	var source webhookRunSource
 	if err := tx.Table("agent_graph_runs").
 		Select("agent_graph_id, project_id, api_key_id").
 		Where("id = ?", runID).
 		Take(&source).Error; err != nil {
-		return fmt.Errorf("load webhook run source: %w", err)
+		return nil, fmt.Errorf("load webhook run source: %w", err)
 	}
 	if source.APIKeyID == nil || source.ProjectID == nil {
-		return nil
+		return nil, nil
 	}
 
 	eventType, body, err := buildWorkflowWebhookBody(runID, source.AgentGraphID, *source.ProjectID, status, finishedAt)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return tx.Exec(`
+	var dispatches []WebhookDispatch
+	err = tx.Raw(`
 		INSERT INTO webhook_deliveries (endpoint_id, run_id, event_id, event_type, body)
 		SELECT e.id, ?, ?, ?, ?
 		FROM webhook_endpoints e
@@ -89,12 +97,27 @@ func queueWebhookDeliveries(tx *gorm.DB, runID string, status string, finishedAt
 		  AND k.project_id = e.project_id
 		  AND k.enabled
 		  AND (k.expires_at IS NULL OR k.expires_at > now())
-		ON CONFLICT (endpoint_id, event_id) DO NOTHING`,
+		ON CONFLICT (endpoint_id, event_id) DO NOTHING
+		RETURNING id::text AS delivery_id, dispatch_id::text AS dispatch_id`,
 		runID,
 		workflowWebhookEventID(runID),
 		eventType,
 		body,
 		*source.APIKeyID,
 		*source.ProjectID,
-	).Error
+	).Scan(&dispatches).Error
+	return dispatches, err
+}
+
+// pendingWebhookDispatches recovers a finished run's unsent deliveries when its
+// finalize step replays after the transaction committed but before Inngest
+// recorded the step result.
+func pendingWebhookDispatches(db *gorm.DB, runID string) ([]WebhookDispatch, error) {
+	var dispatches []WebhookDispatch
+	err := db.Raw(`
+		SELECT id::text AS delivery_id, dispatch_id::text AS dispatch_id
+		FROM webhook_deliveries
+		WHERE run_id = ? AND status = 'pending'
+		ORDER BY id`, runID).Scan(&dispatches).Error
+	return dispatches, err
 }

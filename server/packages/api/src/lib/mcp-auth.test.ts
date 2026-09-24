@@ -5,7 +5,7 @@ import { memoryAdapter } from "better-auth/adapters/memory";
 import { deriveDpopAth, deriveDpopJkt } from "better-auth/oauth2";
 import { admin, emailOTP } from "better-auth/plugins";
 import { createMcpAuthPlugins, MCP_SCOPES } from "./mcp-auth-plugin";
-import { pinnedMetadataDestination } from "./oauth-metadata-fetch";
+import { pinnedPublicHttpsDestination } from "./public-https";
 
 const origin = "http://localhost:3000";
 const resource = `${origin}/api/mcp`;
@@ -401,7 +401,7 @@ describe("MCP OAuth boundary", () => {
 
 	test("metadata connections pin a public address and reject private or mixed DNS answers", () => {
 		expect(
-			pinnedMetadataDestination(new URL(clientId), [
+			pinnedPublicHttpsDestination(new URL(clientId), [
 				{ address: "93.184.216.34", family: 4 },
 			]),
 		).toEqual({
@@ -421,14 +421,14 @@ describe("MCP OAuth boundary", () => {
 			"0.0.0.0",
 		]) {
 			expect(() =>
-				pinnedMetadataDestination(new URL(clientId), [
+				pinnedPublicHttpsDestination(new URL(clientId), [
 					{ address: "93.184.216.34", family: 4 },
 					{ address, family: address.includes(":") ? 6 : 4 },
 				]),
 			).toThrow();
 		}
 		expect(() =>
-			pinnedMetadataDestination(new URL("http://agent.example/client"), [
+			pinnedPublicHttpsDestination(new URL("http://agent.example/client"), [
 				{ address: "93.184.216.34", family: 4 },
 			]),
 		).toThrow();

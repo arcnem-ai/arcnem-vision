@@ -5,6 +5,7 @@ export * from "./contracts/document-chat";
 export * from "./contracts/json";
 export * from "./contracts/runs";
 export * from "./contracts/service-api";
+export * from "./contracts/webhooks";
 export * from "./dashboard/management-utils";
 export * from "./dashboard/workflow-normalization";
 export * from "./dashboard/workflow-template-access";

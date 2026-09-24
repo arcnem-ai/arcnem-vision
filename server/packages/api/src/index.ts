@@ -9,6 +9,8 @@ import { pinoLogger } from "hono-pino";
 import { serve } from "inngest/hono";
 import { auth } from "@/lib/auth";
 import { isTrustedOrigin } from "@/lib/auth-origins";
+import { createWebhookDeliveryFunction } from "@/lib/webhooks/deliver";
+import { requireWebhookSecretEncryptionKey } from "@/lib/webhooks/signing";
 import { ackUploadRouter } from "@/routes/ackUpload";
 import { authRouter } from "@/routes/auth";
 import { getInngestClient } from "./clients/inngest";
@@ -19,6 +21,7 @@ import { dashboardDocumentsRouter } from "./routes/dashboardDocuments";
 import { documentsRouter } from "./routes/documents";
 import { mcpRouter } from "./routes/mcp";
 import { serviceRouter } from "./routes/service";
+import { serviceWebhooksRouter } from "./routes/serviceWebhooks";
 import { uploadRouter } from "./routes/upload";
 import type { HonoServerContext } from "./types/serverContext";
 
@@ -26,6 +29,7 @@ const app = new Hono<HonoServerContext>({
 	strict: false,
 });
 const isDebugMode = isAPIDebugModeEnabled();
+requireWebhookSecretEncryptionKey();
 
 app.use(
 	"*",
@@ -107,12 +111,18 @@ app.use("*", async (c, next) => {
 	await next();
 });
 
+const inngestFunctions = [
+	createWebhookDeliveryFunction(getInngestClient(), getDB, {
+		allowPrivateHttp: isDebugMode,
+	}),
+];
+
 app.on(["GET", "PUT", "POST"], "/api/inngest", (c) => {
 	const inngestClient = c.get("inngestClient");
 
 	const handler = serve({
 		client: inngestClient,
-		functions: [],
+		functions: inngestFunctions,
 		serveOrigin: process.env.JOB_SERVER_URL,
 	});
 
@@ -125,6 +135,7 @@ const routes = [
 	ackUploadRouter,
 	documentsRouter,
 	serviceRouter,
+	serviceWebhooksRouter,
 	mcpRouter,
 	dashboardDocumentsRouter,
 	dashboardRouter,

@@ -58,6 +58,7 @@ func TestFinalizeRunQueuesWebhookDeliveriesPostgres(t *testing.T) {
 		`CREATE TEMP TABLE webhook_deliveries (
 			id uuid PRIMARY KEY DEFAULT gen_random_uuid(), endpoint_id uuid NOT NULL, run_id uuid NOT NULL,
 			event_id text NOT NULL, event_type text NOT NULL, body text NOT NULL, status text NOT NULL DEFAULT 'pending',
+			dispatch_id uuid NOT NULL DEFAULT gen_random_uuid(),
 			UNIQUE (endpoint_id, event_id)
 		) ON COMMIT DROP`,
 	} {
@@ -108,9 +109,9 @@ func TestFinalizeRunQueuesWebhookDeliveriesPostgres(t *testing.T) {
 
 	t.Run("queues one delivery per eligible endpoint with the terminal transition", func(t *testing.T) {
 		run := newRun("019f6666-6666-7666-8666-666666666661", key)
-		transitioned, err := FinalizeRun(tx, run, "org", CompletedRun(map[string]any{"summary": "ok"}))
-		if err != nil || !transitioned {
-			t.Fatalf("FinalizeRun = %v, %v", transitioned, err)
+		result, err := FinalizeRun(tx, run, "org", CompletedRun(map[string]any{"summary": "ok"}))
+		if err != nil || !result.Transitioned || len(result.Deliveries) != 1 || result.Deliveries[0].DispatchID == "" {
+			t.Fatalf("FinalizeRun = %#v, %v", result, err)
 		}
 		rows := deliveries(run)
 		if len(rows) != 1 || rows[0]["endpoint_id"] != endpoint {
@@ -128,8 +129,12 @@ func TestFinalizeRunQueuesWebhookDeliveriesPostgres(t *testing.T) {
 		}
 
 		again, err := FinalizeRun(tx, run, "org", FailedRun(errors.New("late failure")))
-		if err != nil || again {
-			t.Fatalf("repeated FinalizeRun = %v, %v", again, err)
+		if err != nil || again.Transitioned || len(again.Deliveries) != 1 || again.Deliveries[0] != result.Deliveries[0] {
+			t.Fatalf("a replayed FinalizeRun must return the still-pending delivery: %#v, %v", again, err)
+		}
+		mustExec("UPDATE webhook_deliveries SET status = 'delivered' WHERE run_id = ?", run)
+		if delivered, err := FinalizeRun(tx, run, "org", CompletedRun(nil)); err != nil || len(delivered.Deliveries) != 0 {
+			t.Fatalf("delivered webhooks must not be requested again: %#v, %v", delivered, err)
 		}
 		if status(run) != "completed" || len(deliveries(run)) != 1 {
 			t.Fatalf("repeated finalization changed the run or its deliveries: %s %#v", status(run), deliveries(run))
@@ -139,8 +144,8 @@ func TestFinalizeRunQueuesWebhookDeliveriesPostgres(t *testing.T) {
 	t.Run("skips disabled and expired keys and runs without a key", func(t *testing.T) {
 		for _, apiKeyID := range []any{disabledKey, expiredKey, nil} {
 			run := newRun(newTestRunID(t, tx), apiKeyID)
-			if _, err := FinalizeRun(tx, run, "org", FailedRun(errors.New("node failed"))); err != nil {
-				t.Fatal(err)
+			if result, err := FinalizeRun(tx, run, "org", FailedRun(errors.New("node failed"))); err != nil || len(result.Deliveries) != 0 {
+				t.Fatalf("FinalizeRun = %#v, %v", result, err)
 			}
 			if status(run) != "failed" || len(deliveries(run)) != 0 {
 				t.Fatalf("key %v: status %s deliveries %#v", apiKeyID, status(run), deliveries(run))
