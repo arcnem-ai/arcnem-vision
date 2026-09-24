@@ -123,6 +123,20 @@ You can also select documents by scope:
 GET /api/service/workflow-executions/:id
 ```
 
+To be notified instead of polling, register a webhook endpoint.
+
+### Workflow webhooks
+
+```http
+POST   /api/service/webhook-endpoints
+GET    /api/service/webhook-endpoints
+DELETE /api/service/webhook-endpoints/:id
+GET    /api/service/webhook-deliveries?endpointId=&executionId=&limit=&cursor=
+POST   /api/service/webhook-deliveries/:id/resend
+```
+
+Register with `{"url": "https://example.com/webhooks/vision"}`. The response returns the endpoint and its `signingSecret`, which is shown once. Executions started with this key then send signed `workflow.completed` and `workflow.failed` events. See [Receive Workflow Webhooks](/guides/workflow-webhooks/) for verification, retries, resend and rotation.
+
 ### List or read documents
 
 ```http

@@ -112,7 +112,7 @@ describe("MCP OAuth boundary", () => {
 			redirect_uri: redirectUri,
 			response_type: "code",
 			scope:
-				"projects:read workflows:read workflows:write workflows:execute documents:list documents:search documents:read offline_access",
+				"projects:read workflows:read workflows:write workflows:execute documents:list documents:search documents:read webhooks:read webhooks:manage offline_access",
 			resource,
 			state: "test-state",
 			code_challenge: challenge,

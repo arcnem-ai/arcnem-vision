@@ -67,6 +67,11 @@ export default defineConfig({
 							translations: { ja: "OAuth MCP" },
 							slug: "guides/oauth-mcp",
 						},
+						{
+							label: "Workflow Webhooks",
+							translations: { ja: "ワークフローのWebhook" },
+							slug: "guides/workflow-webhooks",
+						},
 					],
 				},
 				{

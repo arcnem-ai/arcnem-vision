@@ -17,3 +17,10 @@ export {
 	updateWorkflowAPIKey,
 	updateWorkflowTemplate,
 } from "@/features/dashboard/server/dashboard-mutations";
+export {
+	createWebhookEndpoint,
+	listWebhookDeliveries,
+	listWebhookEndpoints,
+	resendWebhookDelivery,
+	revokeWebhookEndpoint,
+} from "@/features/dashboard/server/webhook-mutations";

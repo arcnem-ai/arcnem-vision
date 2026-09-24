@@ -105,3 +105,28 @@ export const webhookDeliveriesResponseSchema = z.object({
 export type WebhookDeliveriesResponse = z.infer<
 	typeof webhookDeliveriesResponseSchema
 >;
+
+// Dashboard inputs name the service key whose webhooks are being managed.
+export const dashboardWebhookKeyInputSchema = z.object({
+	apiKeyId: z.string().min(1),
+});
+
+export const dashboardWebhookEndpointCreateInputSchema =
+	webhookEndpointCreateRequestSchema.extend({
+		apiKeyId: z.string().min(1),
+	});
+
+export const dashboardWebhookEndpointRevokeInputSchema = z.object({
+	apiKeyId: z.string().min(1),
+	endpointId: z.string().min(1),
+});
+
+export const dashboardWebhookDeliveriesInputSchema =
+	webhookDeliveryListQuerySchema.extend({
+		apiKeyId: z.string().min(1),
+	});
+
+export const dashboardWebhookDeliveryResendInputSchema = z.object({
+	apiKeyId: z.string().min(1),
+	deliveryId: z.string().min(1),
+});

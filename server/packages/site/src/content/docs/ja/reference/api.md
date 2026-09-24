@@ -103,6 +103,20 @@ Response:
 
 このエンドポイントを使うと、同じ画像に対して別のワークフローを比較したり、あとから再実行したりできます。ワークフローキーのデフォルト割り当てを書き換える必要はありません。
 
+## ワークフローのWebhook
+
+サービスキーで開始した実行の完了・失敗を、ポーリングせずに署名付きイベントで受け取れます。
+
+```http
+POST   /api/service/webhook-endpoints
+GET    /api/service/webhook-endpoints
+DELETE /api/service/webhook-endpoints/:id
+GET    /api/service/webhook-deliveries?endpointId=&executionId=&limit=&cursor=
+POST   /api/service/webhook-deliveries/:id/resend
+```
+
+`{"url": "https://example.com/webhooks/vision"}` で登録すると、エンドポイントと一度だけ表示される `signingSecret` が返ります。検証、再試行、再送、ローテーションは [ワークフローのWebhookを受け取る](/ja/guides/workflow-webhooks/) を参照してください。
+
 ## 認証モデル
 
 - **ワークフローキー経路** は、組織・プロジェクト単位にスコープされ、直接ワークフローへ結び付いた API キーを使います。

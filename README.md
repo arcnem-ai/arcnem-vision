@@ -146,7 +146,7 @@ Add your provider keys:
 - **Same OpenAI key (recommended)** → `OPENAI_API_KEY` in `server/packages/api/.env` for dashboard collection chat and AI workflow draft generation
 - **[Replicate API token](https://replicate.com/account/api-tokens)** → `REPLICATE_API_TOKEN` in `models/mcp/.env`
 
-Everything else is wired for local development. Postgres, Redis, and MinIO come from `docker-compose.yaml`.
+Everything else is wired for local development, including a development-only `WEBHOOK_SECRET_ENCRYPTION_KEY` that the API and seed share. Deployments must generate their own key with `openssl rand -base64 32`. Postgres, Redis, and MinIO come from `docker-compose.yaml`.
 
 ### 2. Start the stack
 
@@ -273,6 +273,7 @@ The service API is the project-scoped orchestration surface for service integrat
 - `POST /api/service/uploads/ack` verifies the object and creates the document.
 - `POST /api/service/workflow-executions` queues a workflow against explicit document ids or a scoped selection.
 - `GET /api/service/workflow-executions/:id` reads execution state.
+- `POST /api/service/webhook-endpoints` registers an endpoint for signed `workflow.completed` / `workflow.failed` events, so clients need not poll. The routes under `/api/service/webhook-deliveries` list delivery history and resend deliveries. See the [webhooks guide](server/packages/site/src/content/docs/guides/workflow-webhooks.md).
 - `GET /api/service/documents` and `POST /api/service/documents/visibility` cover document inspection and publishing.
 - `POST /api/service/documents/search` searches an explicit document allowlist within the service key's project.
 - `GET /api/openapi.json` serves the generated OpenAPI spec for this surface.
@@ -284,7 +285,7 @@ the same service key returns the original document or execution. Reusing that ke
 
 Connect an external agent to `/api/mcp` on the API host to discover projects, edit workflow graphs, run experiments, and inspect documents and execution results. Browser-based OAuth consent grants separate read, write, and execution permissions. The client must support CIMD and OAuth with PKCE.
 
-See the [OAuth MCP guide](server/packages/site/src/content/docs/guides/oauth-mcp.md) for the 12 tools, connection setup, revision checks, experiment loop, and revocation.
+See the [OAuth MCP guide](server/packages/site/src/content/docs/guides/oauth-mcp.md) for the 18 tools (including webhook management), connection setup, revision checks, experiment loop, and revocation.
 
 ## Contributing
 

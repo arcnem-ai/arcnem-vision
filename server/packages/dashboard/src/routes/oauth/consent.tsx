@@ -19,6 +19,10 @@ const scopeDescriptions: Record<string, string> = {
 	"documents:list": "List documents in your projects",
 	"documents:search": "Search documents in your projects",
 	"documents:read": "Read documents and extracted content",
+	"webhooks:read":
+		"List service keys, webhook endpoints, and webhook delivery history",
+	"webhooks:manage":
+		"Register or revoke webhook endpoints and resend deliveries; receives signing secrets",
 	offline_access: "Keep this connection active until you revoke it",
 };
 

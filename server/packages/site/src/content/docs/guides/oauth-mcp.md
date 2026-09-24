@@ -35,6 +35,14 @@ Use your MCP client’s connection management to revoke its OAuth tokens. The st
 | `list_documents` | Browse document summaries in a project. | `documents:list` |
 | `search_documents` | Search selected documents within a project. | `documents:search` |
 | `get_document` | Read document details and available extracted content. | `documents:read` |
+| `list_service_keys` | List a project's service keys (IDs and names only), which own webhook endpoints. | `webhooks:read` |
+| `list_webhook_endpoints` | List a service key's webhook endpoints. | `webhooks:read` |
+| `list_webhook_deliveries` | Read webhook delivery history and each attempt. | `webhooks:read` |
+| `create_webhook_endpoint` | Register an endpoint. Returns its signing secret once. | `webhooks:manage` |
+| `revoke_webhook_endpoint` | Stop deliveries to an endpoint and keep its history. | `webhooks:manage` |
+| `resend_webhook_delivery` | Send a delivery's same event to its endpoint again. | `webhooks:manage` |
+
+`webhooks:manage` hands signing secrets to the agent, so grant it only when the agent should set up receivers. Request it together with `webhooks:read`, which the agent needs to find service keys, endpoints and deliveries. See [Receive Workflow Webhooks](/guides/workflow-webhooks/).
 
 Clients can also request `offline_access` to keep a connection through token refresh. Request only the scopes needed for the task. Granting a scope does not give access to organizations or projects outside the signed-in user's memberships.
 
