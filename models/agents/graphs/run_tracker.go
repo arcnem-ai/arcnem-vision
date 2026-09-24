@@ -250,19 +250,31 @@ func updateRunningRun(db *gorm.DB, runID string, updates map[string]any) *gorm.D
 		Updates(updates)
 }
 
-// FinalizeRun atomically transitions a running run once and publishes its terminal event.
+// FinalizeRun atomically transitions a running run once, queues its webhook
+// deliveries in the same transaction, and publishes its terminal event.
 // A run that is already terminal keeps its first outcome.
 func FinalizeRun(db *gorm.DB, runID string, organizationID string, outcome RunOutcome) (bool, error) {
 	updates, err := terminalRunUpdates(outcome)
 	if err != nil {
 		return false, err
 	}
+	finishedAt := updates["finished_at"].(time.Time)
 
-	tx := updateRunningRun(db, runID, updates)
-	if tx.Error != nil {
-		return false, tx.Error
+	transitioned := false
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		result := updateRunningRun(tx, runID, updates)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return nil
+		}
+		transitioned = true
+		return queueWebhookDeliveries(tx, runID, outcome.Status, finishedAt)
+	}); err != nil {
+		return false, err
 	}
-	if tx.RowsAffected == 0 {
+	if !transitioned {
 		return false, nil
 	}
 

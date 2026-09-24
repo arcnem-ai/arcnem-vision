@@ -33,6 +33,7 @@ func newAgentGraphTemplate(db *gorm.DB, opts ...gen.DOOption) agentGraphTemplate
 	_agentGraphTemplate.CreatedAt = field.NewTime(tableName, "created_at")
 	_agentGraphTemplate.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_agentGraphTemplate.CurrentVersionID = field.NewString(tableName, "current_version_id")
+	_agentGraphTemplate.ArchivedAt = field.NewTime(tableName, "archived_at")
 
 	_agentGraphTemplate.fillFieldMap()
 
@@ -49,6 +50,7 @@ type agentGraphTemplate struct {
 	CreatedAt        field.Time
 	UpdatedAt        field.Time
 	CurrentVersionID field.String
+	ArchivedAt       field.Time
 
 	fieldMap map[string]field.Expr
 }
@@ -71,6 +73,7 @@ func (a *agentGraphTemplate) updateTableName(table string) *agentGraphTemplate {
 	a.CreatedAt = field.NewTime(table, "created_at")
 	a.UpdatedAt = field.NewTime(table, "updated_at")
 	a.CurrentVersionID = field.NewString(table, "current_version_id")
+	a.ArchivedAt = field.NewTime(table, "archived_at")
 
 	a.fillFieldMap()
 
@@ -99,13 +102,14 @@ func (a *agentGraphTemplate) GetFieldByName(fieldName string) (field.OrderExpr, 
 }
 
 func (a *agentGraphTemplate) fillFieldMap() {
-	a.fieldMap = make(map[string]field.Expr, 6)
+	a.fieldMap = make(map[string]field.Expr, 7)
 	a.fieldMap["id"] = a.ID
 	a.fieldMap["visibility"] = a.Visibility
 	a.fieldMap["organization_id"] = a.OrganizationID
 	a.fieldMap["created_at"] = a.CreatedAt
 	a.fieldMap["updated_at"] = a.UpdatedAt
 	a.fieldMap["current_version_id"] = a.CurrentVersionID
+	a.fieldMap["archived_at"] = a.ArchivedAt
 }
 
 func (a agentGraphTemplate) clone(db *gorm.DB) agentGraphTemplate {
