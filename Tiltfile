@@ -19,7 +19,8 @@ dc_resource('minio-init',
 )
 
 local_resource('inngest',
-  serve_cmd='npx inngest-cli@latest dev -u http://localhost:3020/api/inngest',
+  # Agents run workflows; the API delivers webhooks.
+  serve_cmd='npx inngest-cli@latest dev -u http://localhost:3020/api/inngest -u http://localhost:3000/api/inngest',
   resource_deps=['agents'],
   labels=['infrastructure']
 )

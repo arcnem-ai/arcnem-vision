@@ -36,6 +36,7 @@ func newWebhookDelivery(db *gorm.DB, opts ...gen.DOOption) webhookDelivery {
 	_webhookDelivery.Status = field.NewString(tableName, "status")
 	_webhookDelivery.CreatedAt = field.NewTime(tableName, "created_at")
 	_webhookDelivery.UpdatedAt = field.NewTime(tableName, "updated_at")
+	_webhookDelivery.DispatchID = field.NewString(tableName, "dispatch_id")
 
 	_webhookDelivery.fillFieldMap()
 
@@ -55,6 +56,7 @@ type webhookDelivery struct {
 	Status     field.String
 	CreatedAt  field.Time
 	UpdatedAt  field.Time
+	DispatchID field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -80,6 +82,7 @@ func (w *webhookDelivery) updateTableName(table string) *webhookDelivery {
 	w.Status = field.NewString(table, "status")
 	w.CreatedAt = field.NewTime(table, "created_at")
 	w.UpdatedAt = field.NewTime(table, "updated_at")
+	w.DispatchID = field.NewString(table, "dispatch_id")
 
 	w.fillFieldMap()
 
@@ -108,7 +111,7 @@ func (w *webhookDelivery) GetFieldByName(fieldName string) (field.OrderExpr, boo
 }
 
 func (w *webhookDelivery) fillFieldMap() {
-	w.fieldMap = make(map[string]field.Expr, 9)
+	w.fieldMap = make(map[string]field.Expr, 10)
 	w.fieldMap["id"] = w.ID
 	w.fieldMap["endpoint_id"] = w.EndpointID
 	w.fieldMap["run_id"] = w.RunID
@@ -118,6 +121,7 @@ func (w *webhookDelivery) fillFieldMap() {
 	w.fieldMap["status"] = w.Status
 	w.fieldMap["created_at"] = w.CreatedAt
 	w.fieldMap["updated_at"] = w.UpdatedAt
+	w.fieldMap["dispatch_id"] = w.DispatchID
 }
 
 func (w webhookDelivery) clone(db *gorm.DB) webhookDelivery {

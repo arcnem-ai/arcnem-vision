@@ -1,0 +1,1 @@
+ALTER TABLE "webhook_deliveries" ADD COLUMN "dispatch_id" uuid DEFAULT uuidv7() NOT NULL;

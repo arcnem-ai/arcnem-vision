@@ -21,6 +21,7 @@ type WebhookDelivery struct {
 	Status     string    `gorm:"column:status;type:text;not null;default:pending" json:"status"`
 	CreatedAt  time.Time `gorm:"column:created_at;type:timestamp without time zone;not null;default:now()" json:"created_at"`
 	UpdatedAt  time.Time `gorm:"column:updated_at;type:timestamp without time zone;not null;default:now()" json:"updated_at"`
+	DispatchID string    `gorm:"column:dispatch_id;type:uuid;not null;default:uuidv7()" json:"dispatch_id"`
 }
 
 // TableName WebhookDelivery's table name

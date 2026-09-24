@@ -1,6 +1,10 @@
 export type APIKeyKind = "workflow" | "service";
 
-export type APIKeyPermissionDomain = "uploads" | "documents" | "workflows";
+export type APIKeyPermissionDomain =
+	| "uploads"
+	| "documents"
+	| "workflows"
+	| "webhooks";
 
 export type APIKeyPermissions = Partial<
 	Record<APIKeyPermissionDomain, string[]>
@@ -10,6 +14,7 @@ const API_KEY_PERMISSION_DOMAINS: APIKeyPermissionDomain[] = [
 	"uploads",
 	"documents",
 	"workflows",
+	"webhooks",
 ];
 
 export const DEFAULT_WORKFLOW_API_KEY_PERMISSIONS: APIKeyPermissions = {
@@ -21,6 +26,7 @@ export const DEFAULT_SERVICE_API_KEY_PERMISSIONS: APIKeyPermissions = {
 	uploads: ["presign", "ack"],
 	documents: ["list", "read", "search", "visibility"],
 	workflows: ["execute", "read"],
+	webhooks: ["manage", "read"],
 };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

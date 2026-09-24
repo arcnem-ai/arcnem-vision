@@ -4,6 +4,7 @@ import {
 	type ServiceDocumentScope,
 	serviceDocumentListQuerySchema,
 } from "@arcnem-vision/shared";
+import type { Context } from "hono";
 
 type ScopedDocumentSelection = {
 	documentIds?: string[];
@@ -303,3 +304,18 @@ export function buildWorkflowExecutionEventData<
 		initial_state: initialState,
 	};
 }
+
+export const serviceJSONBodyValidation = (
+	result: {
+		success: boolean;
+		error?: readonly { message: string }[];
+	},
+	c: Pick<Context, "json">,
+) => {
+	if (!result.success) {
+		return c.json(
+			{ message: result.error?.[0]?.message ?? "Invalid request body" },
+			400,
+		);
+	}
+};

@@ -14,6 +14,7 @@ INFRA_SERVICES := postgres redis minio minio-init
 INNGEST_LOG_FILE := .make/inngest.log
 INNGEST_TMUX_SESSION := $(PROJECT_NAME)-inngest
 INNGEST_DEV_URL := http://localhost:3020/api/inngest
+INNGEST_API_URL := http://localhost:3000/api/inngest
 INNGEST_PORT ?= 8288
 INNGEST_HEALTH_URL := http://localhost:$(INNGEST_PORT)/health
 
@@ -110,6 +111,7 @@ LIVE_SERVICE_MCP_URL := http://localhost:$(LIVE_SERVICE_MCP_PORT)/health
 LIVE_SERVICE_INNGEST_CONTAINER := $(PROJECT_NAME)-inngest-live-service
 LIVE_SERVICE_INNGEST_IMAGE := inngest/inngest:v1.44.0
 LIVE_SERVICE_INNGEST_DEV_URL := http://$(LIVE_SERVICE_AGENTS_CONTAINER):$(AGENTS_CONTAINER_PORT)/api/inngest
+LIVE_SERVICE_INNGEST_API_URL := http://$(LIVE_SERVICE_API_CONTAINER):$(API_CONTAINER_PORT)/api/inngest
 LIVE_SERVICE_INNGEST_BASE_URL_CONTAINER := http://$(LIVE_SERVICE_INNGEST_CONTAINER):8288
 LIVE_SERVICE_INNGEST_HEALTH_URL := http://localhost:$(LIVE_SERVICE_INNGEST_PORT)/health
 LIVE_SERVICE_MCP_SERVER_URL_CONTAINER := http://$(LIVE_SERVICE_MCP_CONTAINER):$(MCP_CONTAINER_PORT)
@@ -344,7 +346,7 @@ run-inngest:
 		exit 0; \
 	fi
 	@rm -f "$(INNGEST_LOG_FILE)"
-	@tmux new-session -d -s "$(INNGEST_TMUX_SESSION)" "cd '$(CURDIR)' && exec npx -y inngest-cli@latest dev -u '$(INNGEST_DEV_URL)' -p '$(INNGEST_PORT)' >>'$(INNGEST_LOG_FILE)' 2>&1"
+	@tmux new-session -d -s "$(INNGEST_TMUX_SESSION)" "cd '$(CURDIR)' && exec npx -y inngest-cli@latest dev -u '$(INNGEST_DEV_URL)' -u '$(INNGEST_API_URL)' -p '$(INNGEST_PORT)' >>'$(INNGEST_LOG_FILE)' 2>&1"
 	@for attempt in 1 2 3 4 5 6 7 8 9 10; do \
 		if curl --fail --silent --show-error "$(INNGEST_HEALTH_URL)" >/dev/null 2>&1; then \
 			echo "Inngest running in tmux session $(INNGEST_TMUX_SESSION)"; \
@@ -422,7 +424,7 @@ live-service-stack-up:
 	@$(MAKE) run-agents AGENTS_CONTAINER='$(LIVE_SERVICE_AGENTS_CONTAINER)' AGENTS_PORT='$(LIVE_SERVICE_AGENTS_PORT)' AGENTS_RUN_DOCKER_ARGS='$(LIVE_SERVICE_AGENTS_DOCKER_ARGS)'
 	@$(MAKE) run-api API_CONTAINER='$(LIVE_SERVICE_API_CONTAINER)' API_PORT='$(LIVE_SERVICE_API_PORT)' API_RUN_DOCKER_ARGS='$(LIVE_SERVICE_API_DOCKER_ARGS)'
 	@$(DOCKER) rm -f $(LIVE_SERVICE_INNGEST_CONTAINER) >/dev/null 2>&1 || true
-	@$(DOCKER) run -d --name $(LIVE_SERVICE_INNGEST_CONTAINER) $(LIVE_SERVICE_NETWORK_ARGS) -p $(LIVE_SERVICE_INNGEST_PORT):8288 $(LIVE_SERVICE_INNGEST_IMAGE) inngest dev --host 0.0.0.0 --no-discovery -u $(LIVE_SERVICE_INNGEST_DEV_URL) >/dev/null
+	@$(DOCKER) run -d --name $(LIVE_SERVICE_INNGEST_CONTAINER) $(LIVE_SERVICE_NETWORK_ARGS) -p $(LIVE_SERVICE_INNGEST_PORT):8288 $(LIVE_SERVICE_INNGEST_IMAGE) inngest dev --host 0.0.0.0 --no-discovery -u $(LIVE_SERVICE_INNGEST_DEV_URL) -u $(LIVE_SERVICE_INNGEST_API_URL) >/dev/null
 	@$(MAKE) verify-service-test-stack
 
 live-service-stack-down:
