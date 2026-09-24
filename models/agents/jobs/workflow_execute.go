@@ -3,7 +3,6 @@ package jobs
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/arcnem-ai/arcnem-vision/models/agents/clients"
@@ -13,6 +12,7 @@ import (
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
 	"github.com/smallnest/langgraphgo/graph"
+	"gorm.io/gorm"
 )
 
 type preparedWorkflowState struct {
@@ -20,31 +20,23 @@ type preparedWorkflowState struct {
 	Documents   []map[string]any `json:"documents"`
 }
 
-func ExecuteWorkflow(ctx context.Context, input inngestgo.Input[inputs.ExecuteWorkflowInput]) (result any, runErr error) {
+func ExecuteWorkflow(ctx context.Context, input inngestgo.Input[inputs.ExecuteWorkflowInput]) (any, error) {
 	db, ok := GetDBClient(ctx)
 	if !ok {
 		return nil, inngestgo.NoRetryError(fmt.Errorf("db not found in context"))
 	}
 	executionID := input.Event.Data.ExecutionID.String()
 	organizationID := input.Event.Data.OrganizationID.String()
-	finalizeFailure := func(runErr error) {
-		_, err := graphs.FinalizeRun(db, executionID, organizationID, "failed", nil, runErr)
-		if err != nil {
-			log.Printf("workflow run finalization failed run_id=%s err=%v", executionID, err)
-		}
+	failRun := func(runErr error) (any, error) {
+		return finishRun(ctx, db, executionID, organizationID, graphs.FailedRun(runErr))
 	}
-	defer func() {
-		if runErr != nil {
-			finalizeFailure(runErr)
-		}
-	}()
 	s3Client, ok := GetS3Client(ctx)
 	if !ok {
-		return nil, inngestgo.NoRetryError(fmt.Errorf("s3 not found in context"))
+		return failRun(fmt.Errorf("s3 not found in context"))
 	}
 	mcpClient, ok := GetMCPClient(ctx)
 	if !ok {
-		return nil, inngestgo.NoRetryError(fmt.Errorf("mcp not found in context"))
+		return failRun(fmt.Errorf("mcp not found in context"))
 	}
 
 	payload, err := step.Run(ctx, "load-documents-and-agent-graph", func(ctx context.Context) (*load.WorkflowExecutionPayload, error) {
@@ -55,24 +47,22 @@ func ExecuteWorkflow(ctx context.Context, input inngestgo.Input[inputs.ExecuteWo
 			input.Event.Data.ExecutionID,
 		)
 		if err != nil {
-			err = fmt.Errorf("failed to load workflow execution payload: %w", err)
-			finalizeFailure(err)
-			return nil, inngestgo.NoRetryError(err)
+			return nil, inngestgo.NoRetryError(fmt.Errorf("failed to load workflow execution payload: %w", err))
 		}
 		return payload, nil
 	})
 	if err != nil {
-		return nil, err
+		return failRun(err)
 	}
 	if payload == nil {
-		return nil, inngestgo.NoRetryError(fmt.Errorf("workflow execution payload was nil"))
+		return failRun(fmt.Errorf("workflow execution payload was nil"))
 	}
 	if payload.GraphSnapshot == nil || payload.GraphSnapshot.AgentGraph == nil {
-		return nil, inngestgo.NoRetryError(fmt.Errorf("workflow payload had no graph snapshot"))
+		return failRun(fmt.Errorf("workflow payload had no graph snapshot"))
 	}
 	organizationID = payload.GraphSnapshot.AgentGraph.OrganizationID
 	if len(payload.Documents) == 0 {
-		return nil, inngestgo.NoRetryError(fmt.Errorf("workflow execution payload had no documents"))
+		return failRun(fmt.Errorf("workflow execution payload had no documents"))
 	}
 
 	preparedState, err := step.Run(ctx, "prepare-runtime-state", func(ctx context.Context) (*preparedWorkflowState, error) {
@@ -87,13 +77,11 @@ func ExecuteWorkflow(ctx context.Context, input inngestgo.Input[inputs.ExecuteWo
 				15*time.Minute,
 			)
 			if err != nil {
-				err = fmt.Errorf(
+				return nil, inngestgo.NoRetryError(fmt.Errorf(
 					"failed to produce temp url for document %s: %w",
 					document.ID,
 					err,
-				)
-				finalizeFailure(err)
-				return nil, inngestgo.NoRetryError(err)
+				))
 			}
 
 			documentIDs = append(documentIDs, document.ID)
@@ -118,95 +106,81 @@ func ExecuteWorkflow(ctx context.Context, input inngestgo.Input[inputs.ExecuteWo
 		}, nil
 	})
 	if err != nil {
-		return nil, err
+		return failRun(err)
 	}
 	if preparedState == nil {
-		return nil, inngestgo.NoRetryError(fmt.Errorf("prepared workflow state was nil"))
+		return failRun(fmt.Errorf("prepared workflow state was nil"))
 	}
 
-	graphResult, err := step.Run(ctx, "run-graph", func(ctx context.Context) (graphState map[string]any, graphErr error) {
-		defer func() {
-			status := "failed"
-			if graphErr == nil {
-				status = "completed"
-			}
-			_, finalizeErr := graphs.FinalizeRun(
-				db,
-				executionID,
-				organizationID,
-				status,
-				graphState,
-				graphErr,
-			)
-			if finalizeErr != nil {
-				if graphErr == nil {
-					graphState = nil
-					graphErr = fmt.Errorf("failed to finalize workflow run: %w", finalizeErr)
-				} else {
-					log.Printf("workflow run finalization failed run_id=%s err=%v", executionID, finalizeErr)
-				}
-			}
-			if graphErr != nil {
-				graphErr = inngestgo.NoRetryError(fmt.Errorf("graph run failed: %w", graphErr))
-			}
-		}()
-
-		initialState := make(map[string]any, len(input.Event.Data.InitialState)+4)
-		for key, value := range input.Event.Data.InitialState {
-			initialState[key] = value
-		}
-
-		initialState["document_ids"] = preparedState.DocumentIDs
-		initialState["documents"] = preparedState.Documents
-		if input.Event.Data.Scope != nil {
-			initialState["scope"] = input.Event.Data.Scope
-		}
-		if len(preparedState.Documents) == 1 {
-			initialState["document_id"] = preparedState.DocumentIDs[0]
-			initialState["temp_url"] = preparedState.Documents[0]["temp_url"]
-		}
-
-		projectID := payload.Documents[0].ProjectID
-		for _, document := range payload.Documents[1:] {
-			if document.ProjectID != projectID {
-				return nil, fmt.Errorf(
-					"workflow execution %s spans multiple projects",
-					input.Event.Data.ExecutionID.String(),
-				)
-			}
-		}
-
-		tracker, err := graphs.NewRunTrackerWithOptions(
-			db,
-			payload.GraphSnapshot.AgentGraph.ID,
-			payload.GraphSnapshot.AgentGraph.OrganizationID,
-			initialState,
-			graphs.RunTrackerOptions{
-				RunID:     input.Event.Data.ExecutionID.String(),
-				ProjectID: projectID,
-			},
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create run tracker: %w", err)
-		}
-
-		builtGraph, err := graphs.BuildGraph(payload.GraphSnapshot, mcpClient)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build graph: %w", err)
-		}
-		if builtGraph == nil {
-			return nil, fmt.Errorf("built graph is nil")
-		}
-
-		tracer := graph.NewTracer()
-		tracer.AddHook(tracker)
-		builtGraph.SetTracer(tracer)
-		ctx = clients.ContextWithMCPExecutionScope(ctx, db, s3Client, payload.GraphSnapshot.AgentGraph.OrganizationID, projectID, preparedState.DocumentIDs)
-		return builtGraph.Invoke(clients.ContextWithExecutionID(ctx, tracker.RunID()), initialState)
+	outcome, err := step.Run(ctx, "run-graph", func(ctx context.Context) (graphs.RunOutcome, error) {
+		return graphs.GraphRunOutcome(invokeWorkflowGraph(ctx, db, s3Client, mcpClient, input.Event.Data, payload, preparedState)), nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return graphResult, nil
+	return finishRun(ctx, db, executionID, organizationID, outcome)
+}
+
+func invokeWorkflowGraph(
+	ctx context.Context,
+	db *gorm.DB,
+	s3Client *clients.S3Client,
+	mcpClient *clients.MCPClient,
+	input inputs.ExecuteWorkflowInput,
+	payload *load.WorkflowExecutionPayload,
+	preparedState *preparedWorkflowState,
+) (map[string]any, error) {
+	initialState := make(map[string]any, len(input.InitialState)+4)
+	for key, value := range input.InitialState {
+		initialState[key] = value
+	}
+
+	initialState["document_ids"] = preparedState.DocumentIDs
+	initialState["documents"] = preparedState.Documents
+	if input.Scope != nil {
+		initialState["scope"] = input.Scope
+	}
+	if len(preparedState.Documents) == 1 {
+		initialState["document_id"] = preparedState.DocumentIDs[0]
+		initialState["temp_url"] = preparedState.Documents[0]["temp_url"]
+	}
+
+	projectID := payload.Documents[0].ProjectID
+	for _, document := range payload.Documents[1:] {
+		if document.ProjectID != projectID {
+			return nil, fmt.Errorf(
+				"workflow execution %s spans multiple projects",
+				input.ExecutionID.String(),
+			)
+		}
+	}
+
+	tracker, err := graphs.NewRunTrackerWithOptions(
+		db,
+		payload.GraphSnapshot.AgentGraph.ID,
+		payload.GraphSnapshot.AgentGraph.OrganizationID,
+		initialState,
+		graphs.RunTrackerOptions{
+			RunID:     input.ExecutionID.String(),
+			ProjectID: projectID,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create run tracker: %w", err)
+	}
+
+	builtGraph, err := graphs.BuildGraph(payload.GraphSnapshot, mcpClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build graph: %w", err)
+	}
+	if builtGraph == nil {
+		return nil, fmt.Errorf("built graph is nil")
+	}
+
+	tracer := graph.NewTracer()
+	tracer.AddHook(tracker)
+	builtGraph.SetTracer(tracer)
+	ctx = clients.ContextWithMCPExecutionScope(ctx, db, s3Client, payload.GraphSnapshot.AgentGraph.OrganizationID, projectID, preparedState.DocumentIDs)
+	return builtGraph.Invoke(clients.ContextWithExecutionID(ctx, tracker.RunID()), initialState)
 }

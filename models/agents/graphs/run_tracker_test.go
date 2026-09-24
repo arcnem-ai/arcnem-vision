@@ -14,12 +14,16 @@ import (
 	gormtests "gorm.io/gorm/utils/tests"
 )
 
-func TestNodeErrorFinalizesAndPublishesWithoutGraphEnd(t *testing.T) {
+func TestNodeErrorRecordsStepWithoutFinalizingRun(t *testing.T) {
 	db, err := gorm.Open(gormtests.DummyDialector{}, &gorm.Config{DryRun: true})
 	if err != nil {
 		t.Fatalf("open dry-run db: %v", err)
 	}
+	var updates []map[string]any
 	if err := db.Callback().Update().Replace("gorm:update", func(tx *gorm.DB) {
+		if values, ok := tx.Statement.Dest.(map[string]any); ok {
+			updates = append(updates, values)
+		}
 		tx.RowsAffected = 1
 	}); err != nil {
 		t.Fatalf("replace dry-run update callback: %v", err)
@@ -49,22 +53,24 @@ func TestNodeErrorFinalizesAndPublishesWithoutGraphEnd(t *testing.T) {
 		Error:    errors.New("provider unavailable"),
 	})
 
-	if len(reasons) != 2 || reasons[0] != realtime.DashboardReasonRunStepChanged || reasons[1] != realtime.DashboardReasonRunFinished {
-		t.Fatalf("expected step and terminal notifications, got %#v", reasons)
+	if len(reasons) != 1 || reasons[0] != realtime.DashboardReasonRunStepChanged {
+		t.Fatalf("expected only a step notification, got %#v", reasons)
+	}
+	if len(updates) != 1 {
+		t.Fatalf("expected one step update, got %#v", updates)
+	}
+	if _, ok := updates[0]["status"]; ok {
+		t.Fatalf("node error wrote a terminal run status: %#v", updates[0])
 	}
 }
 
-func TestTerminalRunUpdatesRecordsFailureState(t *testing.T) {
-	updates, err := terminalRunUpdates(
-		"failed",
-		map[string]any{"node": "inspect"},
-		errors.New("provider unavailable"),
-	)
+func TestTerminalRunUpdatesRecordsCompletedState(t *testing.T) {
+	updates, err := terminalRunUpdates(CompletedRun(map[string]any{"node": "inspect"}))
 	if err != nil {
 		t.Fatalf("terminalRunUpdates returned error: %v", err)
 	}
-	if updates["status"] != "failed" || updates["error"] != "provider unavailable" {
-		t.Fatalf("unexpected failure updates: %#v", updates)
+	if updates["status"] != "completed" || updates["error"] != nil {
+		t.Fatalf("unexpected completed updates: %#v", updates)
 	}
 	if updates["final_state"] != `{"node":"inspect"}` {
 		t.Fatalf("unexpected final state: %#v", updates["final_state"])
@@ -74,14 +80,33 @@ func TestTerminalRunUpdatesRecordsFailureState(t *testing.T) {
 	}
 }
 
+func TestTerminalRunUpdatesRecordsFailure(t *testing.T) {
+	updates, err := terminalRunUpdates(FailedRun(errors.New("provider unavailable")))
+	if err != nil {
+		t.Fatalf("terminalRunUpdates returned error: %v", err)
+	}
+	if updates["status"] != "failed" || updates["error"] != "provider unavailable" {
+		t.Fatalf("unexpected failure updates: %#v", updates)
+	}
+	if _, ok := updates["final_state"]; ok {
+		t.Fatalf("failed run recorded a final state: %#v", updates)
+	}
+}
+
 func TestTerminalRunUpdatesRejectsFailureWithoutError(t *testing.T) {
-	if _, err := terminalRunUpdates("failed", nil, nil); err == nil {
+	if _, err := terminalRunUpdates(RunOutcome{Status: "failed"}); err == nil {
 		t.Fatal("expected failed run without an error to be rejected")
 	}
 }
 
+func TestTerminalRunUpdatesRejectsUnknownStatus(t *testing.T) {
+	if _, err := terminalRunUpdates(RunOutcome{Status: "running"}); err == nil {
+		t.Fatal("expected a non-terminal status to be rejected")
+	}
+}
+
 func TestTerminalRunUpdatesCompletesWithoutEncodableFinalState(t *testing.T) {
-	updates, err := terminalRunUpdates("completed", make(chan struct{}), nil)
+	updates, err := terminalRunUpdates(CompletedRun(map[string]any{"channel": make(chan struct{})}))
 	if err != nil {
 		t.Fatalf("terminalRunUpdates returned error: %v", err)
 	}
