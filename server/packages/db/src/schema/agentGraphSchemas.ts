@@ -250,7 +250,6 @@ export const agentGraphRuns = pgTable(
 			"agent_graph_runs_idempotency_fields_together",
 			sql`(
 				${t.idempotencyKey} is null and
-				${t.apiKeyId} is null and
 				${t.idempotencyActor} is null and
 				${t.idempotencyRequestHash} is null and
 				${t.idempotencyResponse} is null

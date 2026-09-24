@@ -76,3 +76,43 @@ test("OAuth run history survives project deletion without weakening actor checks
 		db.close();
 	}
 });
+
+test("service-key runs record their key without an idempotency receipt", () => {
+	const db = new Database(":memory:");
+	try {
+		const constraint = getTableConfig(agentGraphRuns).checks.find(
+			(check) => check.name === "agent_graph_runs_idempotency_fields_together",
+		);
+		if (!constraint) throw new Error("Missing idempotency constraint");
+		const check = new PgDialect().sqlToQuery(constraint.value).sql;
+		db.exec(`
+			CREATE TABLE agent_graph_runs (
+				id TEXT PRIMARY KEY,
+				api_key_id TEXT,
+				idempotency_actor TEXT,
+				idempotency_key TEXT,
+				idempotency_request_hash TEXT,
+				idempotency_response TEXT,
+				CHECK (${check})
+			);
+			INSERT INTO agent_graph_runs VALUES ('keyed', 'key', NULL, NULL, NULL, NULL);
+			INSERT INTO agent_graph_runs VALUES ('anonymous', NULL, NULL, NULL, NULL, NULL);
+		`);
+		expect(
+			db.query("SELECT count(*) AS runs FROM agent_graph_runs").get(),
+		).toEqual({ runs: 2 });
+		const rejected = [
+			"('actor-only', NULL, 'oauth-actor', NULL, NULL, NULL)",
+			"('partial-receipt', 'key', NULL, NULL, 'hash', NULL)",
+			"('both-owners', 'key', 'oauth-actor', 'retry', 'hash', '{}')",
+			"('incomplete-receipt', 'key', NULL, 'retry', NULL, '{}')",
+		];
+		for (const values of rejected) {
+			expect(() =>
+				db.exec(`INSERT INTO agent_graph_runs VALUES ${values}`),
+			).toThrow();
+		}
+	} finally {
+		db.close();
+	}
+});

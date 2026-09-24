@@ -19,10 +19,10 @@ type AgentGraph struct {
 	StateSchema                 *string    `gorm:"column:state_schema;type:jsonb" json:"state_schema"`
 	AgentGraphTemplateID        *string    `gorm:"column:agent_graph_template_id;type:uuid" json:"agent_graph_template_id"`
 	OrganizationID              string     `gorm:"column:organization_id;type:uuid;not null" json:"organization_id"`
-	ArchivedAt                  *time.Time `gorm:"column:archived_at;type:timestamp without time zone" json:"archived_at"`
 	CreatedAt                   time.Time  `gorm:"column:created_at;type:timestamp without time zone;not null;default:now()" json:"created_at"`
 	UpdatedAt                   time.Time  `gorm:"column:updated_at;type:timestamp without time zone;not null;default:now()" json:"updated_at"`
 	AgentGraphTemplateVersionID *string    `gorm:"column:agent_graph_template_version_id;type:uuid" json:"agent_graph_template_version_id"`
+	ArchivedAt                  *time.Time `gorm:"column:archived_at;type:timestamp without time zone" json:"archived_at"`
 }
 
 // TableName AgentGraph's table name

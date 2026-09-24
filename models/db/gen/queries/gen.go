@@ -51,6 +51,9 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		Tool:                         newTool(db, opts...),
 		User:                         newUser(db, opts...),
 		Verification:                 newVerification(db, opts...),
+		WebhookDelivery:              newWebhookDelivery(db, opts...),
+		WebhookDeliveryAttempt:       newWebhookDeliveryAttempt(db, opts...),
+		WebhookEndpoint:              newWebhookEndpoint(db, opts...),
 	}
 }
 
@@ -90,6 +93,9 @@ type Query struct {
 	Tool                         tool
 	User                         user
 	Verification                 verification
+	WebhookDelivery              webhookDelivery
+	WebhookDeliveryAttempt       webhookDeliveryAttempt
+	WebhookEndpoint              webhookEndpoint
 }
 
 func (q *Query) Available() bool { return q.db != nil }
@@ -132,6 +138,9 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		Tool:                         q.Tool.clone(db),
 		User:                         q.User.clone(db),
 		Verification:                 q.Verification.clone(db),
+		WebhookDelivery:              q.WebhookDelivery.clone(db),
+		WebhookDeliveryAttempt:       q.WebhookDeliveryAttempt.clone(db),
+		WebhookEndpoint:              q.WebhookEndpoint.clone(db),
 	}
 }
 
@@ -179,6 +188,9 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		Tool:                         q.Tool.replaceDB(db),
 		User:                         q.User.replaceDB(db),
 		Verification:                 q.Verification.replaceDB(db),
+		WebhookDelivery:              q.WebhookDelivery.replaceDB(db),
+		WebhookDeliveryAttempt:       q.WebhookDeliveryAttempt.replaceDB(db),
+		WebhookEndpoint:              q.WebhookEndpoint.replaceDB(db),
 	}
 }
 
@@ -216,6 +228,9 @@ type queryCtx struct {
 	Tool                         *toolDo
 	User                         *userDo
 	Verification                 *verificationDo
+	WebhookDelivery              *webhookDeliveryDo
+	WebhookDeliveryAttempt       *webhookDeliveryAttemptDo
+	WebhookEndpoint              *webhookEndpointDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
@@ -253,6 +268,9 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		Tool:                         q.Tool.WithContext(ctx),
 		User:                         q.User.WithContext(ctx),
 		Verification:                 q.Verification.WithContext(ctx),
+		WebhookDelivery:              q.WebhookDelivery.WithContext(ctx),
+		WebhookDeliveryAttempt:       q.WebhookDeliveryAttempt.WithContext(ctx),
+		WebhookEndpoint:              q.WebhookEndpoint.WithContext(ctx),
 	}
 }
 

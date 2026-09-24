@@ -3,3 +3,4 @@ export * from "./authSchema";
 export * from "./oauthSchema";
 export * from "./projectSchema";
 export * from "./relationships";
+export * from "./webhookSchema";

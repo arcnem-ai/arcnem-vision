@@ -365,7 +365,8 @@ export async function executeServiceWorkflow(
 			graphSnapshot,
 			graphSnapshotHash,
 			initialState: seededState,
-			apiKeyId: idempotencyKey ? (scope.apiKeyId ?? null) : null,
+			// Recorded even without an idempotency key so webhooks can find the caller.
+			apiKeyId: scope.apiKeyId ?? null,
 			idempotencyActor: idempotencyKey
 				? (scope.idempotencyActor ?? null)
 				: null,
