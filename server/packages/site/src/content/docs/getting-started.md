@@ -61,7 +61,7 @@ The seed creates:
 - stored OCR results, descriptions, embeddings, segmentations, and example run history
 - a local debug dashboard session
 
-Because `server/packages/api/.env.example` enables `API_DEBUG=true`, the dashboard can bootstrap into the seeded local session after seeding.
+Because `server/packages/api/.env.example` enables `API_DEBUG=true`, the dashboard can bootstrap into the seeded local session after seeding. Debug mode is local-only: the API refuses to start with it enabled unless `BETTER_AUTH_BASE_URL` is a local `http://` URL.
 
 ## 4. Walk the core product
 

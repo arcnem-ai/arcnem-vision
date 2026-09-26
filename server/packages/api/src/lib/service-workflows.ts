@@ -15,6 +15,7 @@ import {
 	type SQL,
 } from "drizzle-orm";
 import type { Inngest } from "inngest";
+import { MAX_WORKFLOW_EVENT_BYTES } from "@/constants/requests";
 import {
 	buildExecutionScope,
 	buildSeededInitialState,
@@ -38,7 +39,7 @@ export type ExecutionScope = ProjectScope &
 
 function executionResult<
 	T extends object,
-	S extends 202 | 400 | 404 | 409 | 502,
+	S extends 202 | 400 | 404 | 409 | 413 | 502,
 >(body: T, status: S) {
 	return { body, status };
 }
@@ -146,6 +147,19 @@ export async function resolveScopedDocumentIds(
 	};
 }
 
+// The exact event sent to Inngest, so its size can be checked before a run
+// is created.
+function buildWorkflowExecutionEvent(
+	...args: Parameters<typeof buildWorkflowExecutionEventData>
+) {
+	return {
+		// A stable event ID keeps concurrent retries from starting another run.
+		id: args[0],
+		name: "workflow/execute",
+		data: buildWorkflowExecutionEventData(...args),
+	};
+}
+
 async function dispatchServiceWorkflowExecution(input: {
 	inngestClient: Inngest;
 	organizationId: string;
@@ -171,11 +185,8 @@ async function dispatchServiceWorkflowExecution(input: {
 	);
 
 	try {
-		await inngestClient.send({
-			// A stable event ID keeps concurrent retries from starting another run.
-			id: response.executionId,
-			name: "workflow/execute",
-			data: buildWorkflowExecutionEventData(
+		await inngestClient.send(
+			buildWorkflowExecutionEvent(
 				response.executionId,
 				response.workflowId,
 				input.organizationId,
@@ -183,7 +194,7 @@ async function dispatchServiceWorkflowExecution(input: {
 				executionScope,
 				seededState,
 			),
-		});
+		);
 		return true;
 	} catch {
 		// Delivery can be ambiguous. Keep the run resumable; retries reuse the stable event ID.
@@ -347,6 +358,27 @@ export async function executeServiceWorkflow(
 		scope.projectId,
 		executionScope,
 	);
+	const eventBytes = Buffer.byteLength(
+		JSON.stringify(
+			buildWorkflowExecutionEvent(
+				executionId,
+				workflow.id,
+				scope.organizationId,
+				scopedDocumentResolution.documentIds,
+				executionScope,
+				seededState,
+			),
+		),
+	);
+	if (eventBytes > MAX_WORKFLOW_EVENT_BYTES) {
+		return executionResult(
+			{
+				message: `Workflow input is ${eventBytes} bytes, over the ${MAX_WORKFLOW_EVENT_BYTES}-byte limit for a queued run. Store large data as documents instead of initialState.`,
+				maxBytes: MAX_WORKFLOW_EVENT_BYTES,
+			},
+			413,
+		);
+	}
 	const response = {
 		executionId,
 		workflowId: workflow.id,

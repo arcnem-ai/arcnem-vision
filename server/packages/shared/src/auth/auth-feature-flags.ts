@@ -1,26 +1,17 @@
-function parseBooleanEnvVar(value: string | undefined, defaultValue: boolean) {
-	const normalized = value?.trim().toLowerCase();
-	if (!normalized) {
-		return defaultValue;
-	}
-
-	if (["1", "true", "yes", "on"].includes(normalized)) {
-		return true;
-	}
-
-	if (["0", "false", "no", "off"].includes(normalized)) {
-		return false;
-	}
-
-	return defaultValue;
+// Open sign-up lets anyone use the operator's model keys, so a deployment has
+// to choose these values explicitly.
+function requireBooleanEnvVar(name: string) {
+	const value = process.env[name]?.trim();
+	if (value === "true") return true;
+	if (value === "false") return false;
+	throw new Error(`${name} must be set to "true" or "false"`);
 }
 
 export function getAuthFeatureFlags() {
 	return {
-		signUpEnabled: parseBooleanEnvVar(process.env.AUTH_ENABLE_SIGN_UP, true),
-		organizationCreationEnabled: parseBooleanEnvVar(
-			process.env.AUTH_ENABLE_ORGANIZATION_CREATION,
-			true,
+		signUpEnabled: requireBooleanEnvVar("AUTH_ENABLE_SIGN_UP"),
+		organizationCreationEnabled: requireBooleanEnvVar(
+			"AUTH_ENABLE_ORGANIZATION_CREATION",
 		),
 	};
 }

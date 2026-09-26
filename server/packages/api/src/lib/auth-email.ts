@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import { isAPIDebugModeEnabled } from "@/env/isAPIDebugModeEnabled";
+import { isAPIDebugModeEnabled } from "@/env/localOnlySettings";
 
 let resendClient: Resend | null = null;
 

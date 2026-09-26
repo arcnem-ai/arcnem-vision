@@ -1,5 +1,5 @@
 import { createMiddleware } from "hono/factory";
-import { isAPIDebugModeEnabled } from "@/env/isAPIDebugModeEnabled";
+import { isAPIDebugModeEnabled } from "@/env/localOnlySettings";
 import type { HonoServerContext } from "@/types/serverContext";
 
 const isDebugMode = isAPIDebugModeEnabled();

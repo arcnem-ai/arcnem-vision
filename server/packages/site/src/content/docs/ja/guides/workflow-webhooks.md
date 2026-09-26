@@ -127,4 +127,4 @@ APIは起動時に `WEBHOOK_SECRET_ENCRYPTION_KEY`（base64でエンコードし
 
 ローカルのシード（`bun run db:seed`。`server/packages/db/.env` に同じ `WEBHOOK_SECRET_ENCRYPTION_KEY` が必要）は、Seed Project のサービスキーに `http://localhost:3999/webhooks/vision`（`SEED_WEBHOOK_RECEIVER_URL` で変更可能。Docker のサンプルでは `host.docker.internal`）のデモ用エンドポイント、サンプルの配信、無効化済みのエンドポイントを作成し、デモ用の署名シークレットを出力します。そのポートでシークレットを使って受信側を起動し、ダッシュボードから配信を再送すると、届く様子を確認できます。
 
-`API_DEBUG=true` のローカル開発では、エンドポイントに `http://` やプライベートアドレスを使えるため、自分のマシン上の受信側も動作します。デプロイ環境では `API_DEBUG` を無効にしてください。
+エンドポイントには公開された `https://` のURLが必要です。自分のマシン上の受信側を使えるように、ローカル用のenvサンプルでは `WEBHOOK_ALLOW_PRIVATE_DESTINATIONS=true` を設定しており、`http://` やプライベートアドレスも使えます。これはローカル専用の設定です。`API_DEBUG` と同じく、`BETTER_AUTH_BASE_URL` がローカルの `http://` URLでない場合、有効にしたままではAPIが起動しません。

@@ -437,6 +437,10 @@ serviceRouter.post(
 				description: "Workflow or document not found",
 				content: { "application/json": { schema: jsonErrorSchema } },
 			},
+			413: {
+				description: "Workflow input is too large to queue",
+				content: { "application/json": { schema: jsonErrorSchema } },
+			},
 			502: {
 				description: "Failed to enqueue execution",
 				content: { "application/json": { schema: jsonErrorSchema } },

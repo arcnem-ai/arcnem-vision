@@ -2,6 +2,7 @@ import "zod/compile";
 
 import { getDB } from "@arcnem-vision/db/server";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import { openAPIRouteHandler } from "hono-openapi";
@@ -15,7 +16,12 @@ import { ackUploadRouter } from "@/routes/ackUpload";
 import { authRouter } from "@/routes/auth";
 import { getInngestClient } from "./clients/inngest";
 import { getS3Client } from "./clients/s3";
-import { isAPIDebugModeEnabled } from "./env/isAPIDebugModeEnabled";
+import { MAX_API_BODY_BYTES } from "./constants/requests";
+import {
+	allowsPrivateWebhookDestinations,
+	assertLocalOnlySettings,
+	isAPIDebugModeEnabled,
+} from "./env/localOnlySettings";
 import { dashboardRouter } from "./routes/dashboard";
 import { dashboardDocumentsRouter } from "./routes/dashboardDocuments";
 import { documentsRouter } from "./routes/documents";
@@ -28,6 +34,7 @@ import type { HonoServerContext } from "./types/serverContext";
 const app = new Hono<HonoServerContext>({
 	strict: false,
 });
+assertLocalOnlySettings();
 const isDebugMode = isAPIDebugModeEnabled();
 requireWebhookSecretEncryptionKey();
 
@@ -61,6 +68,23 @@ app.use(
 );
 
 app.use(requestId());
+
+// Uploads go straight to storage, so API bodies are small JSON. Inngest's own
+// callbacks carry run state and are exempt.
+const apiBodyLimit = bodyLimit({
+	maxSize: MAX_API_BODY_BYTES,
+	onError: (c) =>
+		c.json(
+			{
+				message: `Request body exceeds ${MAX_API_BODY_BYTES} bytes`,
+				maxBytes: MAX_API_BODY_BYTES,
+			},
+			413,
+		),
+});
+app.use("/api/*", (c, next) =>
+	c.req.path === "/api/inngest" ? next() : apiBodyLimit(c, next),
+);
 
 app.use(
 	pinoLogger({
@@ -113,7 +137,7 @@ app.use("*", async (c, next) => {
 
 const inngestFunctions = [
 	createWebhookDeliveryFunction(getInngestClient(), getDB, {
-		allowPrivateHttp: isDebugMode,
+		allowPrivateHttp: allowsPrivateWebhookDestinations(),
 	}),
 ];
 

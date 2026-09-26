@@ -127,4 +127,4 @@ The API requires `WEBHOOK_SECRET_ENCRYPTION_KEY` at startup: 32 random bytes enc
 
 The local seed (`bun run db:seed`, which needs the same `WEBHOOK_SECRET_ENCRYPTION_KEY` in `server/packages/db/.env`) gives the Seed Project service key a demo endpoint at `http://localhost:3999/webhooks/vision` (`SEED_WEBHOOK_RECEIVER_URL` changes it; the Docker example uses `host.docker.internal`), with sample deliveries and a revoked endpoint. It prints the demo signing secret. Run a receiver on that port with the secret, then resend a delivery from the dashboard to watch it arrive.
 
-In local development with `API_DEBUG=true`, endpoints may use `http://` and private addresses, so a receiver on your machine works. Keep `API_DEBUG` off in deployed environments.
+Endpoints must use public `https://` URLs. For a receiver on your own machine, the local env examples set `WEBHOOK_ALLOW_PRIVATE_DESTINATIONS=true`, which also allows `http://` and private addresses. It is a local-only switch: the API refuses to start with it enabled unless `BETTER_AUTH_BASE_URL` is a local `http://` URL, just like `API_DEBUG`.

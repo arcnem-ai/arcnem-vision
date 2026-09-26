@@ -1,5 +1,5 @@
 import { getAPIEnvVar } from "@/env/getAPIEnvVar";
-import { isAPIDebugModeEnabled } from "@/env/isAPIDebugModeEnabled";
+import { isAPIDebugModeEnabled } from "@/env/localOnlySettings";
 
 function readOptionalOrigins(value: string | undefined) {
 	return (value ?? "")
