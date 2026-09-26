@@ -31,7 +31,7 @@ Please ensure your code passes linting before submitting a PR.
 - Write a clear description of what changed and why.
 - Link any related issues.
 - Run `cd server && bun test` and `go test ./...` in each affected Go module.
-- Database-backed tests are skipped unless `TEST_DATABASE_URL` points at a disposable PostgreSQL database with pgvector. The TypeScript tests need the migrations applied first. CI runs them against a fresh database.
+- Database-backed tests are skipped unless `TEST_DATABASE_URL` points at a disposable PostgreSQL database with pgvector (the TypeScript tests need the migrations applied first), and Redis-backed tests unless `TEST_REDIS_URL` points at a disposable Redis. CI runs both against fresh services.
 
 ## Reporting Issues
 

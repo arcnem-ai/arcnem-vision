@@ -267,14 +267,98 @@ describe("service route helpers", () => {
 		expect(createWorkflowExecutionSnapshotHash(snapshot)).toMatch(
 			/^[a-f0-9]{64}$/,
 		);
-		expect(
-			createWorkflowExecutionSnapshotHash(
+	});
+
+	test("hashes a workflow the same in any row order, and differently after an edit", () => {
+		const tool = (id: string, name: string) => ({
+			tools: {
+				id,
+				name,
+				description: `${name} tool`,
+				inputSchema: { type: "object" },
+				outputSchema: { type: "object" },
+			},
+		});
+		const node = (nodeKey: string, tools: ReturnType<typeof tool>[]) => ({
+			id: `node-${nodeKey}`,
+			nodeKey,
+			nodeType: "worker",
+			inputKey: null,
+			outputKey: `${nodeKey}_out`,
+			config: { system_message: `Run ${nodeKey}.` },
+			agentGraphId: "workflow-1",
+			modelId: null,
+			models: null,
+			agentGraphNodeTools: tools,
+		});
+		const edge = (fromNode: string, toNode: string) => ({
+			id: `edge-${fromNode}-${toNode}`,
+			fromNode,
+			toNode,
+			agentGraphId: "workflow-1",
+		});
+		const build = (order: {
+			nodes: number[];
+			edges: number[];
+			tools: number[];
+			describeMessage?: string;
+		}) => {
+			const tools = [
+				tool("t1", "ocr"),
+				tool("t2", "embed"),
+				tool("t3", "embed"),
+			];
+			const nodes = [
+				node(
+					"describe",
+					order.tools.map((index) => tools[index]),
+				),
+				node("classify", [tools[0]]),
+				node("store", []),
+			];
+			if (order.describeMessage) {
+				nodes[0].config = { system_message: order.describeMessage };
+			}
+			const edges = [
+				edge("describe", "classify"),
+				edge("classify", "store"),
+				edge("store", "END"),
+			];
+			return createWorkflowExecutionSnapshotHash(
 				buildWorkflowExecutionSnapshot({
-					...workflow,
-					agentGraphNodes: [...workflow.agentGraphNodes].reverse(),
-					agentGraphEdges: [...workflow.agentGraphEdges].reverse(),
+					id: "workflow-1",
+					name: "Pipeline",
+					description: null,
+					entryNode: "describe",
+					stateSchema: null,
+					agentGraphTemplateId: null,
+					agentGraphTemplateVersionId: null,
+					organizationId: "org-1",
+					agentGraphNodes: order.nodes.map((index) => nodes[index]),
+					agentGraphEdges: order.edges.map((index) => edges[index]),
 				}),
-			),
-		).toBe(createWorkflowExecutionSnapshotHash(snapshot));
+			);
+		};
+
+		const baseline = build({
+			nodes: [0, 1, 2],
+			edges: [0, 1, 2],
+			tools: [0, 1, 2],
+		});
+		for (const order of [
+			{ nodes: [2, 0, 1], edges: [1, 2, 0], tools: [2, 0, 1] },
+			{ nodes: [1, 2, 0], edges: [2, 0, 1], tools: [1, 2, 0] },
+			{ nodes: [2, 1, 0], edges: [2, 1, 0], tools: [2, 1, 0] },
+		]) {
+			expect(build(order)).toBe(baseline);
+		}
+		expect(
+			build({
+				nodes: [0, 1, 2],
+				edges: [0, 1, 2],
+				tools: [0, 1, 2],
+				describeMessage: "Describe it differently.",
+			}),
+		).not.toBe(baseline);
 	});
 });
