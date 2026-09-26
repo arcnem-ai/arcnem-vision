@@ -39,41 +39,11 @@ export function sanitizeProxyResponseHeaders(upstreamHeaders: Headers) {
 	return headers;
 }
 
+// Pass the upstream body straight through so a client disconnect cancels the
+// upstream stream (and the API's realtime subscription) instead of leaving it
+// open behind a locked reader.
 export function createProxyResponse(upstreamResponse: Response) {
-	const upstreamBody = upstreamResponse.body;
-	const body = upstreamBody
-		? new ReadableStream<Uint8Array>({
-				start(controller) {
-					const reader = upstreamBody.getReader();
-
-					void (async () => {
-						try {
-							while (true) {
-								const { done, value } = await reader.read();
-								if (done) {
-									break;
-								}
-								controller.enqueue(value);
-							}
-							controller.close();
-						} catch (error) {
-							controller.error(error);
-						} finally {
-							reader.releaseLock();
-						}
-					})();
-				},
-				async cancel(reason) {
-					try {
-						await upstreamBody.cancel(reason);
-					} catch {
-						// best effort cleanup
-					}
-				},
-			})
-		: null;
-
-	return new Response(body, {
+	return new Response(upstreamResponse.body, {
 		status: upstreamResponse.status,
 		statusText: upstreamResponse.statusText,
 		headers: sanitizeProxyResponseHeaders(upstreamResponse.headers),
