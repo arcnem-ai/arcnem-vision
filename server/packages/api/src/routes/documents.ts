@@ -1,7 +1,7 @@
 import { schema } from "@arcnem-vision/db";
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, desc, eq, lt } from "drizzle-orm";
 import { Hono, type Context as HonoContext } from "hono";
-import { type APIDocumentRow, toAPIDocumentItem } from "@/lib/document-api";
+import { findSimilarKeyDocuments, toAPIDocumentItem } from "@/lib/document-api";
 import {
 	requireAPIKey,
 	requireAPIKeyPermission,
@@ -170,48 +170,12 @@ documentsRouter.get(
 			return c.json({ message: "Document not found" }, 404);
 		}
 
-		const similarRows = await dbClient.execute(sql`
-		SELECT
-			d.id,
-			d.object_key AS "objectKey",
-			d.content_type AS "contentType",
-			d.size_bytes AS "sizeBytes",
-			d.created_at AS "createdAt",
-			dd.text AS description,
-			d.visibility AS visibility,
-			d.api_key_id AS "apiKeyId",
-			(dde2.embedding <=> dde1.embedding) AS distance
-		FROM document_description_embeddings dde1
-		JOIN document_descriptions dd1 ON dd1.id = dde1.document_description_id
-		JOIN document_description_embeddings dde2
-			ON dde2.embedding_dim = dde1.embedding_dim
-			AND dde2.id != dde1.id
-		JOIN document_descriptions dd2 ON dd2.id = dde2.document_description_id
-		JOIN documents d ON d.id = dd2.document_id
-		LEFT JOIN document_descriptions dd ON dd.document_id = d.id
-		WHERE dd1.document_id = ${documentId}
-			AND d.organization_id = ${keyContext.organizationId}
-			AND d.id != ${documentId}
-		ORDER BY distance ASC
-		LIMIT ${limit}
-	`);
-
-		const matches = similarRows.rows.map((row: Record<string, unknown>) =>
-			toAPIDocumentItem(
-				{
-					id: row.id as string,
-					objectKey: row.objectKey as string,
-					contentType: row.contentType as string,
-					sizeBytes: row.sizeBytes as number | string,
-					createdAt: row.createdAt as Date | string,
-					description: (row.description as string | null) ?? null,
-					visibility: row.visibility as string,
-					apiKeyId: (row.apiKeyId as string | null) ?? null,
-					distance: row.distance as number | string | null,
-				} satisfies APIDocumentRow,
-				s3Client,
-			),
-		);
+		const similarRows = await findSimilarKeyDocuments(dbClient, {
+			documentId,
+			apiKeyId: keyContext.apiKeyId,
+			limit,
+		});
+		const matches = similarRows.map((row) => toAPIDocumentItem(row, s3Client));
 
 		return c.json({ matches });
 	},
