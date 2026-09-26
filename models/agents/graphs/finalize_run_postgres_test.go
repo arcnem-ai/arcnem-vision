@@ -20,7 +20,11 @@ func TestFinalizeRunQueuesWebhookDeliveriesPostgres(t *testing.T) {
 		t.Skip("set TEST_DATABASE_URL to run the PostgreSQL finalization check")
 	}
 	previousPublisher := publishDashboardEvent
-	publishDashboardEvent = func(context.Context, realtime.DashboardEvent) error { return nil }
+	var published []string
+	publishDashboardEvent = func(_ context.Context, event realtime.DashboardEvent) error {
+		published = append(published, event.RunID)
+		return nil
+	}
 	t.Cleanup(func() { publishDashboardEvent = previousPublisher })
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
@@ -138,6 +142,32 @@ func TestFinalizeRunQueuesWebhookDeliveriesPostgres(t *testing.T) {
 		}
 		if status(run) != "completed" || len(deliveries(run)) != 1 {
 			t.Fatalf("repeated finalization changed the run or its deliveries: %s %#v", status(run), deliveries(run))
+		}
+	})
+
+	t.Run("a terminal run keeps its first outcome and publishes nothing", func(t *testing.T) {
+		run := newRun(newTestRunID(t, tx), key)
+		mustExec("UPDATE agent_graph_runs SET status = 'failed', error = 'first' WHERE id = ?", run)
+		published = nil
+
+		result, err := FinalizeRun(tx, run, "org", CompletedRun(map[string]any{"summary": "late"}))
+		if err != nil || result.Transitioned || len(result.Deliveries) != 0 {
+			t.Fatalf("FinalizeRun = %#v, %v", result, err)
+		}
+		var errorText string
+		if err := tx.Raw("SELECT error FROM agent_graph_runs WHERE id = ?", run).Scan(&errorText).Error; err != nil {
+			t.Fatal(err)
+		}
+		if status(run) != "failed" || errorText != "first" || len(deliveries(run)) != 0 || len(published) != 0 {
+			t.Fatalf("status %s error %q deliveries %#v published %#v", status(run), errorText, deliveries(run), published)
+		}
+	})
+
+	t.Run("an unknown run is not finalized", func(t *testing.T) {
+		published = nil
+		result, err := FinalizeRun(tx, newTestRunID(t, tx), "org", CompletedRun(nil))
+		if err != nil || result.Transitioned || len(result.Deliveries) != 0 || len(published) != 0 {
+			t.Fatalf("FinalizeRun = %#v, %v, published %#v", result, err, published)
 		}
 	})
 

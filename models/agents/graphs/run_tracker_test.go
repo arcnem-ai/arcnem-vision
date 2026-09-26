@@ -3,7 +3,6 @@ package graphs
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -115,18 +114,5 @@ func TestTerminalRunUpdatesCompletesWithoutEncodableFinalState(t *testing.T) {
 	}
 	if _, ok := updates["final_state"]; ok {
 		t.Fatalf("unencodable final state was persisted: %#v", updates)
-	}
-}
-
-func TestUpdateRunningRunGuardsTerminalState(t *testing.T) {
-	db, err := gorm.Open(gormtests.DummyDialector{}, &gorm.Config{DryRun: true})
-	if err != nil {
-		t.Fatalf("open dry-run db: %v", err)
-	}
-
-	tx := updateRunningRun(db, "run-1", map[string]any{"status": "failed"})
-	query := tx.Statement.SQL.String()
-	if !strings.Contains(query, "id = ? AND status = ?") {
-		t.Fatalf("terminal update is not guarded by running status: %s", query)
 	}
 }

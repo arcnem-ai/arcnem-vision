@@ -17,6 +17,7 @@ permissions:
 
 env:
   TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+  TEST_REDIS_URL: redis://localhost:6379
 
 jobs:
   bun-tests:
@@ -31,6 +32,15 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:8.10.0-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10

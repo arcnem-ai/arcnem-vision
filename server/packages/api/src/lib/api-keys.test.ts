@@ -171,20 +171,52 @@ describe("verifyAndConsumeAPIKey", () => {
 		expect(calls).toHaveLength(1);
 	});
 
-	test("updates request bookkeeping for an allowed request", async () => {
+	test("saves the incremented counter and request time for an allowed request", async () => {
+		const now = new Date("2026-04-16T00:00:30.000Z");
 		const { db, calls } = buildFakeDB([
-			{ rows: [{ ...baseRow }] },
+			{
+				rows: [
+					{
+						...baseRow,
+						requestCount: 1,
+						lastRequest: new Date("2026-04-16T00:00:00.000Z"),
+					},
+				],
+			},
 			{ rows: [] },
 		]);
 
-		const result = await verifyAndConsumeAPIKey(db, "valid-key");
+		const result = await verifyAndConsumeAPIKey(db, "valid-key", now);
 
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.apiKey.id).toBe(baseRow.id);
 			expect(result.apiKey.organizationId).toBe(baseRow.organizationId);
 		}
-		expect(calls).toHaveLength(2);
+		expect(calls[1]).toMatchObject({
+			type: "update",
+			values: { lastRequest: now, requestCount: 2, updatedAt: now },
+		});
+	});
+
+	test("rejects disabled and expired keys without touching the record", async () => {
+		const now = new Date("2026-04-16T00:00:30.000Z");
+		for (const row of [
+			{ ...baseRow, enabled: false },
+			{ ...baseRow, expiresAt: new Date("2026-04-16T00:00:30.000Z") },
+			{ ...baseRow, expiresAt: "2026-04-15T00:00:00.000Z" },
+		]) {
+			const { db, calls } = buildFakeDB([{ rows: [row] }]);
+
+			const result = await verifyAndConsumeAPIKey(db, "blocked-key", now);
+
+			expect(result).toEqual({
+				ok: false,
+				status: 401,
+				message: "Unauthorized",
+			});
+			expect(calls).toHaveLength(1);
+		}
 	});
 
 	test("returns 429 without updating the record when the key is over limit", async () => {
@@ -231,14 +263,18 @@ describe("verifyAndConsumeAPIKeyForDebugMode", () => {
 			{ rows: [] },
 		]);
 
+		const now = new Date("2026-04-16T00:00:10.000Z");
 		const result = await verifyAndConsumeAPIKeyForDebugMode(
 			db,
 			"debug-key",
-			new Date("2026-04-16T00:00:10.000Z"),
+			now,
 		);
 
 		expect(result?.id).toBe(baseRow.id);
-		expect(calls).toHaveLength(2);
+		expect(calls[1]).toMatchObject({
+			type: "update",
+			values: { lastRequest: now, requestCount: 13, updatedAt: now },
+		});
 	});
 
 	test("still returns disabled keys in debug mode so local dev flows keep working", async () => {

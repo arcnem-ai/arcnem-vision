@@ -59,6 +59,11 @@ func TestPrepareImageBytes_OverLimitOptimizes(t *testing.T) {
 	if prepared.FinalBytes > maxBytes {
 		t.Fatalf("expected optimized bytes <= %d, got %d", maxBytes, prepared.FinalBytes)
 	}
+	requireDecodedOutput(t, prepared, 1024)
+	// 1600x1200 scaled to fit 1024 keeps the 4:3 aspect ratio.
+	if prepared.FinalWidth*3 != prepared.FinalHeight*4 {
+		t.Fatalf("expected a 4:3 image, got %dx%d", prepared.FinalWidth, prepared.FinalHeight)
+	}
 }
 
 func TestPrepareImageForService_DownloadsAndOptimizes(t *testing.T) {
@@ -81,6 +86,33 @@ func TestPrepareImageForService_DownloadsAndOptimizes(t *testing.T) {
 	}
 	if prepared.FinalBytes > maxBytes {
 		t.Fatalf("expected optimized bytes <= %d, got %d", maxBytes, prepared.FinalBytes)
+	}
+	requireDecodedOutput(t, prepared, 1024)
+}
+
+// requireDecodedOutput decodes the prepared bytes and checks them against the
+// reported metadata, so corrupt output with plausible numbers fails.
+func requireDecodedOutput(t *testing.T, prepared *PreparedImage, maxDimension int) {
+	t.Helper()
+	if len(prepared.Data) != prepared.FinalBytes {
+		t.Fatalf("reported %d bytes, data has %d", prepared.FinalBytes, len(prepared.Data))
+	}
+	decoded, format, err := image.Decode(bytes.NewReader(prepared.Data))
+	if err != nil {
+		t.Fatalf("prepared image does not decode: %v", err)
+	}
+	if "image/"+format != prepared.MIMEType {
+		t.Fatalf("reported %q, data is %q", prepared.MIMEType, "image/"+format)
+	}
+	bounds := decoded.Bounds()
+	if bounds.Dx() != prepared.FinalWidth || bounds.Dy() != prepared.FinalHeight {
+		t.Fatalf("reported %dx%d, data is %dx%d", prepared.FinalWidth, prepared.FinalHeight, bounds.Dx(), bounds.Dy())
+	}
+	if bounds.Dx() > maxDimension || bounds.Dy() > maxDimension {
+		t.Fatalf("expected dimensions <= %d, got %dx%d", maxDimension, bounds.Dx(), bounds.Dy())
+	}
+	if bounds.Dx() < 1 || bounds.Dy() < 1 {
+		t.Fatalf("decoded image is empty")
 	}
 }
 
