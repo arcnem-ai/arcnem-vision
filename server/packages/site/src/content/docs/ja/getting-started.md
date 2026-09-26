@@ -11,7 +11,7 @@ description: コアサービスをローカルで起動し、ダッシュボー�
 
 - Docker + Docker Compose
 - Bun
-- Go 1.25+（エージェント、MCP）
+- Go 1.27+（エージェント、MCP）
 - CompileDaemon（`go install github.com/githubnemo/CompileDaemon@latest`）
 - Tilt
 

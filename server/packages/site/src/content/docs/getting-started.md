@@ -11,7 +11,7 @@ Use the dashboard and upload API to explore Arcnem Vision. The core loop is: ing
 
 - Docker + Docker Compose
 - Bun
-- Go 1.25+ (agents, MCP)
+- Go 1.27+ (agents, MCP)
 - CompileDaemon (`go install github.com/githubnemo/CompileDaemon@latest`)
 - Tilt
 
