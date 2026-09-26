@@ -196,6 +196,10 @@ serviceRouter.post(
 				description: "Forbidden",
 				content: { "application/json": { schema: jsonErrorSchema } },
 			},
+			413: {
+				description: "Declared size exceeds the maximum upload size",
+				content: { "application/json": { schema: jsonErrorSchema } },
+			},
 		},
 	}),
 	requireAPIKey,
@@ -267,6 +271,10 @@ serviceRouter.post(
 			},
 			404: {
 				description: "Upload not found",
+				content: { "application/json": { schema: jsonErrorSchema } },
+			},
+			413: {
+				description: "Uploaded object exceeds the maximum upload size",
 				content: { "application/json": { schema: jsonErrorSchema } },
 			},
 		},

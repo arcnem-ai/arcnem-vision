@@ -29,6 +29,12 @@ export const toDocumentUploadErrorResponse = (
 	fallbackMessage: string,
 ) => {
 	if (error instanceof DocumentUploadError) {
+		console.warn(fallbackMessage, {
+			status: error.status,
+			payload: error.payload,
+			path: c.req.path,
+			method: c.req.method,
+		});
 		return c.json(error.payload, error.status);
 	}
 

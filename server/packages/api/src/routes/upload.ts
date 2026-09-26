@@ -54,11 +54,19 @@ uploadRouter.post(
 				.limit(1);
 
 			if (!uploadTarget) {
+				console.warn("Upload presign rejected invalid API key context", {
+					apiKeyId: verifiedKey.id,
+				});
 				return c.json({ message: "Invalid API key context" }, 401);
 			}
 
 			const body = await readJSONBody(c.req);
 			const { contentType, visibility } = parsePresignRequestBody(body);
+			console.info("Issuing presigned upload", {
+				apiKeyId: verifiedKey.id,
+				contentType,
+				visibility: visibility ?? "org",
+			});
 
 			return c.json(
 				await issuePresignedUpload({

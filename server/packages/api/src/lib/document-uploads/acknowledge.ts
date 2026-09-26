@@ -6,7 +6,10 @@ import {
 } from "@arcnem-vision/shared";
 import type { S3Client } from "bun";
 import { and, eq } from "drizzle-orm";
-import { ALLOWED_IMAGE_MIME_TYPES } from "@/constants/uploads";
+import {
+	ALLOWED_IMAGE_MIME_TYPES,
+	MAX_UPLOAD_SIZE_BYTES,
+} from "@/constants/uploads";
 import { publishDashboardRealtimeEvent } from "@/lib/dashboard-realtime";
 import type {
 	AcknowledgedUpload,
@@ -22,29 +25,48 @@ import { fail } from "./errors";
 
 const { documents, presignedUploads } = schema;
 
-const statUploadedObject = async ({
+// Checks the stored object itself: presign only saw the size the client
+// declared, and a presigned PUT does not enforce it.
+export const statUploadedObject = async ({
 	s3Client,
 	objectKey,
 }: {
 	s3Client: S3Client;
 	objectKey: string;
 }): Promise<VerifiedUploadObject> => {
-	const objectStats = (await s3Client
-		.stat(objectKey)
-		.catch(() => fail(404, "Uploaded object not found in storage"))) as {
+	const objectStats = (await s3Client.stat(objectKey).catch((error) => {
+		console.error("Failed to stat uploaded object", {
+			objectKey,
+			error,
+		});
+		return fail(404, "Uploaded object not found in storage");
+	})) as {
 		size: number;
 		lastModified: Date;
 		etag: string;
 		type: string;
 	};
 
+	if (!Number.isInteger(objectStats.size) || objectStats.size <= 0) {
+		fail(409, "Uploaded object has invalid size");
+	}
+
+	// Checked before the content type, so an oversized object is always deleted.
+	if (objectStats.size > MAX_UPLOAD_SIZE_BYTES) {
+		// The object can never become a document, so don't keep it in storage.
+		await s3Client.delete(objectKey).catch((error) => {
+			console.error("Failed to delete oversized upload", { objectKey, error });
+		});
+		fail(
+			413,
+			`Uploaded object exceeds maximum upload size of ${MAX_UPLOAD_SIZE_BYTES} bytes`,
+			{ maxSizeBytes: MAX_UPLOAD_SIZE_BYTES },
+		);
+	}
+
 	const normalizedContentType = objectStats.type.trim().toLowerCase();
 	if (!ALLOWED_IMAGE_MIME_TYPES.has(normalizedContentType)) {
 		fail(400, "Uploaded object is not a supported image type");
-	}
-
-	if (!Number.isInteger(objectStats.size) || objectStats.size <= 0) {
-		fail(409, "Uploaded object has invalid size");
 	}
 
 	if (!objectStats.etag || objectStats.etag.trim().length === 0) {
@@ -120,7 +142,12 @@ const createDocumentAndVerifyUpload = async ({
 		});
 
 		return acknowledgedUpload;
-	} catch {
+	} catch (error) {
+		console.error("Failed to create document or verify upload", {
+			uploadId: upload.id,
+			objectKey: upload.objectKey,
+			error,
+		});
 		return fail(409, "Failed to acknowledge upload");
 	}
 };
