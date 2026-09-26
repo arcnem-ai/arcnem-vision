@@ -13,6 +13,10 @@ type MCPClient struct {
 	endpoint string
 }
 
+// mcpClientVersion is the Arcnem Vision release; it must match "version" in
+// server/package.json, which a server test checks.
+const mcpClientVersion = "0.1.0"
+
 func NewMCPClient() (*MCPClient, error) {
 	endpoint := os.Getenv("MCP_SERVER_URL")
 	if endpoint == "" {
@@ -21,8 +25,8 @@ func NewMCPClient() (*MCPClient, error) {
 
 	return &MCPClient{
 		client: mcp.NewClient(&mcp.Implementation{
-			Name:    os.Getenv("MCP_CLIENT_NAME"),
-			Version: os.Getenv("MCP_CLIENT_VERSION"),
+			Name:    "arcnem-vision-agents",
+			Version: mcpClientVersion,
 		}, nil),
 		endpoint: endpoint,
 	}, nil

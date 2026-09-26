@@ -1,6 +1,7 @@
 import "zod/compile";
 
 import { getDB } from "@arcnem-vision/db/server";
+import { VISION_VERSION } from "@arcnem-vision/shared";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
@@ -177,7 +178,7 @@ app.get(
 			openapi: "3.1.0",
 			info: {
 				title: "Arcnem Vision Service API",
-				version: "1.0.0",
+				version: VISION_VERSION,
 				description:
 					"Project-scoped image ingestion and workflow orchestration API for service integrations.",
 			},
