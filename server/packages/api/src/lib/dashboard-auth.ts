@@ -135,33 +135,3 @@ export async function requireDashboardSessionContext(
 		context: context as AuthenticatedDashboardSessionContext,
 	};
 }
-
-export async function requireOrganizationMembership(
-	c: Context<HonoServerContext>,
-	organizationId: string,
-) {
-	const sessionContext = await getDashboardSessionContext(c);
-	if (!sessionContext.session || !sessionContext.user) {
-		return false;
-	}
-
-	if (
-		sessionContext.organizations.some(
-			(membership) => membership.organizationId === organizationId,
-		)
-	) {
-		return true;
-	}
-
-	const userId = sessionContext.user.id;
-	const dbClient = c.get("dbClient");
-	const membership = await dbClient.query.members.findFirst({
-		where: (row, { and, eq }) =>
-			and(eq(row.userId, userId), eq(row.organizationId, organizationId)),
-		columns: {
-			organizationId: true,
-		},
-	});
-
-	return Boolean(membership);
-}
