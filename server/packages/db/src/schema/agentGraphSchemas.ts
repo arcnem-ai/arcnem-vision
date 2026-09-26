@@ -262,10 +262,6 @@ export const agentGraphRuns = pgTable(
 			)`,
 		),
 		check(
-			"agent_graph_runs_status_known",
-			sql`${t.status} in ('running', 'completed', 'failed')`,
-		),
-		check(
 			"agent_graph_runs_finished_after_started",
 			sql`${t.finishedAt} is null or ${t.finishedAt} >= ${t.startedAt}`,
 		),
