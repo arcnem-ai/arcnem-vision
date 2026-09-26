@@ -24,9 +24,9 @@ import {
 	type WebhookOwner,
 } from "./operations";
 
-// WEBHOOK_TEST_DATABASE_URL enables this check against a migrated PostgreSQL
+// TEST_DATABASE_URL enables this check against a migrated PostgreSQL
 // database. Every test runs in a transaction that is rolled back.
-const databaseURL = process.env.WEBHOOK_TEST_DATABASE_URL;
+const databaseURL = process.env.TEST_DATABASE_URL;
 const describePostgres = databaseURL ? describe : describe.skip;
 const policy = { allowPrivateHttp: true };
 

@@ -6,6 +6,9 @@
 		"zod": "^4.5.4"
 	},
 	"type": "module",
+	"scripts": {
+		"typecheck": "tsc --noEmit"
+	},
 	"exports": {
 		".": {
 			"types": "./src/index.ts",

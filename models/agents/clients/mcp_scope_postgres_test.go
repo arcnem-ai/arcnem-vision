@@ -10,12 +10,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// MCP_SCOPE_DATABASE_URL enables the real PostgreSQL check. Temporary tables
+// TEST_DATABASE_URL enables the real PostgreSQL check. Temporary tables
 // shadow the application tables only in this rollback transaction.
 func TestMCPExecutionScopePostgres(t *testing.T) {
-	dsn := os.Getenv("MCP_SCOPE_DATABASE_URL")
+	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
-		t.Skip("set MCP_SCOPE_DATABASE_URL to run the PostgreSQL scope check")
+		t.Skip("set TEST_DATABASE_URL to run the PostgreSQL scope check")
 	}
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {

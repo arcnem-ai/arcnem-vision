@@ -2,6 +2,8 @@ name: Tests
 
 on:
   push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
@@ -13,10 +15,25 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+
 jobs:
   bun-tests:
-    name: Bun Tests
+    name: Bun Checks
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: server
@@ -32,8 +49,26 @@ jobs:
       - name: Install Bun dependencies
         run: bun install --frozen-lockfile
 
+      - name: Lint
+        run: bun run lint
+
+      - name: Type check
+        run: bun run typecheck
+
+      - name: Apply migrations to the test database
+        working-directory: server/packages/db
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+        run: bun run db:migrate
+
       - name: Run Bun tests
         run: bun test
+
+      - name: Build dashboard
+        working-directory: server/packages/dashboard
+        env:
+          API_URL: http://localhost:3000
+        run: bun run build
 
       - name: Build documentation site
         run: bun run --filter arcnem-vision-docs build
@@ -41,6 +76,18 @@ jobs:
   go-tests:
     name: Go Tests (${{ matrix.module }})
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     strategy:
       fail-fast: false
       matrix:
@@ -63,6 +110,50 @@ jobs:
             models/mcp/go.sum
             models/shared/go.sum
 
+      - name: Check formatting
+        working-directory: ${{ matrix.module }}
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+
+      - name: Vet
+        working-directory: ${{ matrix.module }}
+        run: go vet ./...
+
       - name: Run Go tests
         working-directory: ${{ matrix.module }}
         run: go test ./...
+
+  images:
+    name: Image (${{ matrix.image.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: api
+            dockerfile: server/packages/api/Dockerfile
+            context: server
+          - name: dashboard
+            dockerfile: server/packages/dashboard/Dockerfile
+            context: server
+            build-args: API_URL=http://localhost:3000
+          - name: db
+            dockerfile: server/packages/db/Dockerfile
+            context: server
+          - name: agents
+            dockerfile: models/agents/Dockerfile
+            context: models
+          - name: mcp
+            dockerfile: models/mcp/Dockerfile
+            context: models
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Build image
+        env:
+          BUILD_ARGS: ${{ matrix.image.build-args }}
+        run: >-
+          docker build
+          ${BUILD_ARGS:+--build-arg "$BUILD_ARGS"}
+          -f ${{ matrix.image.dockerfile }}
+          ${{ matrix.image.context }}

@@ -13,7 +13,7 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/db/package.json ./packages/db/
 COPY packages/dashboard/package.json ./packages/dashboard/
 
-RUN bun install
+RUN bun install --frozen-lockfile
 
 FROM base AS builder
 

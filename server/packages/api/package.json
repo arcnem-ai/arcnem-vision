@@ -2,7 +2,8 @@
 	"name": "@arcnem-vision/server",
 	"type": "module",
 	"scripts": {
-		"dev": "bun run --hot src/index.ts"
+		"dev": "bun run --hot src/index.ts",
+		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
 		"@arcnem-vision/db": "workspace:*",

@@ -12,12 +12,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// FINALIZE_RUN_DATABASE_URL enables the real PostgreSQL check. Temporary tables
+// TEST_DATABASE_URL enables the real PostgreSQL check. Temporary tables
 // shadow the application tables only in this rollback transaction.
 func TestFinalizeRunQueuesWebhookDeliveriesPostgres(t *testing.T) {
-	dsn := os.Getenv("FINALIZE_RUN_DATABASE_URL")
+	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
-		t.Skip("set FINALIZE_RUN_DATABASE_URL to run the PostgreSQL finalization check")
+		t.Skip("set TEST_DATABASE_URL to run the PostgreSQL finalization check")
 	}
 	previousPublisher := publishDashboardEvent
 	publishDashboardEvent = func(context.Context, realtime.DashboardEvent) error { return nil }

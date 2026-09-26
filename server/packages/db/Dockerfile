@@ -12,7 +12,7 @@ COPY package.json bun.lock ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/db/package.json ./packages/db/
 
-RUN bun install
+RUN bun install --frozen-lockfile
 
 FROM base AS runner
 
