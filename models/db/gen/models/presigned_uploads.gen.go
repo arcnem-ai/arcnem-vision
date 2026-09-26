@@ -12,17 +12,18 @@ const TableNamePresignedUpload = "presigned_uploads"
 
 // PresignedUpload mapped from table <presigned_uploads>
 type PresignedUpload struct {
-	ID             string    `gorm:"column:id;type:uuid;primaryKey;default:uuidv7()" json:"id"`
-	Bucket         string    `gorm:"column:bucket;type:text;not null" json:"bucket"`
-	ObjectKey      string    `gorm:"column:object_key;type:text;not null" json:"object_key"`
-	Status         string    `gorm:"column:status;type:text;not null;default:issued" json:"status"`
-	CreatedAt      time.Time `gorm:"column:created_at;type:timestamp without time zone;not null;default:now()" json:"created_at"`
-	UpdatedAt      time.Time `gorm:"column:updated_at;type:timestamp without time zone;not null;default:now()" json:"updated_at"`
-	OrganizationID string    `gorm:"column:organization_id;type:uuid;not null" json:"organization_id"`
-	ProjectID      string    `gorm:"column:project_id;type:uuid;not null" json:"project_id"`
-	Visibility     string    `gorm:"column:visibility;type:text;not null;default:org" json:"visibility"`
-	APIKeyID       *string   `gorm:"column:api_key_id;type:uuid" json:"api_key_id"`
-	IdempotencyKey *string   `gorm:"column:idempotency_key;type:text" json:"idempotency_key"`
+	ID                 string     `gorm:"column:id;type:uuid;primaryKey;default:uuidv7()" json:"id"`
+	Bucket             string     `gorm:"column:bucket;type:text;not null" json:"bucket"`
+	ObjectKey          string     `gorm:"column:object_key;type:text;not null" json:"object_key"`
+	Status             string     `gorm:"column:status;type:text;not null;default:issued" json:"status"`
+	CreatedAt          time.Time  `gorm:"column:created_at;type:timestamp without time zone;not null;default:now()" json:"created_at"`
+	UpdatedAt          time.Time  `gorm:"column:updated_at;type:timestamp without time zone;not null;default:now()" json:"updated_at"`
+	OrganizationID     string     `gorm:"column:organization_id;type:uuid;not null" json:"organization_id"`
+	ProjectID          string     `gorm:"column:project_id;type:uuid;not null" json:"project_id"`
+	Visibility         string     `gorm:"column:visibility;type:text;not null;default:org" json:"visibility"`
+	APIKeyID           *string    `gorm:"column:api_key_id;type:uuid" json:"api_key_id"`
+	IdempotencyKey     *string    `gorm:"column:idempotency_key;type:text" json:"idempotency_key"`
+	ProcessingQueuedAt *time.Time `gorm:"column:processing_queued_at;type:timestamp without time zone" json:"processing_queued_at"`
 }
 
 // TableName PresignedUpload's table name

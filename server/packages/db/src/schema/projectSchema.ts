@@ -90,6 +90,9 @@ export const presignedUploads = pgTable(
 		idempotencyKey: text("idempotency_key"),
 		visibility: text("visibility").notNull().default("org"),
 		status: text().notNull().default("issued"),
+		// Set once acknowledgement has queued the upload's processing, so a
+		// repeated acknowledgement retries only a failed enqueue.
+		processingQueuedAt: timestamp("processing_queued_at"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at")
 			.defaultNow()
