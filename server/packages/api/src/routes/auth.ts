@@ -2,7 +2,7 @@ import { and, eq, gt } from "drizzle-orm";
 import { Hono } from "hono";
 import { setSignedCookie } from "hono/cookie";
 import { getAPIEnvVar } from "@/env/getAPIEnvVar";
-import { isAPIDebugModeEnabled } from "@/env/isAPIDebugModeEnabled";
+import { isAPIDebugModeEnabled } from "@/env/localOnlySettings";
 import {
 	verifyAndConsumeAPIKey,
 	verifyAndConsumeAPIKeyForDebugMode,

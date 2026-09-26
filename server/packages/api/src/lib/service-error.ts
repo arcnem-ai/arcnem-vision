@@ -1,6 +1,6 @@
 export class ServiceError extends Error {
 	constructor(
-		public readonly status: 400 | 403 | 404 | 409 | 502,
+		public readonly status: 400 | 403 | 404 | 409 | 413 | 502,
 		message: string,
 		public readonly details?: {
 			missingDocumentIds?: string[];

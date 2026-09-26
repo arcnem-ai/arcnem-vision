@@ -1,8 +1,9 @@
 import type { DashboardData } from "@arcnem-vision/shared";
 import { getAuthFeatureFlags } from "@arcnem-vision/shared";
+import { isAPIDebugModeEnabled } from "@/env/localOnlySettings";
 import type { DashboardSessionContext } from "../dashboard-auth";
 
-const debugSessionBootstrapEnabled = process.env.API_DEBUG === "true";
+const debugSessionBootstrapEnabled = isAPIDebugModeEnabled();
 
 type DashboardAuthPayload = DashboardData["auth"];
 

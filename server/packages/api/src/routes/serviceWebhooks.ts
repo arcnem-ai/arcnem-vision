@@ -10,7 +10,7 @@ import {
 } from "@arcnem-vision/shared";
 import { type Context, Hono } from "hono";
 import { describeRoute, resolver, validator } from "hono-openapi";
-import { isAPIDebugModeEnabled } from "@/env/isAPIDebugModeEnabled";
+import { allowsPrivateWebhookDestinations } from "@/env/localOnlySettings";
 import { ServiceError } from "@/lib/service-error";
 import {
 	createWebhookEndpoint,
@@ -37,7 +37,9 @@ const authErrors = {
 	401: errorResponse("Unauthorized"),
 	403: errorResponse("Forbidden"),
 };
-const destinationPolicy = { allowPrivateHttp: isAPIDebugModeEnabled() };
+const destinationPolicy = {
+	allowPrivateHttp: allowsPrivateWebhookDestinations(),
+};
 
 export const serviceWebhooksRouter = new Hono<HonoServerContext>({
 	strict: false,

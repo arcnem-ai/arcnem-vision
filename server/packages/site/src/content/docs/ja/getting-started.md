@@ -61,7 +61,7 @@ Tilt UI で **seed-database** を実行します。
 - OCR結果、説明文、埋め込み、セグメンテーション、実行履歴のサンプル
 - ローカル開発用のダッシュボードセッション
 
-`server/packages/api/.env.example` では `API_DEBUG=true` が有効になっているので、シード後はダッシュボードがローカル用セッションに入れる状態になります。
+`server/packages/api/.env.example` では `API_DEBUG=true` が有効になっているので、シード後はダッシュボードがローカル用セッションに入れる状態になります。デバッグモードはローカル専用で、`BETTER_AUTH_BASE_URL` がローカルの `http://` URLでない場合、有効にしたままではAPIが起動しません。
 
 
 ## 4. まず見るべきコア体験

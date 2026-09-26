@@ -6,7 +6,7 @@ import {
 	dashboardWebhookKeyInputSchema,
 } from "@arcnem-vision/shared";
 import { type Context, Hono } from "hono";
-import { isAPIDebugModeEnabled } from "@/env/isAPIDebugModeEnabled";
+import { allowsPrivateWebhookDestinations } from "@/env/localOnlySettings";
 import { requireDashboardOrganizationContext } from "@/lib/dashboard-auth";
 import { readValidatedBody } from "@/lib/request-validation";
 import { ServiceError } from "@/lib/service-error";
@@ -21,7 +21,9 @@ import {
 } from "@/lib/webhooks/operations";
 import type { HonoServerContext } from "@/types/serverContext";
 
-const destinationPolicy = { allowPrivateHttp: isAPIDebugModeEnabled() };
+const destinationPolicy = {
+	allowPrivateHttp: allowsPrivateWebhookDestinations(),
+};
 
 export const dashboardWebhooksRouter = new Hono<HonoServerContext>({
 	strict: false,
