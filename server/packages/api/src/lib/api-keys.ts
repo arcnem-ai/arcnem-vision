@@ -187,35 +187,6 @@ export function evaluateAPIKeyRateLimit(
 	};
 }
 
-export async function verifyAPIKey(
-	dbClient: PGDB,
-	rawKey: string,
-): Promise<VerifiedAPIKey | null> {
-	const hashedKey = await hashAPIKey(rawKey);
-	const [apiKey] = await dbClient
-		.select({
-			id: apikeys.id,
-			userId: apikeys.userId,
-			organizationId: apikeys.organizationId,
-			projectId: apikeys.projectId,
-			agentGraphId: apikeys.agentGraphId,
-			kind: apikeys.kind,
-			permissions: apikeys.permissions,
-			metadata: apikeys.metadata,
-		})
-		.from(apikeys)
-		.where(
-			and(
-				eq(apikeys.key, hashedKey),
-				eq(apikeys.enabled, true),
-				or(isNull(apikeys.expiresAt), gt(apikeys.expiresAt, new Date())),
-			),
-		)
-		.limit(1);
-
-	return apiKey ? toVerifiedAPIKey(apiKey) : null;
-}
-
 export async function verifyAndConsumeAPIKey(
 	dbClient: PGDB,
 	rawKey: string,
@@ -341,29 +312,6 @@ export async function verifyAndConsumeAPIKeyForDebugMode(
 
 		return toVerifiedAPIKey(row);
 	});
-}
-
-export async function findAPIKeyForDebugMode(
-	dbClient: PGDB,
-	rawKey: string,
-): Promise<VerifiedAPIKey | null> {
-	const hashedKey = await hashAPIKey(rawKey);
-	const [apiKey] = await dbClient
-		.select({
-			id: apikeys.id,
-			userId: apikeys.userId,
-			organizationId: apikeys.organizationId,
-			projectId: apikeys.projectId,
-			agentGraphId: apikeys.agentGraphId,
-			kind: apikeys.kind,
-			permissions: apikeys.permissions,
-			metadata: apikeys.metadata,
-		})
-		.from(apikeys)
-		.where(eq(apikeys.key, hashedKey))
-		.limit(1);
-
-	return apiKey ? toVerifiedAPIKey(apiKey) : null;
 }
 
 export function apiKeyHasPermission(

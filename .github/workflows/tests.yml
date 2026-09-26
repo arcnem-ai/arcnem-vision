@@ -124,6 +124,10 @@ jobs:
         working-directory: ${{ matrix.module }}
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
 
+      - name: Check go.mod is tidy
+        working-directory: ${{ matrix.module }}
+        run: go mod tidy -diff
+
       - name: Vet
         working-directory: ${{ matrix.module }}
         run: go vet ./...

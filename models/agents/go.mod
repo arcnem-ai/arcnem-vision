@@ -13,6 +13,7 @@ require (
 	github.com/sashabaranov/go-openai v1.42.0
 	github.com/smallnest/langgraphgo v0.8.5
 	github.com/tmc/langchaingo v0.1.14
+	gorm.io/driver/postgres v1.6.2
 	gorm.io/gorm v1.31.2
 )
 
@@ -104,5 +105,4 @@ require (
 	google.golang.org/grpc v1.82.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gorm.io/driver/postgres v1.6.2 // indirect
 )

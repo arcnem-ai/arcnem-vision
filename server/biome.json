@@ -38,7 +38,7 @@
 	},
 	"overrides": [
 		{
-			"includes": ["packages/dashboard/src/routeTree.gen.ts"],
+			"includes": ["packages/**/src/routeTree.gen.ts"],
 			"formatter": {
 				"enabled": false
 			},

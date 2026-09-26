@@ -7,12 +7,12 @@ import (
 )
 
 func RegisterJobs(inngestClient inngestgo.Client, dbClient *gorm.DB, s3Client *clients.S3Client, mcpClient *clients.MCPClient) {
-	seedInitialWithContext := WithJobContext(dbClient, s3Client, mcpClient, ProcessDocumentUpload)
+	processDocumentUploadWithContext := WithJobContext(dbClient, s3Client, mcpClient, ProcessDocumentUpload)
 	inngestgo.CreateFunction(inngestClient, inngestgo.FunctionOpts{
 		ID: "process-document-upload",
 	},
 		inngestgo.EventTrigger("document/process.upload", nil),
-		seedInitialWithContext,
+		processDocumentUploadWithContext,
 	)
 
 	executeWorkflowWithContext := WithJobContext(dbClient, s3Client, mcpClient, ExecuteWorkflow)
