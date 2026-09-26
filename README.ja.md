@@ -205,7 +205,7 @@ curl -X POST http://localhost:3000/api/uploads/ack \
 
 - Docker + Docker Compose
 - Bun
-- Go 1.25+
+- Go 1.27+
 - CompileDaemon（`go install github.com/githubnemo/CompileDaemon@latest`）
 - Tilt
 
