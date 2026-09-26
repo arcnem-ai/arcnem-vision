@@ -17,6 +17,7 @@ import { authRouter } from "@/routes/auth";
 import { getInngestClient } from "./clients/inngest";
 import { getS3Client } from "./clients/s3";
 import { MAX_API_BODY_BYTES } from "./constants/requests";
+import { getAPIEnvVar } from "./env/getAPIEnvVar";
 import {
 	allowsPrivateWebhookDestinations,
 	assertLocalOnlySettings,
@@ -141,17 +142,14 @@ const inngestFunctions = [
 	}),
 ];
 
-app.on(["GET", "PUT", "POST"], "/api/inngest", (c) => {
-	const inngestClient = c.get("inngestClient");
-
-	const handler = serve({
-		client: inngestClient,
-		functions: inngestFunctions,
-		serveOrigin: process.env.JOB_SERVER_URL,
-	});
-
-	return handler(c);
+// INNGEST_SERVE_ORIGIN is this API's own origin, where Inngest calls back.
+const inngestHandler = serve({
+	client: getInngestClient(),
+	functions: inngestFunctions,
+	serveOrigin: getAPIEnvVar("INNGEST_SERVE_ORIGIN"),
 });
+
+app.on(["GET", "PUT", "POST"], "/api/inngest", inngestHandler);
 
 const routes = [
 	authRouter,

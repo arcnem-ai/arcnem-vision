@@ -3,9 +3,9 @@ import {
 	hostHeaderValidationResponse,
 } from "@modelcontextprotocol/server";
 import { Hono } from "hono";
-import { getAPIEnvVar } from "@/env/getAPIEnvVar";
 import { allowsPrivateWebhookDestinations } from "@/env/localOnlySettings";
 import { mcpResourceUrl } from "@/lib/auth";
+import { isTrustedOrigin } from "@/lib/auth-origins";
 import { protectMcpRequest } from "@/lib/mcp-auth";
 import { createVisionMcpServer } from "@/lib/mcp-server";
 import type { HonoServerContext } from "@/types/serverContext";
@@ -20,15 +20,7 @@ mcpRouter.all("/mcp", async (c) => {
 	]);
 	if (rejectedHost) return rejectedHost;
 	const origin = request.headers.get("origin");
-	const allowedOrigins = [
-		resource.origin,
-		getAPIEnvVar("CLIENT_ORIGIN"),
-		getAPIEnvVar("DASHBOARD_ORIGIN"),
-		...(process.env.TRUSTED_ORIGINS ?? "")
-			.split(",")
-			.map((value) => value.trim()),
-	];
-	if (origin && !allowedOrigins.includes(origin))
+	if (origin && origin !== resource.origin && !isTrustedOrigin(origin))
 		return c.json({ message: "Origin not allowed" }, 403);
 	return protectMcpRequest(request, (principal) =>
 		createMcpHandler(

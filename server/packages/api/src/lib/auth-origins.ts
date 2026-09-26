@@ -14,7 +14,6 @@ export function getTrustedOrigins() {
 	}
 
 	const origins = new Set<string>();
-	origins.add(getAPIEnvVar("CLIENT_ORIGIN"));
 	origins.add(getAPIEnvVar("DASHBOARD_ORIGIN"));
 
 	for (const origin of readOptionalOrigins(process.env.TRUSTED_ORIGINS)) {
