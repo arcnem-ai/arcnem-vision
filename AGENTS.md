@@ -53,10 +53,10 @@ Each API, dashboard, database, agents, MCP, and introspection service reads its 
 
 ## Style and verification
 
-- TypeScript uses `server/biome.json`: tabs, double quotes, and organized imports. Run `cd server && bunx biome check packages`.
+- TypeScript uses `server/biome.json`: tabs, double quotes, and organized imports. Run `cd server && bun run lint` and `bun run typecheck`.
 - Prefer canonical Tailwind utilities, including v4 variable syntax such as `text-(--ink)`.
 - Go uses `gofmt`, lowercase package names, and feature-oriented packages.
-- Run `cd server && bun test` for deterministic TypeScript tests, including service contracts, authorization, and OpenAPI generation. Run `go test ./...` in each affected Go module; CI covers agents, db, MCP, and shared.
+- Run `cd server && bun test` for deterministic TypeScript tests, including service contracts, authorization, and OpenAPI generation. Run `go test ./...` in each affected Go module; CI covers agents, db, MCP, and shared. Database-backed tests run when `TEST_DATABASE_URL` points at a disposable, migrated pgvector database; never point it at shared data.
 - For dashboard changes, also build the dashboard.
 - Add focused colocated tests (`*.test.ts`, `*_test.go`) for changed behavior. Keep external providers and live infrastructure out of the default suite.
 - `make live-service-test` runs the fuller upload/acknowledge/execute/publish probe. It uses the existing `.env.docker` files but starts isolated Postgres/Redis/MinIO and dedicated service containers. Use it when changing that lifecycle; `make live-service-stack-down` removes only that isolated stack and its volumes.

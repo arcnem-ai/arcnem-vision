@@ -5,7 +5,8 @@
 		"db:migrate": "drizzle-kit migrate",
 		"db:generate": "drizzle-kit generate",
 		"db:studio": "drizzle-kit studio",
-		"db:seed": "bun ./seed.ts"
+		"db:seed": "bun ./seed.ts",
+		"typecheck": "tsc --noEmit"
 	},
 	"exports": {
 		".": {

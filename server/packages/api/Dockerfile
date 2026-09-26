@@ -11,7 +11,7 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/db/package.json ./packages/db/
 COPY packages/api/package.json ./packages/api/
 
-RUN bun install
+RUN bun install --frozen-lockfile
 
 FROM oven/bun:1.4.0-alpine AS runner
 
