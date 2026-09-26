@@ -38,6 +38,7 @@ func newPresignedUpload(db *gorm.DB, opts ...gen.DOOption) presignedUpload {
 	_presignedUpload.Visibility = field.NewString(tableName, "visibility")
 	_presignedUpload.APIKeyID = field.NewString(tableName, "api_key_id")
 	_presignedUpload.IdempotencyKey = field.NewString(tableName, "idempotency_key")
+	_presignedUpload.ProcessingQueuedAt = field.NewTime(tableName, "processing_queued_at")
 
 	_presignedUpload.fillFieldMap()
 
@@ -47,18 +48,19 @@ func newPresignedUpload(db *gorm.DB, opts ...gen.DOOption) presignedUpload {
 type presignedUpload struct {
 	presignedUploadDo presignedUploadDo
 
-	ALL            field.Asterisk
-	ID             field.String
-	Bucket         field.String
-	ObjectKey      field.String
-	Status         field.String
-	CreatedAt      field.Time
-	UpdatedAt      field.Time
-	OrganizationID field.String
-	ProjectID      field.String
-	Visibility     field.String
-	APIKeyID       field.String
-	IdempotencyKey field.String
+	ALL                field.Asterisk
+	ID                 field.String
+	Bucket             field.String
+	ObjectKey          field.String
+	Status             field.String
+	CreatedAt          field.Time
+	UpdatedAt          field.Time
+	OrganizationID     field.String
+	ProjectID          field.String
+	Visibility         field.String
+	APIKeyID           field.String
+	IdempotencyKey     field.String
+	ProcessingQueuedAt field.Time
 
 	fieldMap map[string]field.Expr
 }
@@ -86,6 +88,7 @@ func (p *presignedUpload) updateTableName(table string) *presignedUpload {
 	p.Visibility = field.NewString(table, "visibility")
 	p.APIKeyID = field.NewString(table, "api_key_id")
 	p.IdempotencyKey = field.NewString(table, "idempotency_key")
+	p.ProcessingQueuedAt = field.NewTime(table, "processing_queued_at")
 
 	p.fillFieldMap()
 
@@ -114,7 +117,7 @@ func (p *presignedUpload) GetFieldByName(fieldName string) (field.OrderExpr, boo
 }
 
 func (p *presignedUpload) fillFieldMap() {
-	p.fieldMap = make(map[string]field.Expr, 11)
+	p.fieldMap = make(map[string]field.Expr, 12)
 	p.fieldMap["id"] = p.ID
 	p.fieldMap["bucket"] = p.Bucket
 	p.fieldMap["object_key"] = p.ObjectKey
@@ -126,6 +129,7 @@ func (p *presignedUpload) fillFieldMap() {
 	p.fieldMap["visibility"] = p.Visibility
 	p.fieldMap["api_key_id"] = p.APIKeyID
 	p.fieldMap["idempotency_key"] = p.IdempotencyKey
+	p.fieldMap["processing_queued_at"] = p.ProcessingQueuedAt
 }
 
 func (p presignedUpload) clone(db *gorm.DB) presignedUpload {

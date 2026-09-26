@@ -1,5 +1,5 @@
 import { schema } from "@arcnem-vision/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import type { QueueProcessingWithResult } from "@/lib/document-uploads";
 import {
@@ -7,6 +7,7 @@ import {
 	isDocumentVisibility,
 	parseAckRequestBody,
 	readJSONBody,
+	replayAcknowledgedUpload,
 	toDocumentUploadErrorResponse,
 } from "@/lib/document-uploads";
 import { findActiveWorkflowById } from "@/lib/workflow-run-availability";
@@ -51,6 +52,8 @@ ackUploadRouter.post(
 					projectId: presignedUploads.projectId,
 					apiKeyId: presignedUploads.apiKeyId,
 					visibility: presignedUploads.visibility,
+					status: presignedUploads.status,
+					processingQueuedAt: presignedUploads.processingQueuedAt,
 				})
 				.from(presignedUploads)
 				.innerJoin(
@@ -65,7 +68,7 @@ ackUploadRouter.post(
 					and(
 						eq(apikeys.id, verifiedKey.id),
 						eq(presignedUploads.objectKey, objectKey),
-						eq(presignedUploads.status, "issued"),
+						inArray(presignedUploads.status, ["issued", "verified"]),
 					),
 				)
 				.limit(1);
@@ -108,17 +111,44 @@ ackUploadRouter.post(
 						code: "workflow_unavailable",
 					};
 
-			return c.json(
-				await acknowledgePresignedUpload({
+			const upload = {
+				...uploadForKey,
+				visibility: uploadForKey.visibility,
+			};
+			// A verified upload is acknowledged again to retry its processing, for
+			// example after the first acknowledgement reported
+			// processing_enqueue_failed. The event ID is stable per document.
+			if (uploadForKey.status === "verified") {
+				const replayed = await replayAcknowledgedUpload({
 					dbClient,
-					s3Client,
-					upload: {
-						...uploadForKey,
-						visibility: uploadForKey.visibility,
-					},
+					upload,
 					queueProcessing,
-				}),
-			);
+				});
+				if (!replayed) {
+					throw new Error("Verified upload is missing its document");
+				}
+				return c.json(replayed);
+			}
+
+			try {
+				return c.json(
+					await acknowledgePresignedUpload({
+						dbClient,
+						s3Client,
+						upload,
+						queueProcessing,
+					}),
+				);
+			} catch (error) {
+				// A concurrent acknowledgement may have verified the upload first.
+				const replayed = await replayAcknowledgedUpload({
+					dbClient,
+					upload,
+					queueProcessing,
+				});
+				if (!replayed) throw error;
+				return c.json(replayed);
+			}
 		} catch (error) {
 			return toDocumentUploadErrorResponse(
 				c,

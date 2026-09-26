@@ -1,4 +1,8 @@
-export { acknowledgePresignedUpload } from "./acknowledge";
+export {
+	acknowledgePresignedUpload,
+	findAcknowledgedUpload,
+	replayAcknowledgedUpload,
+} from "./acknowledge";
 export type {
 	AcknowledgedUpload,
 	AcknowledgedUploadWithProcessing,

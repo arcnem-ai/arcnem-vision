@@ -169,11 +169,15 @@ const publishDocumentCreated = async ({
 };
 
 const enqueueDocumentProcessing = async ({
+	dbClient,
 	options,
+	uploadId,
 	documentId,
 	objectKey,
 }: {
+	dbClient: PGDB;
 	options: QueueProcessingOptions;
+	uploadId: string;
 	documentId: string;
 	objectKey: string;
 }): Promise<WorkflowUploadProcessing | null> => {
@@ -188,6 +192,9 @@ const enqueueDocumentProcessing = async ({
 
 	try {
 		await options.inngestClient.send({
+			// One stable ID per document, so a repeated acknowledgement can retry a
+			// failed enqueue without queueing the upload twice.
+			id: `document-process-upload-${documentId}`,
 			name: "document/process.upload",
 			data: {
 				document_id: documentId,
@@ -196,10 +203,6 @@ const enqueueDocumentProcessing = async ({
 					: {}),
 			},
 		});
-
-		return {
-			status: "queued" as const,
-		};
 	} catch (error) {
 		console.error("Failed to enqueue document processing", {
 			documentId,
@@ -212,7 +215,86 @@ const enqueueDocumentProcessing = async ({
 			code: "processing_enqueue_failed" as const,
 		};
 	}
+
+	// If this write fails the acknowledgement fails too, so the client retries
+	// while Inngest's deduplication of the stable event ID still applies.
+	await dbClient
+		.update(presignedUploads)
+		.set({ processingQueuedAt: new Date() })
+		.where(eq(presignedUploads.id, uploadId));
+
+	return {
+		status: "queued" as const,
+	};
 };
+
+// The document created by an earlier acknowledgement of this upload.
+export async function findAcknowledgedUpload(
+	dbClient: PGDB,
+	upload: Omit<PendingUpload, "visibility">,
+): Promise<AcknowledgedUpload | undefined> {
+	if (!upload.apiKeyId) {
+		return undefined;
+	}
+
+	const [document] = await dbClient
+		.select({ id: documents.id })
+		.from(documents)
+		.where(
+			and(
+				eq(documents.bucket, upload.bucket),
+				eq(documents.objectKey, upload.objectKey),
+				eq(documents.organizationId, upload.organizationId),
+				eq(documents.projectId, upload.projectId),
+				eq(documents.apiKeyId, upload.apiKeyId),
+			),
+		)
+		.limit(1);
+
+	return document
+		? {
+				status: "verified",
+				documentId: document.id,
+				presignedUploadId: upload.id,
+			}
+		: undefined;
+}
+
+// Repeats the processing step for an upload that was already acknowledged,
+// such as after the first acknowledgement failed to enqueue it.
+export async function replayAcknowledgedUpload({
+	dbClient,
+	upload,
+	queueProcessing,
+}: {
+	dbClient: PGDB;
+	upload: PendingUpload & { processingQueuedAt: Date | null };
+	queueProcessing: QueueProcessingWithResult;
+}): Promise<AcknowledgedUploadWithProcessing | undefined> {
+	const acknowledged = await findAcknowledgedUpload(dbClient, upload);
+	if (!acknowledged) {
+		return undefined;
+	}
+
+	// Inngest only deduplicates event IDs for 24 hours, so an upload whose
+	// processing was queued is never sent again.
+	if (upload.processingQueuedAt) {
+		return { ...acknowledged, processing: { status: "queued" } };
+	}
+
+	const processing = await enqueueDocumentProcessing({
+		dbClient,
+		options: queueProcessing,
+		uploadId: upload.id,
+		documentId: acknowledged.documentId,
+		objectKey: upload.objectKey,
+	});
+	if (!processing) {
+		throw new Error("Expected an upload processing result");
+	}
+
+	return { ...acknowledged, processing };
+}
 
 export function acknowledgePresignedUpload(args: {
 	dbClient: PGDB;
@@ -253,7 +335,9 @@ export async function acknowledgePresignedUpload({
 	});
 
 	const processing = await enqueueDocumentProcessing({
+		dbClient,
 		options: queueProcessing,
+		uploadId: upload.id,
 		documentId: acknowledgedUpload.documentId,
 		objectKey: upload.objectKey,
 	});

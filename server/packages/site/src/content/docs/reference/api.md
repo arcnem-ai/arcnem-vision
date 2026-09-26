@@ -41,6 +41,8 @@ curl -X POST http://localhost:3000/api/uploads/ack \
 
 After step 3, the API verifies the object, creates the document, and emits `document/process.upload`. The agents service loads the workflow key's bound workflow and executes it.
 
+The response includes `processing.status`: `queued`, `skipped` (`workflow_unavailable`) or `failed` (`processing_enqueue_failed`). Acknowledgement is safe to repeat. Sending the same `objectKey` again returns the same document and retries the enqueue. Once processing has been queued, a repeated acknowledgement doesn't send the event again, and the event ID is stable per document. A retry never queues the upload twice.
+
 ## Service API
 
 The service API is the face-neutral orchestration surface for server-side clients.

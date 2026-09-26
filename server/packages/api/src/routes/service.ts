@@ -1,7 +1,6 @@
 import { schema } from "@arcnem-vision/db";
 import type { PGDB } from "@arcnem-vision/db/server";
 import {
-	type ServiceUploadAcknowledgeResponse,
 	serviceDocumentItemSchema,
 	serviceDocumentSearchRequestSchema,
 	serviceDocumentSearchResponseSchema,
@@ -23,6 +22,7 @@ import { Hono, type Context as HonoContext } from "hono";
 import { describeRoute, resolver, validator } from "hono-openapi";
 import {
 	acknowledgePresignedUpload,
+	findAcknowledgedUpload,
 	isDocumentVisibility,
 	issuePresignedUpload,
 	parseAckRequestBody,
@@ -91,44 +91,6 @@ async function findServiceUpload(
 		.limit(1);
 
 	return upload;
-}
-
-async function findAcknowledgedServiceUpload(
-	dbClient: PGDB,
-	upload: {
-		id: string;
-		bucket: string;
-		objectKey: string;
-		organizationId: string;
-		projectId: string;
-		apiKeyId: string | null;
-	},
-): Promise<ServiceUploadAcknowledgeResponse | undefined> {
-	if (!upload.apiKeyId) {
-		return undefined;
-	}
-
-	const [document] = await dbClient
-		.select({ id: documents.id })
-		.from(documents)
-		.where(
-			and(
-				eq(documents.bucket, upload.bucket),
-				eq(documents.objectKey, upload.objectKey),
-				eq(documents.organizationId, upload.organizationId),
-				eq(documents.projectId, upload.projectId),
-				eq(documents.apiKeyId, upload.apiKeyId),
-			),
-		)
-		.limit(1);
-
-	return document
-		? {
-				status: "verified",
-				documentId: document.id,
-				presignedUploadId: upload.id,
-			}
-		: undefined;
 }
 
 async function getServiceUploadTarget(c: HonoContext<HonoServerContext>) {
@@ -364,7 +326,7 @@ serviceRouter.post(
 				return c.json({ message: "Upload has invalid visibility" }, 500);
 			}
 
-			let acknowledgedUpload = await findAcknowledgedServiceUpload(
+			let acknowledgedUpload = await findAcknowledgedUpload(
 				dbClient,
 				uploadForKey,
 			);
@@ -382,7 +344,7 @@ serviceRouter.post(
 						},
 					});
 				} catch (error) {
-					acknowledgedUpload = await findAcknowledgedServiceUpload(
+					acknowledgedUpload = await findAcknowledgedUpload(
 						dbClient,
 						uploadForKey,
 					);
