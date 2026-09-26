@@ -71,10 +71,6 @@ export const documents = pgTable(
 			table.createdAt,
 		),
 		check("documents_size_bytes_positive", sql`${table.sizeBytes} > 0`),
-		check(
-			"documents_visibility_known",
-			sql`${table.visibility} in ('org', 'private', 'public')`,
-		),
 	],
 );
 
@@ -118,10 +114,6 @@ export const presignedUploads = pgTable(
 		check(
 			"presigned_uploads_idempotency_key_scoped",
 			sql`${table.idempotencyKey} is null or ${table.apiKeyId} is not null`,
-		),
-		check(
-			"presigned_uploads_status_known",
-			sql`${table.status} in ('issued', 'verified')`,
 		),
 	],
 );
