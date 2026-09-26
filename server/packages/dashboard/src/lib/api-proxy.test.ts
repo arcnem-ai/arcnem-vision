@@ -62,15 +62,26 @@ describe("sanitizeProxyResponseHeaders", () => {
 	});
 });
 
+async function waitFor(condition: () => boolean, timeoutMs = 2000) {
+	const deadline = Date.now() + timeoutMs;
+	while (!condition()) {
+		if (Date.now() > deadline) throw new Error("Timed out waiting");
+		await Bun.sleep(10);
+	}
+}
+
 describe("createProxyResponse", () => {
-	test("relays streamed response chunks without forwarding hop-by-hop headers", async () => {
+	test("relays chunks as they arrive without forwarding hop-by-hop headers", async () => {
 		const encoder = new TextEncoder();
+		let sendSecondChunk: (() => void) | undefined;
 		const upstream = new Response(
 			new ReadableStream<Uint8Array>({
 				start(controller) {
 					controller.enqueue(encoder.encode("chunk-1"));
-					controller.enqueue(encoder.encode("chunk-2"));
-					controller.close();
+					sendSecondChunk = () => {
+						controller.enqueue(encoder.encode("chunk-2"));
+						controller.close();
+					};
 				},
 			}),
 			{
@@ -92,7 +103,85 @@ describe("createProxyResponse", () => {
 		expect(response.headers.get("content-type")).toBe("text/event-stream");
 		expect(response.headers.has("connection")).toBe(false);
 		expect(response.headers.has("transfer-encoding")).toBe(false);
-		expect(await response.text()).toBe("chunk-1chunk-2");
+
+		const reader = (response.body as ReadableStream<Uint8Array>).getReader();
+		const decoder = new TextDecoder();
+		const first = await reader.read();
+		expect(decoder.decode(first.value)).toBe("chunk-1");
+		sendSecondChunk?.();
+		const second = await reader.read();
+		expect(decoder.decode(second.value)).toBe("chunk-2");
+		expect((await reader.read()).done).toBe(true);
+	});
+
+	test("cancelling the proxied body cancels the upstream body", async () => {
+		let cancelReason: unknown;
+		const upstream = new Response(
+			new ReadableStream<Uint8Array>({
+				start(controller) {
+					controller.enqueue(new TextEncoder().encode("event: ready\n\n"));
+				},
+				cancel(reason) {
+					cancelReason = reason;
+				},
+			}),
+			{ headers: { "content-type": "text/event-stream" } },
+		);
+
+		const response = createProxyResponse(upstream);
+		const reader = (response.body as ReadableStream<Uint8Array>).getReader();
+		await reader.read();
+		await reader.cancel("client closed");
+
+		expect(cancelReason).toBe("client closed");
+	});
+
+	test("a client disconnect closes the upstream stream over HTTP", async () => {
+		let upstreamCancelled = false;
+		let interval: ReturnType<typeof setInterval> | undefined;
+		const upstream = Bun.serve({
+			port: 0,
+			fetch() {
+				const encoder = new TextEncoder();
+				return new Response(
+					new ReadableStream<Uint8Array>({
+						start(controller) {
+							controller.enqueue(encoder.encode("event: ready\n\n"));
+							interval = setInterval(() => {
+								controller.enqueue(encoder.encode(": keepalive\n\n"));
+							}, 20);
+						},
+						cancel() {
+							upstreamCancelled = true;
+							clearInterval(interval);
+						},
+					}),
+					{ headers: { "content-type": "text/event-stream" } },
+				);
+			},
+		});
+		const proxy = Bun.serve({
+			port: 0,
+			// No abort signal here, so the test covers the proxied body alone.
+			async fetch() {
+				const response = await fetch(upstream.url, { decompress: false });
+				return createProxyResponse(response);
+			},
+		});
+		const client = new AbortController();
+		try {
+			const response = await fetch(proxy.url, { signal: client.signal });
+			const reader = (response.body as ReadableStream<Uint8Array>).getReader();
+			await reader.read();
+			client.abort();
+
+			await waitFor(() => upstreamCancelled);
+			expect(upstreamCancelled).toBe(true);
+		} finally {
+			clearInterval(interval);
+			proxy.stop(true);
+			upstream.stop(true);
+		}
 	});
 });
 

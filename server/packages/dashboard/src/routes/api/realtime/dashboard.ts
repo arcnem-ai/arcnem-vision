@@ -27,6 +27,7 @@ export const Route = createFileRoute("/api/realtime/dashboard")({
 						method: "GET",
 						headers,
 						decompress: false,
+						signal: request.signal,
 					},
 				);
 
