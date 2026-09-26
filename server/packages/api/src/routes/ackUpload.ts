@@ -38,6 +38,10 @@ ackUploadRouter.post(
 			const inngestClient = c.get("inngestClient");
 			const body = await readJSONBody(c.req);
 			const { objectKey } = parseAckRequestBody(body);
+			console.info("Acknowledging uploaded object", {
+				apiKeyId: verifiedKey.id,
+				objectKey,
+			});
 			const [uploadForKey] = await dbClient
 				.select({
 					id: presignedUploads.id,
@@ -67,6 +71,10 @@ ackUploadRouter.post(
 				.limit(1);
 
 			if (!uploadForKey) {
+				console.warn("Upload ack rejected unknown or stale object key", {
+					apiKeyId: verifiedKey.id,
+					objectKey,
+				});
 				return c.json(
 					{ message: "Upload objectKey is not valid for this API key" },
 					404,
@@ -74,6 +82,11 @@ ackUploadRouter.post(
 			}
 
 			if (!isDocumentVisibility(uploadForKey.visibility)) {
+				console.error("Upload ack found invalid persisted visibility", {
+					apiKeyId: verifiedKey.id,
+					objectKey,
+					visibility: uploadForKey.visibility,
+				});
 				return c.json({ message: "Upload has invalid visibility" }, 500);
 			}
 
