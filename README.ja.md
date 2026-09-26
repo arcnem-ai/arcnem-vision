@@ -245,6 +245,8 @@ arcnem-vision/
 
 [CONTRIBUTING.md](CONTRIBUTING.md) にコントリビューション手順があります。AIコーディングエージェントを使う場合は [AGENTS.md](AGENTS.md) も参照してください。
 
+リリースノートと既知の制限は [CHANGELOG.md](CHANGELOG.md)（英語）にあります。脆弱性の報告方法は [SECURITY.md](SECURITY.md)（英語）を参照してください。
+
 ---
 
 <p align="center">

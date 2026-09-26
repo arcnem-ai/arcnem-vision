@@ -291,6 +291,8 @@ See the [OAuth MCP guide](server/packages/site/src/content/docs/guides/oauth-mcp
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor workflow. If you use AI coding agents, also read [AGENTS.md](AGENTS.md).
 
+Release notes and known limitations are in [CHANGELOG.md](CHANGELOG.md). To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
 ---
 
 <p align="center">

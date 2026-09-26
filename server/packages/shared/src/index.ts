@@ -13,3 +13,4 @@ export * from "./dashboard/workflow-template-snapshot";
 export * from "./dashboard/workflow-template-utils";
 export * from "./env/createEnvVarGetter";
 export * from "./realtime/dashboard-events";
+export * from "./version";

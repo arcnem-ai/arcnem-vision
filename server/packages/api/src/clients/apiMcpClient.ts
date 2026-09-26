@@ -1,3 +1,4 @@
+import { VISION_VERSION } from "@arcnem-vision/shared";
 import {
 	Client,
 	StreamableHTTPClientTransport,
@@ -9,7 +10,7 @@ export class ApiMcpClient {
 	private readonly client = new Client(
 		{
 			name: "arcnem-vision-api",
-			version: "1.0.0",
+			version: VISION_VERSION,
 		},
 		{
 			capabilities: {},
