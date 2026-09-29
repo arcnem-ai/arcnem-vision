@@ -3,7 +3,9 @@ import type {
 	WorkflowModelOption,
 	WorkflowToolOption,
 } from "@arcnem-vision/shared";
+import { ServiceError } from "./service-error";
 import {
+	draftFromModelResponse,
 	getCompatibleWorkerModels,
 	materializeGeneratedWorkflowDraft,
 } from "./workflow-draft-generator";
@@ -693,5 +695,118 @@ describe("workflow draft generator helpers", () => {
 				executionModelCatalog: [...executionModelCatalog],
 			}),
 		).toThrow(/missing resolvable values for required inputs: text/i);
+	});
+});
+
+describe("draftFromModelResponse", () => {
+	const catalog = {
+		modelCatalog,
+		toolCatalog,
+		executionModelCatalog: [...executionModelCatalog],
+	};
+	const completed = { response_metadata: { status: "completed" } };
+	const unknownToolPlan = {
+		name: "Email Workflow",
+		description: "Try to email a summary.",
+		entryNode: "send_email",
+		nodes: [
+			{
+				nodeKey: "send_email",
+				nodeType: "tool",
+				inputKey: "",
+				outputKey: "",
+				tools: ["send_email"],
+				inputMappingEntries: [],
+				inputParamEntries: [],
+				outputMappingEntries: [],
+			},
+		],
+		edges: [{ fromNode: "send_email", toNode: "END" }],
+	};
+
+	function failure(run: () => unknown) {
+		try {
+			run();
+		} catch (error) {
+			return error;
+		}
+		throw new Error("Expected a failure");
+	}
+
+	test("reports a draft that cannot be built as a 400 with its reason", () => {
+		const error = failure(() =>
+			draftFromModelResponse(
+				{ raw: completed, parsed: unknownToolPlan },
+				catalog,
+			),
+		);
+		expect(error).toBeInstanceOf(ServiceError);
+		expect((error as ServiceError).status).toBe(400);
+		expect((error as ServiceError).message).toMatch(/unknown tool/i);
+	});
+
+	test("reports the model's impossible reason as a 400", () => {
+		const error = failure(() =>
+			draftFromModelResponse(
+				{
+					raw: completed,
+					parsed: {
+						...unknownToolPlan,
+						impossibleReason: "Email is not supported.",
+					},
+				},
+				catalog,
+			),
+		);
+		expect(error).toBeInstanceOf(ServiceError);
+		expect((error as ServiceError).status).toBe(400);
+		expect((error as ServiceError).message).toBe("Email is not supported.");
+	});
+
+	test("reports a refusal as a 400", () => {
+		const error = failure(() =>
+			draftFromModelResponse(
+				{
+					raw: {
+						response_metadata: {
+							status: "completed",
+							output: [{ content: [{ type: "refusal" }] }],
+						},
+					},
+					parsed: unknownToolPlan,
+				},
+				catalog,
+			),
+		);
+		expect(error).toBeInstanceOf(ServiceError);
+		expect((error as ServiceError).status).toBe(400);
+	});
+
+	test("leaves incomplete or malformed responses as generation failures", () => {
+		const incomplete = failure(() =>
+			draftFromModelResponse(
+				{
+					raw: { response_metadata: { status: "incomplete" } },
+					parsed: unknownToolPlan,
+				},
+				catalog,
+			),
+		);
+		const malformed = failure(() =>
+			draftFromModelResponse({ raw: completed, parsed: { nodes: 3 } }, catalog),
+		);
+		expect(incomplete).not.toBeInstanceOf(ServiceError);
+		expect(malformed).not.toBeInstanceOf(ServiceError);
+	});
+
+	test("reports a catalog without worker models as a 409", () => {
+		const error = failure(() =>
+			draftFromModelResponse(
+				{ raw: completed, parsed: unknownToolPlan },
+				{ ...catalog, modelCatalog: [] },
+			),
+		);
+		expect(error).toBeInstanceOf(ServiceError);
+		expect((error as ServiceError).status).toBe(409);
 	});
 });
