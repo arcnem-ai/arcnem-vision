@@ -28,7 +28,7 @@ Cloudflare R2の場合、エンドポイントは `https://<account-id>.r2.cloud
 
 ## テンプレートをデプロイする
 
-READMEの **Deploy on Railway** ボタンからテンプレートを開き、変数を入力します。
+[Arcnem Visionのテンプレート](https://railway.com/deploy/uNnh3M)（READMEの **Deploy on Railway** ボタンからも開けます）を開き、変数を入力します。
 
 | 変数 | サービス | 値 |
 | --- | --- | --- |

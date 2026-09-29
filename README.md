@@ -12,6 +12,9 @@
   <a href="https://deepwiki.com/arcnem-ai/arcnem-vision">
     <img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki" />
   </a>
+  <a href="https://railway.com/deploy/uNnh3M">
+    <img src="https://railway.com/button.svg" alt="Deploy on Railway" />
+  </a>
 </p>
 
 <p align="center">
@@ -202,6 +205,12 @@ curl -X POST http://localhost:3000/api/uploads/ack \
 ```
 
 For workflow-key uploads, step 3 verifies the object, creates the document, and enqueues `document/process.upload` for the key's bound workflow.
+
+## Deploy on Railway
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/uNnh3M)
+
+The Railway template runs the whole service in one project: the API, dashboard, agents and tools, Postgres with pgvector, Redis, and a self-hosted Inngest server. Bring an S3-compatible bucket, such as Cloudflare R2, and your OpenAI and Replicate keys. The first deploy creates your owner account, organization and a starter workflow. See the [Deploy on Railway guide](server/packages/site/src/content/docs/guides/deploy-railway.md) for the bucket setup and first sign-in.
 
 ## Requirements
 

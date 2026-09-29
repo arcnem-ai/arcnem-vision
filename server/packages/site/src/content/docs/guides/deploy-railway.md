@@ -30,7 +30,7 @@ With Cloudflare R2, the endpoint is `https://<account-id>.r2.cloudflarestorage.c
 
 ## Deploy the template
 
-Open the template from the **Deploy on Railway** button in the README and fill in the variables:
+Open the [Arcnem Vision template](https://railway.com/deploy/uNnh3M) (also linked from the **Deploy on Railway** button in the README) and fill in the variables:
 
 | Variable | Service | Value |
 | --- | --- | --- |
