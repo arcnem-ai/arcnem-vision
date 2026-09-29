@@ -3,7 +3,8 @@
   "packageManager": "bun@1.4.0",
   "private": true,
   "devDependencies": {
-    "husky": "^9.1.7"
+    "husky": "^9.1.7",
+    "railway": "^3.11.0"
   },
   "scripts": {
     "prepare": "husky"

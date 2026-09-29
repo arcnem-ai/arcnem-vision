@@ -12,6 +12,9 @@
   <a href="https://deepwiki.com/arcnem-ai/arcnem-vision">
     <img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki" />
   </a>
+  <a href="https://railway.com/deploy/uNnh3M">
+    <img src="https://railway.com/button.svg" alt="Deploy on Railway" />
+  </a>
 </p>
 
 <p align="center">
@@ -201,6 +204,12 @@ curl -X POST http://localhost:3000/api/uploads/ack \
 ```
 
 ワークフローキーに紐づいたアップロードでは、3番目の `ack` でドキュメントが作成され、そのキーに設定されたワークフローが `document/process.upload` 経由で実行されます。
+
+## Railwayにデプロイ
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/uNnh3M)
+
+Railwayのテンプレートは、API、ダッシュボード、エージェントとツール、pgvector入りのPostgres、Redis、セルフホストのInngestサーバーをひとつのプロジェクトで動かします。Cloudflare R2などのS3互換バケットと、OpenAIとReplicateのキーを用意してください。最初のデプロイでオーナーのアカウント、組織、スターターワークフローが作成されます。バケットの設定と最初のサインインは[Railwayへのデプロイガイド](server/packages/site/src/content/docs/ja/guides/deploy-railway.md)を参照してください。
 
 ## 必要条件
 

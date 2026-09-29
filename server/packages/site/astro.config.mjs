@@ -72,6 +72,11 @@ export default defineConfig({
 							translations: { ja: "ワークフローのWebhook" },
 							slug: "guides/workflow-webhooks",
 						},
+						{
+							label: "Deploy on Railway",
+							translations: { ja: "Railwayにデプロイ" },
+							slug: "guides/deploy-railway",
+						},
 					],
 				},
 				{
