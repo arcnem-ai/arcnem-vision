@@ -1,4 +1,12 @@
 // LangChain exposes Responses status and raw output in response_metadata.
+// The model refused the request, as opposed to failing to answer it.
+export class OpenAIRefusalError extends Error {
+	constructor() {
+		super("OpenAI declined this request.");
+		this.name = "OpenAIRefusalError";
+	}
+}
+
 export function assertOpenAIResponseComplete(
 	message:
 		| {
@@ -19,6 +27,6 @@ export function assertOpenAIResponseComplete(
 				item.content.some((part: { type?: string }) => part.type === "refusal"),
 		)
 	) {
-		throw new Error("OpenAI declined this request.");
+		throw new OpenAIRefusalError();
 	}
 }

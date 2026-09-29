@@ -10,7 +10,6 @@ import {
 } from "@arcnem-vision/shared";
 import { eq, isNull } from "drizzle-orm";
 import { Hono } from "hono";
-import { z } from "zod";
 import { requireDashboardOrganizationContext } from "@/lib/dashboard-auth";
 import { loadDashboardCatalog } from "@/lib/dashboard-state/catalog";
 import { readValidatedBody } from "@/lib/request-validation";
@@ -20,21 +19,16 @@ import { insertWorkflowGraphFromSnapshot } from "@/lib/workflow-graph-persistenc
 import { createWorkflow, updateWorkflow } from "@/lib/workflow-operations";
 import { buildWorkflowTemplateAccessCondition } from "@/lib/workflow-template-access";
 import type { HonoServerContext } from "@/types/serverContext";
+import {
+	handleDashboardWorkflowError,
+	workflowDraftErrorResponse,
+} from "./errors";
 
 export const dashboardWorkflowRecordsRouter = new Hono<HonoServerContext>({
 	strict: false,
 });
 
-dashboardWorkflowRecordsRouter.onError((error, c) => {
-	if (error instanceof ServiceError)
-		return c.json({ message: error.message }, error.status);
-	if (error instanceof z.ZodError)
-		return c.json(
-			{ message: error.issues[0]?.message ?? "Invalid workflow definition." },
-			400,
-		);
-	throw error;
-});
+dashboardWorkflowRecordsRouter.onError(handleDashboardWorkflowError);
 
 dashboardWorkflowRecordsRouter.post(
 	"/dashboard/workflows/archive",
@@ -111,15 +105,7 @@ dashboardWorkflowRecordsRouter.post(
 
 			return c.json({ draft });
 		} catch (error) {
-			return c.json(
-				{
-					message:
-						error instanceof Error
-							? error.message
-							: "Failed to generate workflow draft.",
-				},
-				400,
-			);
+			return workflowDraftErrorResponse(c, error);
 		}
 	},
 );
@@ -193,19 +179,23 @@ dashboardWorkflowRecordsRouter.post(
 				},
 			});
 			if (!template) {
-				throw new Error(
+				throw new ServiceError(
+					404,
 					"Workflow template not found or not shared with your organization.",
 				);
 			}
 			if (!template.currentVersion) {
-				throw new Error("Workflow template has no current version.");
+				throw new ServiceError(
+					409,
+					"Workflow template has no current version.",
+				);
 			}
 
 			const snapshot = parseWorkflowTemplateSnapshot(
 				template.currentVersion.snapshot,
 			);
 			if (!snapshot) {
-				throw new Error("Workflow template version is invalid.");
+				throw new ServiceError(409, "Workflow template version is invalid.");
 			}
 
 			const existingWorkflowNames = await tx.query.agentGraphs.findMany({

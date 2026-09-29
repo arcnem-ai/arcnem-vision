@@ -9,7 +9,11 @@ import {
 import { ChatOpenAI } from "@langchain/openai";
 import { API_ENV_VAR } from "@/env/apiEnvVar";
 import { getAPIEnvVar } from "@/env/getAPIEnvVar";
-import { assertOpenAIResponseComplete } from "../openai-response";
+import { ServiceError } from "@/lib/service-error";
+import {
+	assertOpenAIResponseComplete,
+	OpenAIRefusalError,
+} from "../openai-response";
 import {
 	buildExecutionModelLookup,
 	buildModelLookup,
@@ -450,7 +454,8 @@ export function materializeGeneratedWorkflowDraft(input: {
 
 	const workerModels = getCompatibleWorkerModels(input.modelCatalog);
 	if (workerModels.length === 0) {
-		throw new Error(
+		throw new ServiceError(
+			409,
 			"No compatible worker models are available for AI generation.",
 		);
 	}
@@ -542,7 +547,8 @@ export async function generateWorkflowDraftFromDescription(input: {
 }) {
 	const workerModels = getCompatibleWorkerModels(input.catalog.modelCatalog);
 	if (workerModels.length === 0) {
-		throw new Error(
+		throw new ServiceError(
+			409,
 			"No compatible worker models are available for AI generation.",
 		);
 	}
@@ -581,13 +587,43 @@ export async function generateWorkflowDraftFromDescription(input: {
 		},
 	]);
 
-	assertOpenAIResponseComplete(generated.raw);
-	return materializeGeneratedWorkflowDraft({
-		generated: generatedWorkflowPlanSchema.parse(generated.parsed),
-		modelCatalog: input.catalog.modelCatalog,
-		toolCatalog: input.catalog.toolCatalog,
-		executionModelCatalog: input.catalog.executionModelCatalog,
-	});
+	return draftFromModelResponse(generated, input.catalog);
+}
+
+// Turns the model's answer into a draft. A refusal or a draft that cannot be
+// built is reported to the user as a ServiceError; an incomplete or malformed
+// response is a generation failure and stays a plain error.
+export function draftFromModelResponse(
+	generated: {
+		raw: Parameters<typeof assertOpenAIResponseComplete>[0];
+		parsed: unknown;
+	},
+	catalog: WorkflowGenerationCatalog,
+) {
+	try {
+		assertOpenAIResponseComplete(generated.raw);
+	} catch (error) {
+		if (error instanceof OpenAIRefusalError)
+			throw new ServiceError(400, error.message);
+		throw error;
+	}
+	const plan = generatedWorkflowPlanSchema.parse(generated.parsed);
+	try {
+		return materializeGeneratedWorkflowDraft({
+			generated: plan,
+			modelCatalog: catalog.modelCatalog,
+			toolCatalog: catalog.toolCatalog,
+			executionModelCatalog: catalog.executionModelCatalog,
+		});
+	} catch (error) {
+		if (error instanceof ServiceError) throw error;
+		throw new ServiceError(
+			400,
+			error instanceof Error
+				? error.message
+				: "The generated draft is invalid.",
+		);
+	}
 }
 
 export { getCompatibleWorkerModels } from "./catalog";

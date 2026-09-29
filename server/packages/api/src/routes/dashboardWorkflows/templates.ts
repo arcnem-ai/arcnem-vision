@@ -13,11 +13,15 @@ import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { requireDashboardOrganizationContext } from "@/lib/dashboard-auth";
 import { readValidatedBody } from "@/lib/request-validation";
+import { ServiceError } from "@/lib/service-error";
 import type { HonoServerContext } from "@/types/serverContext";
+import { handleDashboardWorkflowError } from "./errors";
 
 export const dashboardWorkflowTemplatesRouter = new Hono<HonoServerContext>({
 	strict: false,
 });
+
+dashboardWorkflowTemplatesRouter.onError(handleDashboardWorkflowError);
 
 dashboardWorkflowTemplatesRouter.post(
 	"/dashboard/workflow-templates/archive",
@@ -141,7 +145,7 @@ dashboardWorkflowTemplatesRouter.post(
 				},
 			});
 			if (!sourceWorkflow) {
-				throw new Error("Workflow not found in your organization.");
+				throw new ServiceError(404, "Workflow not found in your organization.");
 			}
 
 			const snapshot = createWorkflowTemplateSnapshot({
@@ -260,13 +264,13 @@ dashboardWorkflowTemplatesRouter.post(
 				},
 			});
 			if (!template) {
-				throw new Error("Template not found in your organization.");
+				throw new ServiceError(404, "Template not found in your organization.");
 			}
 			const currentSnapshot = template.currentVersion
 				? parseWorkflowTemplateSnapshot(template.currentVersion.snapshot)
 				: null;
 			if (!currentSnapshot) {
-				throw new Error("Template has no valid current version.");
+				throw new ServiceError(409, "Template has no valid current version.");
 			}
 
 			const latestVersion = await tx.query.agentGraphTemplateVersions.findFirst(
