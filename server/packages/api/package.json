@@ -3,6 +3,8 @@
 	"type": "module",
 	"scripts": {
 		"dev": "bun run --hot src/index.ts",
+		"bootstrap": "bun src/bootstrap.ts",
+		"deploy:prepare": "sh ../db/migrate.sh && bun src/bootstrap.ts",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {

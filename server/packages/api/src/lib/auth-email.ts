@@ -1,19 +1,35 @@
 import { Resend } from "resend";
-import { isAPIDebugModeEnabled } from "@/env/localOnlySettings";
 
-let resendClient: Resend | null = null;
+// AUTH_EMAIL_DELIVERY decides how sign-in codes reach people:
+// - "resend" emails them (RESEND_API_KEY and TRANSACTIONAL_EMAIL_ADDRESS).
+// - "log" writes them to the API log. Anyone who can read the logs can sign in
+//   as anyone, so use it only for local development or a single-operator
+//   deployment where the operator is the only person with log access.
+type AuthEmailDelivery =
+	| { kind: "resend"; client: Resend; from: string }
+	| { kind: "log" };
 
-function getResendClient() {
+let delivery: AuthEmailDelivery | null = null;
+
+export function requireAuthEmailDelivery(): AuthEmailDelivery {
+	if (delivery) return delivery;
+	const kind = process.env.AUTH_EMAIL_DELIVERY?.trim();
+	if (kind === "log") {
+		delivery = { kind: "log" };
+		return delivery;
+	}
+	if (kind !== "resend") {
+		throw new Error('AUTH_EMAIL_DELIVERY must be set to "resend" or "log"');
+	}
 	const apiKey = process.env.RESEND_API_KEY?.trim();
-	if (!apiKey) {
-		return null;
+	const from = process.env.TRANSACTIONAL_EMAIL_ADDRESS?.trim();
+	if (!apiKey || !from) {
+		throw new Error(
+			'AUTH_EMAIL_DELIVERY="resend" requires RESEND_API_KEY and TRANSACTIONAL_EMAIL_ADDRESS',
+		);
 	}
-
-	if (!resendClient) {
-		resendClient = new Resend(apiKey);
-	}
-
-	return resendClient;
+	delivery = { kind: "resend", client: new Resend(apiKey), from };
+	return delivery;
 }
 
 function buildOTPEmailHTML(otp: string) {
@@ -49,18 +65,10 @@ export async function sendAuthOTPEmail({
 	otp: string;
 	type: "sign-in" | "email-verification" | "forget-password" | "change-email";
 }) {
-	const resend = getResendClient();
-	const from = process.env.TRANSACTIONAL_EMAIL_ADDRESS?.trim();
-
-	if (!resend || !from) {
-		if (isAPIDebugModeEnabled()) {
-			console.info(`[auth] ${type} OTP for ${email}: ${otp}`);
-			return;
-		}
-
-		throw new Error(
-			"RESEND_API_KEY and TRANSACTIONAL_EMAIL_ADDRESS must be configured for email OTP delivery.",
-		);
+	const delivery = requireAuthEmailDelivery();
+	if (delivery.kind === "log") {
+		console.info(`[auth] ${type} OTP for ${email}: ${otp}`);
+		return;
 	}
 
 	const subject =
@@ -68,8 +76,8 @@ export async function sendAuthOTPEmail({
 			? "Your Arcnem Vision sign-in code"
 			: "Your Arcnem Vision verification code";
 
-	const response = await resend.emails.send({
-		from,
+	const response = await delivery.client.emails.send({
+		from: delivery.from,
 		to: email,
 		subject,
 		html: buildOTPEmailHTML(otp),

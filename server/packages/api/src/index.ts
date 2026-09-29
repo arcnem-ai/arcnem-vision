@@ -10,6 +10,7 @@ import { openAPIRouteHandler } from "hono-openapi";
 import { pinoLogger } from "hono-pino";
 import { serve } from "inngest/hono";
 import { auth } from "@/lib/auth";
+import { requireAuthEmailDelivery } from "@/lib/auth-email";
 import { isTrustedOrigin } from "@/lib/auth-origins";
 import { createWebhookDeliveryFunction } from "@/lib/webhooks/deliver";
 import { requireWebhookSecretEncryptionKey } from "@/lib/webhooks/signing";
@@ -39,6 +40,7 @@ const app = new Hono<HonoServerContext>({
 assertLocalOnlySettings();
 const isDebugMode = isAPIDebugModeEnabled();
 requireWebhookSecretEncryptionKey();
+requireAuthEmailDelivery();
 
 app.use(
 	"*",
