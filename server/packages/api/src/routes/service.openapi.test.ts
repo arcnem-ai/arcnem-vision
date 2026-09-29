@@ -33,9 +33,11 @@ describe("service openapi", () => {
 		expect(
 			spec.paths["/service/workflow-executions"]?.post?.responses,
 		).toHaveProperty("409");
-		expect(spec.paths["/service/uploads/ack"]?.post?.responses).toHaveProperty(
-			"409",
-		);
+		for (const status of ["409", "500", "502"]) {
+			expect(
+				spec.paths["/service/uploads/ack"]?.post?.responses,
+			).toHaveProperty(status);
+		}
 		expect(
 			spec.paths["/service/workflow-executions"]?.post?.requestBody,
 		).toMatchObject({

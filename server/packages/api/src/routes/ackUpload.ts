@@ -1,13 +1,12 @@
 import { schema } from "@arcnem-vision/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
-import type { QueueProcessingWithResult } from "@/lib/document-uploads";
 import {
-	acknowledgePresignedUpload,
+	acknowledgeWorkflowUpload,
 	isDocumentVisibility,
 	parseAckRequestBody,
 	readJSONBody,
-	replayAcknowledgedUpload,
+	respondWithAcknowledgement,
 	toDocumentUploadErrorResponse,
 } from "@/lib/document-uploads";
 import { findActiveWorkflowById } from "@/lib/workflow-run-availability";
@@ -35,8 +34,6 @@ ackUploadRouter.post(
 			if (!verifiedKey) throw new Error("Expected API key");
 
 			const dbClient = c.get("dbClient");
-			const s3Client = c.get("s3Client");
-			const inngestClient = c.get("inngestClient");
 			const body = await readJSONBody(c.req);
 			const { objectKey } = parseAckRequestBody(body);
 			console.info("Acknowledging uploaded object", {
@@ -100,55 +97,16 @@ ackUploadRouter.post(
 						verifiedKey.agentGraphId,
 					)
 				: null;
-			const queueProcessing: QueueProcessingWithResult = activeWorkflow
-				? {
-						enabled: true,
-						inngestClient,
-						agentGraphId: activeWorkflow.id,
-					}
-				: {
-						enabled: false,
-						code: "workflow_unavailable",
-					};
 
-			const upload = {
-				...uploadForKey,
-				visibility: uploadForKey.visibility,
-			};
-			// A verified upload is acknowledged again to retry its processing, for
-			// example after the first acknowledgement reported
-			// processing_enqueue_failed. The event ID is stable per document.
-			if (uploadForKey.status === "verified") {
-				const replayed = await replayAcknowledgedUpload({
-					dbClient,
-					upload,
-					queueProcessing,
-				});
-				if (!replayed) {
-					throw new Error("Verified upload is missing its document");
-				}
-				return c.json(replayed);
-			}
-
-			try {
-				return c.json(
-					await acknowledgePresignedUpload({
-						dbClient,
-						s3Client,
-						upload,
-						queueProcessing,
-					}),
-				);
-			} catch (error) {
-				// A concurrent acknowledgement may have verified the upload first.
-				const replayed = await replayAcknowledgedUpload({
-					dbClient,
-					upload,
-					queueProcessing,
-				});
-				if (!replayed) throw error;
-				return c.json(replayed);
-			}
+			return await respondWithAcknowledgement(
+				c,
+				acknowledgeWorkflowUpload(
+					{ ...uploadForKey, visibility: uploadForKey.visibility },
+					activeWorkflow
+						? { enabled: true, agentGraphId: activeWorkflow.id }
+						: { enabled: false, code: "workflow_unavailable" },
+				),
+			);
 		} catch (error) {
 			return toDocumentUploadErrorResponse(
 				c,
