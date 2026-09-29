@@ -1,5 +1,8 @@
-#!/bin/bash
-set -euo pipefail
+#!/bin/sh
+set -eu
+
+# The db package directory, wherever the checkout or image puts it.
+DB_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 echo "Running migrations..."
 
@@ -8,7 +11,7 @@ RETRY_COUNT=0
 
 while true; do
   set +e
-  bun --cwd /app/packages/db -e '
+  bun --cwd "$DB_DIR" -e '
     import { Client } from "pg";
 
     if (!process.env.DATABASE_URL) {
@@ -75,6 +78,6 @@ while true; do
   sleep 2
 done
 
-bun run --cwd /app/packages/db db:migrate
+bun run --cwd "$DB_DIR" db:migrate
 
 echo "Migrations completed successfully!"

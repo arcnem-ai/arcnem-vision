@@ -7,7 +7,7 @@ import {
 	hashAPIKey,
 	resolveAPIKeyPermissions,
 } from "@arcnem-vision/shared";
-import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 const { apikeys } = schema;
 

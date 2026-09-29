@@ -4,6 +4,14 @@ Arcnem Vision follows [semantic versioning](https://semver.org/). Before 1.0, mi
 
 ## Unreleased
 
+### Added
+
+- **Production bootstrap.** `bun run bootstrap` (API package) prepares a fresh deployment after migrations: the model and tool catalog, the first owner with an organization and default project, and a starter workflow. It is idempotent and safe to run from overlapping deploys. `bun run deploy:prepare` waits for the database, migrates, then bootstraps. The local seed now takes its catalog from the same module.
+
+### Changed
+
+- **Sign-in code delivery (breaking).** `AUTH_EMAIL_DELIVERY` is required: `resend` emails codes, `log` writes them to the API log. Codes are no longer logged just because `API_DEBUG` is on.
+
 ### Fixed
 
 - **Agents register with a self-hosted Inngest server (configuration).** A self-hosted server syncs an app by asking it to post its functions back, but the Go SDK replies with them inline, so the agents never registered and uploads were never processed. The agents now register themselves when they start and retry until Inngest accepts them. Set `INNGEST_SERVE_ORIGIN` on the agents to their own origin, the address Inngest uses to reach them.

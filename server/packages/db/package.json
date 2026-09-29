@@ -20,6 +20,10 @@
 		"./schema": {
 			"types": "./src/schema/index.ts",
 			"default": "./src/schema/index.ts"
+		},
+		"./catalog": {
+			"types": "./src/catalog.ts",
+			"default": "./src/catalog.ts"
 		}
 	},
 	"types": "./src/index.ts",
