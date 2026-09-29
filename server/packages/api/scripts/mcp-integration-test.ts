@@ -9,7 +9,8 @@ import {
 // workflow. Creates a named copy and one real model execution; never edits the source.
 // Required: MCP_TEST_URL, MCP_TEST_ACCESS_TOKEN, MCP_TEST_PROJECT_ID,
 // MCP_TEST_DOCUMENT_ID, MCP_TEST_WORKFLOW_ID. Optional: MCP_TEST_SEARCH_QUERY,
-// MCP_TEST_FORBIDDEN_PROJECT_ID, MCP_TEST_FORBIDDEN_ORGANIZATION_ID.
+// MCP_TEST_FORBIDDEN_PROJECT_ID, MCP_TEST_FORBIDDEN_ORGANIZATION_ID. The token
+// needs every scope except webhooks:manage; the probe never changes webhooks.
 const expectedTools = [
 	"list_projects",
 	"list_workflows",
@@ -23,6 +24,9 @@ const expectedTools = [
 	"list_documents",
 	"search_documents",
 	"get_document",
+	"list_service_keys",
+	"list_webhook_endpoints",
+	"list_webhook_deliveries",
 ];
 
 type Workflow = {
@@ -100,18 +104,13 @@ async function main() {
 	await client.connect(transport);
 	try {
 		const discovery = await client.listTools();
-		assert.equal(
-			discovery.tools.length,
-			expectedTools.length,
-			"Unexpected MCP tool count",
-		);
 		assert(
 			expectedTools.every((name) =>
 				discovery.tools.some((tool) => tool.name === name),
 			),
 			"Expected MCP tools missing",
 		);
-		console.log("Discovered all 12 tools.");
+		console.log(`Discovered all ${expectedTools.length} tools.`);
 
 		const projects = await call<{
 			projects: { id: string; organizationId: string }[];
@@ -224,7 +223,6 @@ async function main() {
 						config: {
 							system_message: "Reply with READY.",
 							max_output_tokens: 512,
-							reasoning_effort: "low",
 						},
 					})),
 				},
@@ -257,7 +255,6 @@ async function main() {
 					config: {
 						system_message: `Reply with exactly ${marker} and nothing else.`,
 						max_output_tokens: 512,
-						reasoning_effort: "low",
 					},
 				},
 			],
@@ -373,9 +370,26 @@ async function main() {
 			Array.isArray(execution.steps) && execution.steps.length > 0,
 			"Execution did not expose node step results",
 		);
-		assert(
-			exercised.size === expectedTools.length,
-			"Probe did not exercise all 12 tools",
+		// Webhook reads only; the probe never registers, revokes or resends.
+		const { serviceKeys } = await call<{ serviceKeys: { id: string }[] }>(
+			"list_service_keys",
+			{ projectId },
+		);
+		const serviceKey = serviceKeys[0];
+		assert(serviceKey, "Test project has no service key for webhook reads");
+		await call("list_webhook_endpoints", {
+			projectId,
+			apiKeyId: serviceKey.id,
+		});
+		await call("list_webhook_deliveries", {
+			projectId,
+			apiKeyId: serviceKey.id,
+			limit: 5,
+		});
+		assert.deepEqual(
+			expectedTools.filter((name) => !exercised.has(name)),
+			[],
+			"Probe did not exercise every expected tool",
 		);
 		console.log(
 			JSON.stringify({

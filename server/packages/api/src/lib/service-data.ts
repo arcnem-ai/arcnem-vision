@@ -152,7 +152,8 @@ export async function searchServiceDocuments(
 			);
 		}
 		return parsed;
-	} catch {
+	} catch (error) {
+		console.error("Document search failed", error);
 		throw new ServiceError(502, "Document search failed");
 	}
 }
@@ -191,7 +192,8 @@ export async function readServiceDocumentContext(
 		)
 			throw new Error("Document outside scope");
 		return parsed.documents[0] ?? null;
-	} catch {
+	} catch (error) {
+		console.error("Document context could not be read", error);
 		throw new ServiceError(502, "Document context could not be read");
 	}
 }

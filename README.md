@@ -144,6 +144,7 @@ Add your provider keys:
 
 - **[OpenAI API key](https://platform.openai.com/api-keys)** → `OPENAI_API_KEY` in `models/agents/.env`
 - **Same OpenAI key (recommended)** → `OPENAI_API_KEY` in `server/packages/api/.env` for dashboard collection chat and AI workflow draft generation
+- **Same OpenAI key** → `OPENAI_API_KEY` in `models/mcp/.env` for semantic document search (MCP, the service API and collection chat)
 - **[Replicate API token](https://replicate.com/account/api-tokens)** → `REPLICATE_API_TOKEN` in `models/mcp/.env`
 
 Everything else is wired for local development, including a development-only `WEBHOOK_SECRET_ENCRYPTION_KEY` that the API and seed share. Deployments must generate their own key with `openssl rand -base64 32`. Postgres, Redis, and MinIO come from `docker-compose.yaml`.
