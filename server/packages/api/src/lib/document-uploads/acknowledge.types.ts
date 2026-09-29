@@ -1,5 +1,3 @@
-import type { Inngest } from "inngest";
-
 export const DOCUMENT_VISIBILITIES = ["private", "org", "public"] as const;
 
 export type DocumentVisibility = (typeof DOCUMENT_VISIBILITIES)[number];
@@ -48,25 +46,17 @@ export type VerifiedUploadObject = {
 	lastModifiedAt: Date;
 };
 
-export type QueueProcessingWithoutResult = {
-	enabled: false;
-	code?: undefined;
-};
+// Whether an acknowledgement queues the upload's workflow. When it does not,
+// a code explains why to the caller; without a code no processing result is
+// reported at all.
+export type QueueProcessing =
+	| { enabled: false; code?: UploadProcessingSkippedCode }
+	| { enabled: true; agentGraphId?: string };
 
-export type QueueProcessingWithResult =
-	| {
-			enabled: false;
-			code: UploadProcessingSkippedCode;
-	  }
-	| {
-			enabled: true;
-			inngestClient: Inngest;
-			agentGraphId?: string;
-	  };
-
-export type QueueProcessingOptions =
-	| QueueProcessingWithoutResult
-	| QueueProcessingWithResult;
+// Workflow-key acknowledgements always report what happened to processing.
+export type WorkflowQueueProcessing =
+	| { enabled: false; code: UploadProcessingSkippedCode }
+	| { enabled: true; agentGraphId?: string };
 
 export type AcknowledgedUpload = {
 	status: "verified";

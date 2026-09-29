@@ -1,11 +1,10 @@
 import { schema } from "@arcnem-vision/db";
-import type { PGDB } from "@arcnem-vision/db/server";
 import {
 	createDashboardRealtimeEvent,
 	DASHBOARD_REALTIME_REASON,
 } from "@arcnem-vision/shared";
-import type { S3Client } from "bun";
 import { and, eq } from "drizzle-orm";
+import { Data, Effect } from "effect";
 import {
 	ALLOWED_IMAGE_MIME_TYPES,
 	MAX_UPLOAD_SIZE_BYTES,
@@ -15,337 +14,383 @@ import type {
 	AcknowledgedUpload,
 	AcknowledgedUploadWithProcessing,
 	PendingUpload,
-	QueueProcessingOptions,
-	QueueProcessingWithoutResult,
-	QueueProcessingWithResult,
+	QueueProcessing,
 	VerifiedUploadObject,
+	WorkflowQueueProcessing,
 	WorkflowUploadProcessing,
 } from "./acknowledge.types";
-import { fail } from "./errors";
+import {
+	DatabaseFailed,
+	queryDatabase,
+	UploadDatabase,
+	UploadEvents,
+	UploadStorage,
+} from "./services";
 
 const { documents, presignedUploads } = schema;
 
+// The stored object cannot become a document. Its status and message are what
+// the client receives.
+export class UploadRejected extends Data.TaggedError("UploadRejected")<{
+	status: 400 | 409 | 413;
+	message: string;
+	maxSizeBytes?: number;
+}> {}
+
+// Another acknowledgement verified this upload first. The caller replays that
+// acknowledgement instead of failing.
+export class UploadAlreadyAcknowledged extends Data.TaggedError(
+	"UploadAlreadyAcknowledged",
+)<{ uploadId: string }> {}
+
+// Thrown inside the transaction so it rolls back, then reported as
+// UploadAlreadyAcknowledged.
+class UploadNoLongerIssued extends Error {}
+
+// A document already exists for this object, so another acknowledgement
+// committed first. Drizzle may wrap the driver error, so check its cause too.
+function isDuplicateDocument(error: unknown): boolean {
+	for (let current = error; current; ) {
+		const candidate = current as { code?: string; constraint?: string };
+		if (
+			candidate.code === "23505" &&
+			candidate.constraint === "documents_bucket_object_key_uidx"
+		)
+			return true;
+		current = (current as { cause?: unknown }).cause;
+	}
+	return false;
+}
+
 // Checks the stored object itself: presign only saw the size the client
 // declared, and a presigned PUT does not enforce it.
-export const statUploadedObject = async ({
-	s3Client,
-	objectKey,
-}: {
-	s3Client: S3Client;
-	objectKey: string;
-}): Promise<VerifiedUploadObject> => {
-	const objectStats = (await s3Client.stat(objectKey).catch((error) => {
-		console.error("Failed to stat uploaded object", {
-			objectKey,
-			error,
-		});
-		return fail(404, "Uploaded object not found in storage");
-	})) as {
-		size: number;
-		lastModified: Date;
-		etag: string;
-		type: string;
-	};
+export const statUploadedObject = Effect.fn("statUploadedObject")(function* (
+	objectKey: string,
+) {
+	const storage = yield* UploadStorage;
+	const stats = yield* storage.stat(objectKey);
 
-	if (!Number.isInteger(objectStats.size) || objectStats.size <= 0) {
-		fail(409, "Uploaded object has invalid size");
+	if (!Number.isInteger(stats.size) || stats.size <= 0) {
+		return yield* new UploadRejected({
+			status: 409,
+			message: "Uploaded object has invalid size",
+		});
 	}
 
 	// Checked before the content type, so an oversized object is always deleted.
-	if (objectStats.size > MAX_UPLOAD_SIZE_BYTES) {
+	if (stats.size > MAX_UPLOAD_SIZE_BYTES) {
 		// The object can never become a document, so don't keep it in storage.
-		await s3Client.delete(objectKey).catch((error) => {
-			console.error("Failed to delete oversized upload", { objectKey, error });
-		});
-		fail(
-			413,
-			`Uploaded object exceeds maximum upload size of ${MAX_UPLOAD_SIZE_BYTES} bytes`,
-			{ maxSizeBytes: MAX_UPLOAD_SIZE_BYTES },
+		yield* storage.delete(objectKey).pipe(
+			Effect.catch((error) =>
+				Effect.sync(() =>
+					console.error("Failed to delete oversized upload", {
+						objectKey,
+						error: error.cause,
+					}),
+				),
+			),
 		);
+		return yield* new UploadRejected({
+			status: 413,
+			message: `Uploaded object exceeds maximum upload size of ${MAX_UPLOAD_SIZE_BYTES} bytes`,
+			maxSizeBytes: MAX_UPLOAD_SIZE_BYTES,
+		});
 	}
 
-	const normalizedContentType = objectStats.type.trim().toLowerCase();
-	if (!ALLOWED_IMAGE_MIME_TYPES.has(normalizedContentType)) {
-		fail(400, "Uploaded object is not a supported image type");
+	const contentType = stats.type.trim().toLowerCase();
+	if (!ALLOWED_IMAGE_MIME_TYPES.has(contentType)) {
+		return yield* new UploadRejected({
+			status: 400,
+			message: "Uploaded object is not a supported image type",
+		});
 	}
-
-	if (!objectStats.etag || objectStats.etag.trim().length === 0) {
-		fail(409, "Uploaded object is missing ETag metadata");
+	if (!stats.etag || stats.etag.trim().length === 0) {
+		return yield* new UploadRejected({
+			status: 409,
+			message: "Uploaded object is missing ETag metadata",
+		});
 	}
-
-	if (Number.isNaN(objectStats.lastModified.getTime())) {
-		fail(409, "Uploaded object has invalid lastModified metadata");
+	if (Number.isNaN(stats.lastModified.getTime())) {
+		return yield* new UploadRejected({
+			status: 409,
+			message: "Uploaded object has invalid lastModified metadata",
+		});
 	}
 
 	return {
-		contentType: normalizedContentType,
-		size: objectStats.size,
-		eTag: objectStats.etag,
-		lastModifiedAt: objectStats.lastModified,
-	};
-};
+		contentType,
+		size: stats.size,
+		eTag: stats.etag,
+		lastModifiedAt: stats.lastModified,
+	} satisfies VerifiedUploadObject;
+});
 
-const createDocumentAndVerifyUpload = async ({
-	dbClient,
-	upload,
-	verifiedObject,
-}: {
-	dbClient: PGDB;
-	upload: PendingUpload;
-	verifiedObject: VerifiedUploadObject;
-}): Promise<{ documentId: string; presignedUploadId: string }> => {
-	try {
-		const acknowledgedUpload = await dbClient.transaction(async (tx) => {
-			const [createdDocument] = await tx
-				.insert(documents)
-				.values({
-					bucket: upload.bucket,
-					objectKey: upload.objectKey,
-					contentType: verifiedObject.contentType,
-					eTag: verifiedObject.eTag,
-					sizeBytes: verifiedObject.size,
-					visibility: upload.visibility,
-					lastModifiedAt: verifiedObject.lastModifiedAt,
-					organizationId: upload.organizationId,
-					projectId: upload.projectId,
-					apiKeyId: upload.apiKeyId,
-				})
-				.returning({
-					id: documents.id,
-				});
+const createDocumentAndVerifyUpload = Effect.fn(
+	"createDocumentAndVerifyUpload",
+)(function* (upload: PendingUpload, verifiedObject: VerifiedUploadObject) {
+	const db = yield* UploadDatabase;
+	return yield* Effect.tryPromise({
+		try: () =>
+			db.transaction(async (tx) => {
+				const [createdDocument] = await tx
+					.insert(documents)
+					.values({
+						bucket: upload.bucket,
+						objectKey: upload.objectKey,
+						contentType: verifiedObject.contentType,
+						eTag: verifiedObject.eTag,
+						sizeBytes: verifiedObject.size,
+						visibility: upload.visibility,
+						lastModifiedAt: verifiedObject.lastModifiedAt,
+						organizationId: upload.organizationId,
+						projectId: upload.projectId,
+						apiKeyId: upload.apiKeyId,
+					})
+					.returning({ id: documents.id });
+				if (!createdDocument) throw new Error("Failed to create document");
 
-			if (!createdDocument) {
-				throw new Error("Failed to create document");
-			}
+				const [verifiedUpload] = await tx
+					.update(presignedUploads)
+					.set({ status: "verified" })
+					.where(
+						and(
+							eq(presignedUploads.id, upload.id),
+							eq(presignedUploads.status, "issued"),
+						),
+					)
+					.returning({ id: presignedUploads.id });
+				if (!verifiedUpload) throw new UploadNoLongerIssued();
 
-			const [verifiedUpload] = await tx
-				.update(presignedUploads)
-				.set({ status: "verified" })
-				.where(
-					and(
-						eq(presignedUploads.id, upload.id),
-						eq(presignedUploads.status, "issued"),
-					),
-				)
-				.returning({
-					id: presignedUploads.id,
-				});
-
-			if (!verifiedUpload) {
-				throw new Error("Presigned upload is not in an issued state");
-			}
-
-			return {
-				documentId: createdDocument.id,
-				presignedUploadId: verifiedUpload.id,
-			};
-		});
-
-		return acknowledgedUpload;
-	} catch (error) {
-		console.error("Failed to create document or verify upload", {
-			uploadId: upload.id,
-			objectKey: upload.objectKey,
-			error,
-		});
-		return fail(409, "Failed to acknowledge upload");
-	}
-};
-
-const publishDocumentCreated = async ({
-	organizationId,
-	documentId,
-}: {
-	organizationId: string;
-	documentId: string;
-}) => {
-	await publishDashboardRealtimeEvent(
-		createDashboardRealtimeEvent({
-			reason: DASHBOARD_REALTIME_REASON.documentCreated,
-			organizationId,
-			documentId,
-		}),
+				return {
+					documentId: createdDocument.id,
+					presignedUploadId: verifiedUpload.id,
+				};
+			}),
+		catch: (cause) => cause,
+	}).pipe(
+		Effect.mapError((cause) =>
+			cause instanceof UploadNoLongerIssued || isDuplicateDocument(cause)
+				? new UploadAlreadyAcknowledged({ uploadId: upload.id })
+				: new DatabaseFailed({
+						operation: "create document and verify upload",
+						cause,
+					}),
+		),
 	);
-};
+});
 
-const enqueueDocumentProcessing = async ({
-	dbClient,
-	options,
-	uploadId,
-	documentId,
-	objectKey,
-}: {
-	dbClient: PGDB;
-	options: QueueProcessingOptions;
-	uploadId: string;
-	documentId: string;
-	objectKey: string;
-}): Promise<WorkflowUploadProcessing | null> => {
-	if (!options.enabled) {
-		return options.code
-			? {
-					status: "skipped" as const,
-					code: options.code,
-				}
-			: null;
-	}
+const enqueueDocumentProcessing = Effect.fn("enqueueDocumentProcessing")(
+	function* (
+		queueProcessing: QueueProcessing,
+		upload: { id: string; objectKey: string },
+		documentId: string,
+	) {
+		if (!queueProcessing.enabled) {
+			return queueProcessing.code
+				? ({ status: "skipped", code: queueProcessing.code } as const)
+				: null;
+		}
 
-	try {
-		await options.inngestClient.send({
-			// One stable ID per document, so a repeated acknowledgement can retry a
-			// failed enqueue without queueing the upload twice.
-			id: `document-process-upload-${documentId}`,
-			name: "document/process.upload",
-			data: {
-				document_id: documentId,
-				...(options.agentGraphId
-					? { agent_graph_id: options.agentGraphId }
-					: {}),
-			},
-		});
-	} catch (error) {
-		console.error("Failed to enqueue document processing", {
-			documentId,
-			objectKey,
-			error,
-		});
+		const events = yield* UploadEvents;
+		// One stable ID per document, so a repeated acknowledgement can retry a
+		// failed enqueue without queueing the upload twice.
+		const enqueued = yield* events
+			.send({
+				id: `document-process-upload-${documentId}`,
+				name: "document/process.upload",
+				data: {
+					document_id: documentId,
+					...(queueProcessing.agentGraphId
+						? { agent_graph_id: queueProcessing.agentGraphId }
+						: {}),
+				},
+			})
+			.pipe(
+				Effect.as(true),
+				Effect.catch((error) =>
+					Effect.sync(() => {
+						console.error("Failed to enqueue document processing", {
+							documentId,
+							objectKey: upload.objectKey,
+							error: error.cause,
+						});
+						return false;
+					}),
+				),
+			);
+		if (!enqueued) {
+			return {
+				status: "failed",
+				code: "processing_enqueue_failed",
+			} as const satisfies WorkflowUploadProcessing;
+		}
 
-		return {
-			status: "failed" as const,
-			code: "processing_enqueue_failed" as const,
-		};
-	}
-
-	// If this write fails the acknowledgement fails too, so the client retries
-	// while Inngest's deduplication of the stable event ID still applies.
-	await dbClient
-		.update(presignedUploads)
-		.set({ processingQueuedAt: new Date() })
-		.where(eq(presignedUploads.id, uploadId));
-
-	return {
-		status: "queued" as const,
-	};
-};
+		// If this write fails the acknowledgement fails too, so the client retries
+		// while Inngest's deduplication of the stable event ID still applies.
+		yield* queryDatabase("record queued processing", (db) =>
+			db
+				.update(presignedUploads)
+				.set({ processingQueuedAt: new Date() })
+				.where(eq(presignedUploads.id, upload.id)),
+		);
+		return { status: "queued" } as const satisfies WorkflowUploadProcessing;
+	},
+);
 
 // The document created by an earlier acknowledgement of this upload.
-export async function findAcknowledgedUpload(
-	dbClient: PGDB,
-	upload: Omit<PendingUpload, "visibility">,
-): Promise<AcknowledgedUpload | undefined> {
-	if (!upload.apiKeyId) {
-		return undefined;
-	}
+export const findAcknowledgedUpload = Effect.fn("findAcknowledgedUpload")(
+	function* (upload: Omit<PendingUpload, "visibility">) {
+		const apiKeyId = upload.apiKeyId;
+		if (!apiKeyId) return undefined;
 
-	const [document] = await dbClient
-		.select({ id: documents.id })
-		.from(documents)
-		.where(
-			and(
-				eq(documents.bucket, upload.bucket),
-				eq(documents.objectKey, upload.objectKey),
-				eq(documents.organizationId, upload.organizationId),
-				eq(documents.projectId, upload.projectId),
-				eq(documents.apiKeyId, upload.apiKeyId),
-			),
-		)
-		.limit(1);
-
-	return document
-		? {
-				status: "verified",
-				documentId: document.id,
-				presignedUploadId: upload.id,
-			}
-		: undefined;
-}
+		const [document] = yield* queryDatabase("find acknowledged upload", (db) =>
+			db
+				.select({ id: documents.id })
+				.from(documents)
+				.where(
+					and(
+						eq(documents.bucket, upload.bucket),
+						eq(documents.objectKey, upload.objectKey),
+						eq(documents.organizationId, upload.organizationId),
+						eq(documents.projectId, upload.projectId),
+						eq(documents.apiKeyId, apiKeyId),
+					),
+				)
+				.limit(1),
+		);
+		return document
+			? ({
+					status: "verified",
+					documentId: document.id,
+					presignedUploadId: upload.id,
+				} satisfies AcknowledgedUpload)
+			: undefined;
+	},
+);
 
 // Repeats the processing step for an upload that was already acknowledged,
 // such as after the first acknowledgement failed to enqueue it.
-export async function replayAcknowledgedUpload({
-	dbClient,
-	upload,
-	queueProcessing,
-}: {
-	dbClient: PGDB;
-	upload: PendingUpload & { processingQueuedAt: Date | null };
-	queueProcessing: QueueProcessingWithResult;
-}): Promise<AcknowledgedUploadWithProcessing | undefined> {
-	const acknowledged = await findAcknowledgedUpload(dbClient, upload);
-	if (!acknowledged) {
-		return undefined;
-	}
+export const replayAcknowledgedUpload = Effect.fn("replayAcknowledgedUpload")(
+	function* (
+		upload: PendingUpload & { processingQueuedAt: Date | null },
+		queueProcessing: QueueProcessing,
+	) {
+		const acknowledged = yield* findAcknowledgedUpload(upload);
+		if (!acknowledged) return undefined;
 
-	// Inngest only deduplicates event IDs for 24 hours, so an upload whose
-	// processing was queued is never sent again.
-	if (upload.processingQueuedAt) {
-		return { ...acknowledged, processing: { status: "queued" } };
-	}
+		// Inngest only deduplicates event IDs for 24 hours, so an upload whose
+		// processing was queued is never sent again.
+		if (upload.processingQueuedAt) {
+			return { ...acknowledged, processing: { status: "queued" } } as const;
+		}
+		const processing = yield* enqueueDocumentProcessing(
+			queueProcessing,
+			upload,
+			acknowledged.documentId,
+		);
+		return processing ? { ...acknowledged, processing } : acknowledged;
+	},
+);
 
-	const processing = await enqueueDocumentProcessing({
-		dbClient,
-		options: queueProcessing,
-		uploadId: upload.id,
-		documentId: acknowledged.documentId,
-		objectKey: upload.objectKey,
-	});
-	if (!processing) {
-		throw new Error("Expected an upload processing result");
-	}
-
-	return { ...acknowledged, processing };
-}
-
-export function acknowledgePresignedUpload(args: {
-	dbClient: PGDB;
-	s3Client: S3Client;
-	upload: PendingUpload;
-	queueProcessing: QueueProcessingWithoutResult;
-}): Promise<AcknowledgedUpload>;
-export function acknowledgePresignedUpload(args: {
-	dbClient: PGDB;
-	s3Client: S3Client;
-	upload: PendingUpload;
-	queueProcessing: QueueProcessingWithResult;
-}): Promise<AcknowledgedUploadWithProcessing>;
-export async function acknowledgePresignedUpload({
-	dbClient,
-	s3Client,
-	upload,
-	queueProcessing,
-}: {
-	dbClient: PGDB;
-	s3Client: S3Client;
-	upload: PendingUpload;
-	queueProcessing: QueueProcessingOptions;
-}): Promise<AcknowledgedUpload | AcknowledgedUploadWithProcessing> {
-	const verifiedObject = await statUploadedObject({
-		s3Client,
-		objectKey: upload.objectKey,
-	});
-	const acknowledgedUpload = await createDocumentAndVerifyUpload({
-		dbClient,
+// Turns a verified upload into a document and queues its processing.
+export const acknowledgePresignedUpload = Effect.fn(
+	"acknowledgePresignedUpload",
+)(function* (upload: PendingUpload, queueProcessing: QueueProcessing) {
+	const verifiedObject = yield* statUploadedObject(upload.objectKey);
+	const acknowledged = yield* createDocumentAndVerifyUpload(
 		upload,
 		verifiedObject,
-	});
+	);
 
-	await publishDocumentCreated({
-		organizationId: upload.organizationId,
-		documentId: acknowledgedUpload.documentId,
-	});
+	yield* Effect.promise(() =>
+		publishDashboardRealtimeEvent(
+			createDashboardRealtimeEvent({
+				reason: DASHBOARD_REALTIME_REASON.documentCreated,
+				organizationId: upload.organizationId,
+				documentId: acknowledged.documentId,
+			}),
+		),
+	);
 
-	const processing = await enqueueDocumentProcessing({
-		dbClient,
-		options: queueProcessing,
-		uploadId: upload.id,
-		documentId: acknowledgedUpload.documentId,
-		objectKey: upload.objectKey,
-	});
-
+	const processing = yield* enqueueDocumentProcessing(
+		queueProcessing,
+		upload,
+		acknowledged.documentId,
+	);
 	return {
 		status: "verified",
-		documentId: acknowledgedUpload.documentId,
-		presignedUploadId: acknowledgedUpload.presignedUploadId,
+		documentId: acknowledged.documentId,
+		presignedUploadId: acknowledged.presignedUploadId,
 		...(processing ? { processing } : {}),
-	};
-}
+	} as AcknowledgedUpload & { processing?: WorkflowUploadProcessing };
+});
+
+const missingDocument = Effect.die(
+	new Error("Verified upload is missing its document"),
+);
+
+// Workflow-key acknowledgement. A verified upload is acknowledged again to
+// retry its processing, for example after the first acknowledgement reported
+// processing_enqueue_failed; the event ID is stable per document.
+export const acknowledgeWorkflowUpload = Effect.fn("acknowledgeWorkflowUpload")(
+	function* (
+		upload: PendingUpload & {
+			status: string;
+			processingQueuedAt: Date | null;
+		},
+		queueProcessing: WorkflowQueueProcessing,
+	) {
+		const replay = replayAcknowledgedUpload(upload, queueProcessing).pipe(
+			Effect.flatMap((replayed) =>
+				replayed ? Effect.succeed(replayed) : missingDocument,
+			),
+		);
+		if (upload.status === "verified") {
+			return (yield* replay) as AcknowledgedUploadWithProcessing;
+		}
+		return (yield* acknowledgePresignedUpload(upload, queueProcessing).pipe(
+			Effect.catchTag("UploadAlreadyAcknowledged", () => replay),
+		)) as AcknowledgedUploadWithProcessing;
+	},
+);
+
+// Service-key acknowledgement. It never queues processing; the caller runs
+// workflows explicitly.
+export const acknowledgeServiceUpload = Effect.fn("acknowledgeServiceUpload")(
+	function* (upload: PendingUpload & { status: string }) {
+		const existing = yield* findAcknowledgedUpload(upload);
+		if (existing) return existing;
+		if (upload.status !== "issued") return yield* missingDocument;
+
+		return yield* acknowledgePresignedUpload(upload, { enabled: false }).pipe(
+			Effect.map(
+				({ status, documentId, presignedUploadId }): AcknowledgedUpload => ({
+					status,
+					documentId,
+					presignedUploadId,
+				}),
+			),
+			Effect.catchTag("UploadAlreadyAcknowledged", () =>
+				findAcknowledgedUpload(upload).pipe(
+					Effect.flatMap((found) =>
+						found ? Effect.succeed(found) : missingDocument,
+					),
+				),
+			),
+		);
+	},
+);
+
+// Dashboard acknowledgement. Dashboard uploads are acknowledged once and never
+// replayed, so a concurrent second acknowledgement is a conflict.
+export const acknowledgeDashboardUpload = (upload: PendingUpload) =>
+	acknowledgePresignedUpload(upload, { enabled: false }).pipe(
+		Effect.catchTag("UploadAlreadyAcknowledged", () =>
+			Effect.fail(
+				new UploadRejected({
+					status: 409,
+					message: "Upload was already acknowledged",
+				}),
+			),
+		),
+	);

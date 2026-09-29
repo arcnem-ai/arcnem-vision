@@ -6,12 +6,13 @@ import {
 	hasDashboardOrganizationAccess,
 } from "@/lib/dashboard-documents";
 import {
-	acknowledgePresignedUpload,
+	acknowledgeDashboardUpload,
 	isDocumentVisibility,
 	issuePresignedUpload,
 	parseAckRequestBody,
 	parsePresignRequestBody,
 	readJSONBody,
+	respondWithAcknowledgement,
 	toDocumentUploadErrorResponse,
 } from "@/lib/document-uploads";
 import { requireSession } from "@/middleware/requireSession";
@@ -103,36 +104,29 @@ export function registerDashboardDocumentUploadRoutes(
 				return c.json({ message: "Upload has invalid visibility" }, 500);
 			}
 
-			const acknowledgedUpload = await acknowledgePresignedUpload({
-				dbClient,
-				s3Client: c.get("s3Client"),
-				upload: {
+			return await respondWithAcknowledgement(
+				c,
+				acknowledgeDashboardUpload({
 					...uploadForKey,
 					visibility: uploadForKey.visibility,
+				}),
+				async (acknowledgedUpload) => {
+					const document = await findDashboardDocumentById(
+						c,
+						acknowledgedUpload.documentId,
+					);
+					if (!document) {
+						return c.json(
+							{
+								message:
+									"Upload was acknowledged but the document could not be loaded",
+							},
+							500,
+						);
+					}
+					return c.json({ ...acknowledgedUpload, document });
 				},
-				queueProcessing: {
-					enabled: false,
-				},
-			});
-			const document = await findDashboardDocumentById(
-				c,
-				acknowledgedUpload.documentId,
 			);
-
-			if (!document) {
-				return c.json(
-					{
-						message:
-							"Upload was acknowledged but the document could not be loaded",
-					},
-					500,
-				);
-			}
-
-			return c.json({
-				...acknowledgedUpload,
-				document,
-			});
 		} catch (error) {
 			return toDocumentUploadErrorResponse(
 				c,

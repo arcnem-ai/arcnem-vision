@@ -2,14 +2,21 @@ import { describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { schema } from "@arcnem-vision/db";
 import type { PGDB } from "@arcnem-vision/db/server";
-import type { S3Client } from "bun";
 import { eq, TransactionRollbackError } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
-import type { Inngest } from "inngest";
+import { Effect, Layer } from "effect";
 import {
 	acknowledgePresignedUpload,
+	acknowledgeWorkflowUpload,
 	replayAcknowledgedUpload,
 } from "./acknowledge";
+import {
+	EnqueueFailed,
+	UploadDatabase,
+	type UploadEvent,
+	UploadEvents,
+	UploadStorage,
+} from "./services";
 
 // TEST_DATABASE_URL enables this check against a migrated PostgreSQL database.
 // Every test runs in a transaction that is rolled back.
@@ -76,14 +83,19 @@ async function seedIssuedUpload(db: PGDB) {
 	return { ...upload, visibility: "org" as const };
 }
 
-const storage = {
-	stat: async () => ({
-		size: 1024,
-		lastModified: new Date("2026-09-01T00:00:00Z"),
-		etag: '"etag"',
-		type: "image/png",
+const storage = Layer.succeed(
+	UploadStorage,
+	UploadStorage.of({
+		stat: () =>
+			Effect.succeed({
+				size: 1024,
+				lastModified: new Date("2026-09-01T00:00:00Z"),
+				etag: '"etag"',
+				type: "image/png",
+			}),
+		delete: () => Effect.void,
 	}),
-} as unknown as S3Client;
+);
 
 async function readUpload(db: PGDB, id: string) {
 	const [row] = await db
@@ -94,33 +106,59 @@ async function readUpload(db: PGDB, id: string) {
 	return { ...row, visibility: "org" as const };
 }
 
-function recordingInngest(failures: number) {
-	const sent: { id?: string; name: string }[] = [];
+function recordingEvents(failures: number) {
+	const sent: UploadEvent[] = [];
 	let remainingFailures = failures;
-	const inngestClient = {
-		send: async (event: { id?: string; name: string }) => {
-			if (remainingFailures > 0) {
-				remainingFailures -= 1;
-				throw new Error("Inngest unavailable");
-			}
-			sent.push(event);
-		},
-	} as unknown as Inngest;
-	return { sent, queueProcessing: { enabled: true as const, inngestClient } };
+	const layer = Layer.succeed(
+		UploadEvents,
+		UploadEvents.of({
+			send: (event) =>
+				Effect.suspend(() => {
+					if (remainingFailures > 0) {
+						remainingFailures -= 1;
+						return Effect.fail(
+							new EnqueueFailed({
+								eventId: event.id,
+								cause: new Error("Inngest unavailable"),
+							}),
+						);
+					}
+					sent.push(event);
+					return Effect.void;
+				}),
+		}),
+	);
+	return { sent, layer };
+}
+
+const queueProcessing = { enabled: true as const };
+
+function run<A, E>(
+	db: PGDB,
+	events: Layer.Layer<UploadEvents>,
+	effect: Effect.Effect<A, E, UploadStorage | UploadDatabase | UploadEvents>,
+) {
+	return Effect.runPromise(
+		effect.pipe(
+			Effect.provide(
+				Layer.mergeAll(storage, events, Layer.succeed(UploadDatabase, db)),
+			),
+		),
+	);
 }
 
 describePostgres("workflow-key upload acknowledgement", () => {
 	test("a repeated acknowledgement retries a failed enqueue once", async () => {
 		await withRollback(async (db) => {
 			const upload = await seedIssuedUpload(db);
-			const { sent, queueProcessing } = recordingInngest(1);
+			const events = recordingEvents(1);
+			const { sent } = events;
 
-			const first = await acknowledgePresignedUpload({
-				dbClient: db,
-				s3Client: storage,
-				upload,
-				queueProcessing,
-			});
+			const first = await run(
+				db,
+				events.layer,
+				acknowledgePresignedUpload(upload, queueProcessing),
+			);
 			expect(first.processing).toEqual({
 				status: "failed",
 				code: "processing_enqueue_failed",
@@ -129,11 +167,11 @@ describePostgres("workflow-key upload acknowledgement", () => {
 			expect(afterFailure.status).toBe("verified");
 			expect(afterFailure.processingQueuedAt).toBeNull();
 
-			const retried = await replayAcknowledgedUpload({
-				dbClient: db,
-				upload: afterFailure,
-				queueProcessing,
-			});
+			const retried = await run(
+				db,
+				events.layer,
+				replayAcknowledgedUpload(afterFailure, queueProcessing),
+			);
 			expect(retried).toEqual({
 				status: "verified",
 				documentId: first.documentId,
@@ -146,12 +184,15 @@ describePostgres("workflow-key upload acknowledgement", () => {
 
 			// Once queued, later acknowledgements never send again, even after
 			// Inngest's deduplication window.
-			const again = await replayAcknowledgedUpload({
-				dbClient: db,
-				upload: await readUpload(db, upload.id),
-				queueProcessing,
-			});
-			expect(again?.processing).toEqual({ status: "queued" });
+			const again = await run(
+				db,
+				events.layer,
+				replayAcknowledgedUpload(
+					await readUpload(db, upload.id),
+					queueProcessing,
+				),
+			);
+			expect(again).toMatchObject({ processing: { status: "queued" } });
 			expect(sent).toHaveLength(1);
 			expect(
 				await db
@@ -165,22 +206,22 @@ describePostgres("workflow-key upload acknowledgement", () => {
 	test("a successful first acknowledgement records that processing was queued", async () => {
 		await withRollback(async (db) => {
 			const upload = await seedIssuedUpload(db);
-			const { sent, queueProcessing } = recordingInngest(0);
+			const events = recordingEvents(0);
+			const { sent } = events;
 
-			await acknowledgePresignedUpload({
-				dbClient: db,
-				s3Client: storage,
-				upload,
-				queueProcessing,
-			});
+			await run(
+				db,
+				events.layer,
+				acknowledgePresignedUpload(upload, queueProcessing),
+			);
 			const verified = await readUpload(db, upload.id);
 			expect(verified.processingQueuedAt).toBeInstanceOf(Date);
 
-			await replayAcknowledgedUpload({
-				dbClient: db,
-				upload: verified,
-				queueProcessing,
-			});
+			await run(
+				db,
+				events.layer,
+				replayAcknowledgedUpload(verified, queueProcessing),
+			);
 			expect(sent).toHaveLength(1);
 		});
 	});
@@ -189,15 +230,50 @@ describePostgres("workflow-key upload acknowledgement", () => {
 		await withRollback(async (db) => {
 			const upload = await seedIssuedUpload(db);
 			expect(
-				await replayAcknowledgedUpload({
-					dbClient: db,
-					upload: await readUpload(db, upload.id),
-					queueProcessing: {
+				await run(
+					db,
+					recordingEvents(0).layer,
+					replayAcknowledgedUpload(await readUpload(db, upload.id), {
 						enabled: false,
 						code: "workflow_unavailable",
-					},
-				}),
+					}),
+				),
 			).toBeUndefined();
+		});
+	});
+
+	test("an acknowledgement that loses the race replays the winner's result", async () => {
+		await withRollback(async (db) => {
+			const upload = await seedIssuedUpload(db);
+			const events = recordingEvents(0);
+
+			const winner = await run(
+				db,
+				events.layer,
+				acknowledgePresignedUpload(upload, queueProcessing),
+			);
+			// The loser read the upload while it was still issued.
+			const loser = await run(
+				db,
+				events.layer,
+				acknowledgeWorkflowUpload(
+					{ ...upload, status: "issued", processingQueuedAt: null },
+					queueProcessing,
+				),
+			);
+
+			expect(loser).toEqual({
+				status: "verified",
+				documentId: winner.documentId,
+				presignedUploadId: upload.id,
+				processing: { status: "queued" },
+			});
+			expect(
+				await db
+					.select()
+					.from(schema.documents)
+					.where(eq(schema.documents.objectKey, upload.objectKey)),
+			).toHaveLength(1);
 		});
 	});
 });

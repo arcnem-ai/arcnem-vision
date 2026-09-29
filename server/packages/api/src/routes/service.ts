@@ -21,12 +21,12 @@ import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { Hono, type Context as HonoContext } from "hono";
 import { describeRoute, resolver, validator } from "hono-openapi";
 import {
-	acknowledgePresignedUpload,
-	findAcknowledgedUpload,
+	acknowledgeServiceUpload,
 	isDocumentVisibility,
 	issuePresignedUpload,
 	parseAckRequestBody,
 	parsePresignRequestBody,
+	respondWithAcknowledgement,
 	toDocumentUploadErrorResponse,
 } from "@/lib/document-uploads";
 import {
@@ -239,6 +239,14 @@ serviceRouter.post(
 				description: "Uploaded object exceeds the maximum upload size",
 				content: { "application/json": { schema: jsonErrorSchema } },
 			},
+			500: {
+				description: "The upload could not be recorded; retry",
+				content: { "application/json": { schema: jsonErrorSchema } },
+			},
+			502: {
+				description: "Storage is unavailable; retry",
+				content: { "application/json": { schema: jsonErrorSchema } },
+			},
 		},
 	}),
 	requireAPIKey,
@@ -257,7 +265,6 @@ serviceRouter.post(
 			}
 
 			const dbClient = c.get("dbClient");
-			const s3Client = c.get("s3Client");
 			const body = c.req.valid("json");
 			const { objectKey } = parseAckRequestBody(body);
 			const { idempotencyKey } = body;
@@ -326,39 +333,13 @@ serviceRouter.post(
 				return c.json({ message: "Upload has invalid visibility" }, 500);
 			}
 
-			let acknowledgedUpload = await findAcknowledgedUpload(
-				dbClient,
-				uploadForKey,
+			return await respondWithAcknowledgement(
+				c,
+				acknowledgeServiceUpload({
+					...uploadForKey,
+					visibility: uploadForKey.visibility,
+				}),
 			);
-			if (!acknowledgedUpload && uploadForKey.status === "issued") {
-				try {
-					acknowledgedUpload = await acknowledgePresignedUpload({
-						dbClient,
-						s3Client,
-						upload: {
-							...uploadForKey,
-							visibility: uploadForKey.visibility,
-						},
-						queueProcessing: {
-							enabled: false,
-						},
-					});
-				} catch (error) {
-					acknowledgedUpload = await findAcknowledgedUpload(
-						dbClient,
-						uploadForKey,
-					);
-					if (!acknowledgedUpload) {
-						throw error;
-					}
-				}
-			}
-
-			if (!acknowledgedUpload) {
-				throw new Error("Verified upload is missing its document");
-			}
-
-			return c.json(acknowledgedUpload);
 		} catch (error) {
 			return toDocumentUploadErrorResponse(
 				c,
