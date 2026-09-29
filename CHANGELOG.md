@@ -2,7 +2,14 @@
 
 Arcnem Vision follows [semantic versioning](https://semver.org/). Before 1.0, minor releases may include breaking changes, which are called out here.
 
-## Unreleased
+## 0.2.0 (2026-09-29)
+
+One-click deployment on Railway, and what a fresh deployment needs to run: a production bootstrap and agents that register with a self-hosted Inngest server.
+
+### Upgrading from 0.1.0
+
+- Set `AUTH_EMAIL_DELIVERY` on the API to `resend` or `log`. The API refuses to start without it.
+- Set `INNGEST_SERVE_ORIGIN` on the agents to their own origin, as Inngest reaches them. Leave `INNGEST_DEV` unset in deployments; the agents refuse `0` and `false`.
 
 ### Added
 
