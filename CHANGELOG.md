@@ -2,7 +2,7 @@
 
 Arcnem Vision follows [semantic versioning](https://semver.org/). Before 1.0, minor releases may include breaking changes, which are called out here.
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-09-29)
 
 The first tagged release. It covers the core service: image ingestion, configurable agent workflows, the operator dashboard, and the ways other systems connect to them.
 
@@ -28,6 +28,7 @@ The first tagged release. It covers the core service: image ingestion, configura
 - **Dashboard.** Closing a tab now closes the API realtime and chat streams behind it. Only content-hashed assets are cached as immutable.
 - **Database.** Enum-style CHECK constraints are dropped (migration `0015`). `presigned_uploads.processing_queued_at` is added (migration `0016`).
 - **CI.** CI runs lint, type checks, the database- and Redis-backed tests, the dashboard build and every Docker image.
+- **Quickstart.** `OPENAI_API_KEY` belongs in `models/mcp/.env` too; semantic search runs in the MCP service.
 
 ### Known limitations
 

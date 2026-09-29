@@ -37,6 +37,7 @@ cp models/mcp/.env.example          models/mcp/.env
 
 - **[OpenAI APIキー](https://platform.openai.com/api-keys)** → `models/agents/.env` の `OPENAI_API_KEY`
 - **同じOpenAIキーを使う場合（推奨）** → ダッシュボードのコレクションチャットとAIワークフロー下書き生成用に `server/packages/api/.env` の `OPENAI_API_KEY`
+- **同じOpenAIキー** → 意味検索（MCP、サービスAPI、コレクションチャット）用に `models/mcp/.env` の `OPENAI_API_KEY`
 - **[Replicate APIトークン](https://replicate.com/account/api-tokens)** → `models/mcp/.env` の `REPLICATE_API_TOKEN`
 
 それ以外はローカル開発向けにほぼ初期設定済みです。Postgres、Redis、MinIO は `docker-compose.yaml` から起動されます。
