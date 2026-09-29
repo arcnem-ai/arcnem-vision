@@ -2,6 +2,12 @@
 
 Arcnem Vision follows [semantic versioning](https://semver.org/). Before 1.0, minor releases may include breaking changes, which are called out here.
 
+## Unreleased
+
+### Fixed
+
+- **Agents register with a self-hosted Inngest server (configuration).** A self-hosted server syncs an app by asking it to post its functions back, but the Go SDK replies with them inline, so the agents never registered and uploads were never processed. The agents now register themselves when they start and retry until Inngest accepts them. Set `INNGEST_SERVE_ORIGIN` on the agents to their own origin, the address Inngest uses to reach them.
+
 ## 0.1.0 (2026-09-29)
 
 The first tagged release. It covers the core service: image ingestion, configurable agent workflows, the operator dashboard, and the ways other systems connect to them.
