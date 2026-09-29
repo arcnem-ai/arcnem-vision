@@ -46,9 +46,15 @@ func StartServer() error {
 
 	jobs.RegisterJobs(inngestClient, dbClient, s3Client, mcpClient)
 
-	router.POST("/api/inngest", gin.WrapH(inngestClient.Serve()))
-	router.GET("/api/inngest", gin.WrapH(inngestClient.Serve()))
-	router.PUT("/api/inngest", gin.WrapH(inngestClient.Serve()))
+	inngestHandler, err := clients.NewInngestHandler(inngestClient)
+	if err != nil {
+		return err
+	}
+	publicInngestHandler := gin.WrapH(clients.RequireSignedInngestSync(inngestHandler))
+	router.POST(clients.InngestServePath, publicInngestHandler)
+	router.GET(clients.InngestServePath, publicInngestHandler)
+	router.PUT(clients.InngestServePath, publicInngestHandler)
+	go clients.SyncInngestFunctions(ctx, inngestHandler)
 
 	return router.Run()
 }
