@@ -7,6 +7,7 @@ Arcnem Vision follows [semantic versioning](https://semver.org/). Before 1.0, mi
 ### Added
 
 - **Production bootstrap.** `bun run bootstrap` (API package) prepares a fresh deployment after migrations: the model and tool catalog, the first owner with an organization and default project, and a starter workflow. It is idempotent and safe to run from overlapping deploys. `bun run deploy:prepare` waits for the database, migrates, then bootstraps. The local seed now takes its catalog from the same module.
+- **Deploy on Railway.** A Railway template runs the whole service in one project: the API, dashboard, agents and tools, Postgres with pgvector, Redis, and a self-hosted Inngest server. You bring an S3-compatible bucket and your OpenAI and Replicate keys. The first deploy creates the owner, organization and starter workflow. See the new Deploy on Railway guide.
 
 ### Changed
 
