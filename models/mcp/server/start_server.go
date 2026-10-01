@@ -48,7 +48,7 @@ func newStreamableHTTPHandler(server *mcp.Server) http.Handler {
 
 // mcpServerVersion is the Arcnem Vision release; it must match "version" in
 // server/package.json, which a server test checks.
-const mcpServerVersion = "0.2.0"
+const mcpServerVersion = "0.2.1"
 
 func StartServer() error {
 	if err := env.LoadEnv(); err != nil {
