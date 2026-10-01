@@ -1,6 +1,6 @@
 {
 	"name": "arcnem-vision-docs",
-	"packageManager": "bun@1.4.0",
+	"packageManager": "bun@1.4.2",
 	"type": "module",
 	"version": "0.0.1",
 	"scripts": {
@@ -10,8 +10,8 @@
 		"astro": "astro"
 	},
 	"dependencies": {
-		"@astrojs/starlight": "^0.41.7",
-		"astro": "^7.2.4",
-		"sharp": "^0.35.3"
+		"@astrojs/starlight": "^0.42.4",
+		"astro": "^7.3.5",
+		"sharp": "^0.35.5"
 	}
 }

@@ -29,9 +29,9 @@
 	"types": "./src/index.ts",
 	"dependencies": {
 		"@arcnem-vision/shared": "workspace:*",
-		"drizzle-kit": "0.31.10",
-		"drizzle-orm": "0.45.2",
-		"pg": "^8.23.0"
+		"drizzle-kit": "0.31.11",
+		"drizzle-orm": "0.45.3",
+		"pg": "^8.23.1"
 	},
 	"devDependencies": {
 		"@types/pg": "^8.23.1"

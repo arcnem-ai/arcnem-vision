@@ -1,7 +1,7 @@
 {
 	"name": "@arcnem-vision/shared",
 	"dependencies": {
-		"zod": "^4.5.4"
+		"zod": "^4.6.5"
 	},
 	"type": "module",
 	"scripts": {

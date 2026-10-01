@@ -36,7 +36,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
       redis:
-        image: redis:8.10.0-alpine
+        image: redis:8.10.2-alpine
         ports:
           - 6379:6379
         options: >-
@@ -54,7 +54,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.0
+          bun-version: 1.4.2
 
       - name: Install Bun dependencies
         run: bun install --frozen-lockfile
