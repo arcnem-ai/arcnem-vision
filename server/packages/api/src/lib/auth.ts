@@ -25,7 +25,6 @@ const authFeatureFlags = getAuthFeatureFlags();
 
 export const auth = betterAuth({
 	baseURL: getAPIEnvVar("BETTER_AUTH_BASE_URL"),
-	experimental: { joins: true },
 	verification: { storeInDatabase: true },
 	session: {
 		storeSessionInDatabase: true,
@@ -70,6 +69,7 @@ export const auth = betterAuth({
 	advanced: {
 		database: {
 			generateId: false,
+			joins: true,
 		},
 	},
 	database: drizzleAdapter(db, {

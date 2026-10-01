@@ -441,7 +441,7 @@ live-service-test: live-service-stack-up
 		--env DATABASE_URL='$(LIVE_SERVICE_DB_URL_CONTAINER)' \
 		$(LIVE_SERVICE_NETWORK_ARGS) \
 		$(LOCAL_DOCKER_ARGS) \
-		oven/bun:1.4.0 \
+		oven/bun:1.4.2 \
 		bun -e 'import { getDB } from "./packages/db/src/server"; const db = getDB(); const workflow = await db.query.agentGraphs.findFirst({ where: (row, { eq }) => eq(row.name, "$(LIVE_SERVICE_WORKFLOW_NAME)"), columns: { id: true } }); if (!workflow) { throw new Error("Workflow not found: $(LIVE_SERVICE_WORKFLOW_NAME)"); } console.log(workflow.id);')"; \
 	test -n "$$workflow_id"; \
 	$(DOCKER) run --rm \
@@ -454,7 +454,7 @@ live-service-test: live-service-stack-up
 		--env S3_PUBLIC_BASE_URL='$(LIVE_SERVICE_S3_PUBLIC_BASE_URL_CONTAINER)' \
 		$(LIVE_SERVICE_NETWORK_ARGS) \
 		$(LOCAL_DOCKER_ARGS) \
-		oven/bun:1.4.0 \
+		oven/bun:1.4.2 \
 		bun run test:live:service-api
 
 run-all:

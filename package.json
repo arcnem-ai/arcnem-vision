@@ -1,10 +1,10 @@
 {
   "name": "arcnem-vision-monorepo",
-  "packageManager": "bun@1.4.0",
+  "packageManager": "bun@1.4.2",
   "private": true,
   "devDependencies": {
     "husky": "^9.1.7",
-    "railway": "^3.11.0"
+    "railway": "^3.12.0"
   },
   "scripts": {
     "prepare": "husky"
