@@ -2,6 +2,25 @@
 
 Arcnem Vision follows [semantic versioning](https://semver.org/). Before 1.0, minor releases may include breaking changes, which are called out here.
 
+## 0.2.1 (2026-10-01)
+
+Accurate errors from upload acknowledgement and the dashboard workflow routes, and current dependencies, including the stable Effect 4.0 release.
+
+### Upgrading from 0.2.0
+
+- No configuration or migration changes.
+- Service clients should retry an upload acknowledgement that returns 502. Storage failures used to return 404.
+
+### Changed
+
+- **Dependencies.** Effect 4.0.0 (previously a release candidate), Better Auth 1.7.7, TanStack AI 0.63, the MCP SDKs (TypeScript 2.2, Go 1.8), Hono 4.13.12, Inngest 4.21 and current Go modules. Runtimes and images: Bun 1.4.2, Go 1.27.1, Alpine 3.24 and Redis 8.10.2.
+- **Railway template link.** The READMEs and the Deploy on Railway guide link to the published template, https://railway.com/deploy/arcnem-vision.
+
+### Fixed
+
+- **Upload acknowledgement reports storage and database failures accurately.** A storage outage or credential error returned 404 "Uploaded object not found"; it now returns 502 "Storage is unavailable. Please retry." A stalled storage call times out after 10 seconds instead of holding the request open. A database failure returned 409 and now returns 500. Only a concurrent acknowledgement replays the earlier result, so 400 and 413 rejections are no longer replayed. The service OpenAPI document lists the retryable failures.
+- **Dashboard workflow errors carry the right status.** A missing or unshared template returns 404 instead of 500, and a template without a usable version returns 409. Workflow draft generation returns 502 for provider failures instead of 400, without passing provider error text to the browser.
+
 ## 0.2.0 (2026-09-29)
 
 One-click deployment on Railway, and what a fresh deployment needs to run: a production bootstrap and agents that register with a self-hosted Inngest server.
